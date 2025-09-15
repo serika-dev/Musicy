@@ -1,0 +1,364 @@
+// Musicy - Lossless Music Streaming Platform Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String?  @unique
+  password     String?  // For credentials login
+  displayName  String?
+  avatarUrl    String?
+  isPremium    Boolean  @default(false)
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Authentication
+  accounts Account[]
+  sessions Session[]
+
+  // Music Library
+  playlists    Playlist[]
+
+  // Social Features
+  following     UserFollow[] @relation("UserFollowing")
+  followers     UserFollow[] @relation("UserFollowers")
+  likedTracks   UserLike[]
+  comments      Comment[]
+  
+  // Listening History
+  listeningHistory ListeningHistory[]
+  
+  // Playlist Relations
+  playlistCollaborations PlaylistCollaborator[]
+  addedTracks           PlaylistTrack[]
+  playlistLikes         PlaylistLike[]
+  
+  // Artist Relations  
+  artistFollows         ArtistFollow[]
+  
+  // Daily Mixes
+  dailyMixes            DailyMix[]
+
+  @@map("users")
+}
+
+// Authentication Models (NextAuth.js)
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Music Library Models
+model Artist {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  bio         String?
+  imageUrl    String?
+  website     String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tracks      Track[]
+  albums      Album[]
+  followers   ArtistFollow[]
+
+  @@map("artists")
+}
+
+model Album {
+  id           String      @id @default(cuid())
+  title        String
+  description  String?
+  coverImageUrl String?
+  releaseDate  DateTime?
+  genre        String?
+  albumType    AlbumType   @default(ALBUM)
+  isPublic     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  artistId     String
+  artist       Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks       Track[]
+
+  @@unique([title, artistId])
+  @@map("albums")
+}
+
+model Track {
+  id            String   @id @default(cuid())
+  title         String
+  duration      Int      // in seconds
+  filePath      String
+  fileSize      BigInt
+  bitRate       Int?
+  sampleRate    Int?
+  format        String   // FLAC, ALAC, WAV, MP3, etc.
+  trackNumber   Int?
+  year          Int?
+  genre         String?
+  isPublic      Boolean  @default(true)
+  playCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Lyrics support
+  lrcId         Int?     // LRCLib ID
+  plainLyrics   String?  @db.Text
+  syncedLyrics  String?  @db.Text
+
+  // Relations
+  artistId      String
+  artist        Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  albumId       String?
+  album         Album?   @relation(fields: [albumId], references: [id])
+
+  // Many-to-many relations
+  playlists           PlaylistTrack[]
+  likes              UserLike[]
+  listeningHistory   ListeningHistory[]
+  comments           Comment[]
+  dailyMixTracks     DailyMixTrack[]
+
+  @@unique([title, artistId])
+  @@map("tracks")
+}
+
+// Playlist Models
+model Playlist {
+  id             String    @id @default(cuid())
+  name           String
+  description    String?
+  coverImageUrl  String?
+  isPublic       Boolean   @default(true)
+  isCollaborative Boolean  @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  ownerId        String
+  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tracks         PlaylistTrack[]
+  collaborators  PlaylistCollaborator[]
+  likes          PlaylistLike[]
+
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id         String   @id @default(cuid())
+  position   Int
+  addedAt    DateTime @default(now())
+
+  // Relations
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  trackId    String
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  addedById  String
+  addedBy    User     @relation(fields: [addedById], references: [id])
+
+  @@unique([playlistId, trackId])
+  @@map("playlist_tracks")
+}
+
+model PlaylistCollaborator {
+  id         String   @id @default(cuid())
+  canEdit    Boolean  @default(true)
+  canDelete  Boolean  @default(false)
+  addedAt    DateTime @default(now())
+
+  // Relations
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([playlistId, userId])
+  @@map("playlist_collaborators")
+}
+
+// Social Features
+model UserFollow {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+
+  // Relations
+  followerId  String
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("user_follows")
+}
+
+model ArtistFollow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artistId  String
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, artistId])
+  @@map("artist_follows")
+}
+
+model UserLike {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@map("user_likes")
+}
+
+model PlaylistLike {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+
+  // Relations
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, playlistId])
+  @@map("playlist_likes")
+}
+
+// Activity & History
+model ListeningHistory {
+  id        String   @id @default(cuid())
+  playedAt  DateTime @default(now())
+  duration  Int      // how long the user listened in seconds
+
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@map("listening_history")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// Daily Mixes
+model DailyMix {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  mixType     String   // "liked", "trending", "discovery", "popular"
+  coverImageUrl String?
+  createdDate DateTime @default(now()) @db.Date // Store only the date part
+  expiresAt   DateTime // When this mix expires (next day)
+  isActive    Boolean  @default(true)
+  
+  // Relations
+  userId      String?  // null for global mixes like "popular"
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks      DailyMixTrack[]
+  
+  @@unique([userId, mixType, createdDate]) // One mix per type per user per day
+  @@map("daily_mixes")
+}
+
+model DailyMixTrack {
+  id        String   @id @default(cuid())
+  position  Int
+  addedAt   DateTime @default(now())
+  
+  // Relations
+  mixId     String
+  mix       DailyMix @relation(fields: [mixId], references: [id], onDelete: Cascade)
+  trackId   String
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  
+  @@unique([mixId, trackId])
+  @@map("daily_mix_tracks")
+}
+
+// Enums
+enum AlbumType {
+  ALBUM
+  EP
+  SINGLE
+  COMPILATION
+  MIXTAPE
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
