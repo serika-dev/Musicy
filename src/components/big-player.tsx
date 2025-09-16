@@ -61,10 +61,24 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
   const { data: lyricsData } = useLyrics(currentTrack?.id)
   const lyricsTyped = lyricsData as LyricsData | undefined
   const parsedSyncedLyrics: ParsedLyricLine[] = lyricsTyped?.syncedLyrics ? parseSyncedLyrics(lyricsTyped.syncedLyrics) : []
+  
+  // Helper function to create CSS-safe IDs
+  const sanitizeForCSS = (text: string): string => {
+    return text
+      // Remove or replace problematic characters that break CSS selectors
+      .replace(/['"\\\/\[\](){}:;.,!?@#$%^&*+=|`~<>]/g, '') // Remove special chars
+      .replace(/\s+/g, '-') // Replace spaces with dashes
+      .replace(/[^\w-]/g, '') // Keep only alphanumeric, underscore, and dash
+      .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+      .replace(/-+/g, '-') // Replace multiple dashes with single dash
+      .toLowerCase() // Convert to lowercase for consistency
+      .substring(0, 50) // Limit length to prevent overly long IDs
+  }
+  
   // Add unique IDs to parsed lyrics to prevent duplicate highlighting
   const lyricsWithIds: (ParsedLyricLine & { id: string })[] = parsedSyncedLyrics.map((line, index) => ({
     ...line,
-    id: `${currentTrack?.id}-${index}-${line.time}-${line.text.replace(/\s+/g, '-')}`
+    id: `${currentTrack?.id}-${index}-${line.time}-${sanitizeForCSS(line.text)}`
   }))
   // Compute current and next lyric indices from lyricsWithIds for accurate tracking
   const currentLyricIndex = (() => {
