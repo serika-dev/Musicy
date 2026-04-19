@@ -7,6 +7,9 @@ import { Play, Pause } from "lucide-react"
 import { formatDuration } from "@/lib/utils"
 import type { Track } from "@/types/track"
 import { AddToPlaylistButton } from "@/components/add-to-playlist-button"
+import { ShareMenu } from "@/components/share-menu"
+import { MoreVertical, Share2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface TrackListItemProps {
   track: Track
@@ -15,6 +18,7 @@ interface TrackListItemProps {
   onPlay: () => void
   showAlbum?: boolean
   showAddButton?: boolean
+  className?: string
 }
 
 export function TrackListItem({ 
@@ -23,13 +27,16 @@ export function TrackListItem({
   isCurrentTrack = false,
   onPlay,
   showAlbum = true,
-  showAddButton = false
+  showAddButton = false,
+  className
 }: TrackListItemProps) {
   return (
     <div 
-      className={`w-full flex items-center space-x-2 sm:space-x-4 p-2 sm:p-3 rounded-md hover:bg-muted/50 group cursor-pointer transition-colors ${
-        isCurrentTrack ? 'bg-primary/10' : ''
-      }`}
+      className={cn(
+        "w-full flex items-center space-x-2 sm:space-x-4 p-2 sm:p-3 rounded-md hover:bg-muted/50 group cursor-pointer transition-colors",
+        isCurrentTrack ? 'bg-primary/10' : '',
+        className
+      )}
       onClick={(e) => {
         // Only trigger play if clicking on the main area, not on buttons or links
         if (!(e.target as Element).closest('button, a')) {
@@ -121,6 +128,23 @@ export function TrackListItem({
         <span className="text-xs sm:text-sm text-muted-foreground">
           {formatDuration(track.duration)}
         </span>
+
+        <ShareMenu
+          title={track.title}
+          url={`/tracks/${track.id}`}
+          id={track.id}
+          type="track"
+          trigger={
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-8 w-8 sm:h-9 sm:w-9 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          }
+        />
         
         <Button 
           size="sm" 

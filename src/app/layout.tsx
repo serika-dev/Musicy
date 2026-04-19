@@ -49,6 +49,7 @@ export default function RootLayout({
           strategy="afterInteractive"
           id="web-scrobbler-connector"
         />
+        <link rel="alternate" type="application/json+oembed" title="Musicy oEmbed Profile" href="/api/oembed?url={url}" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

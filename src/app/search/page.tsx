@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { TrackListItem } from "@/components/track-list-item"
-import { Search, Music, User, Album, TrendingUp, Clock } from "lucide-react"
+import { Search, Music, User, Album, TrendingUp, Clock, Play, Headphones } from "lucide-react"
 import { useMusicPlayer } from "@/contexts/music-player-context"
 import Link from "next/link"
 
@@ -114,17 +114,18 @@ function SearchPageContent() {
   const totalResults = results.tracks.length + results.artists.length + results.albums.length + results.playlists.length
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-6 py-8 max-w-6xl">
-        {/* Search Header */}
-        <div className="mb-8">
-          <form onSubmit={handleSearch} className="relative max-w-2xl">
+    <div className="min-h-screen bg-background pb-20">
+      <main className="container mx-auto px-4 py-4 lg:py-8 lg:px-6 max-w-6xl">
+        {/* Search Header - Sticky on Mobile */}
+        <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-xl -mx-4 px-4 py-4 mb-6 lg:static lg:bg-transparent lg:p-0 lg:mb-8">
+          <h1 className="text-3xl font-black mb-6 lg:hidden">Search</h1>
+          <form onSubmit={handleSearch} className="relative w-full lg:max-w-2xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="What do you want to play?"
-              className="pl-12 h-14 text-lg bg-muted/50 border-0 rounded-full"
+              placeholder="Artists, songs, or podcasts"
+              className="pl-12 h-14 text-base bg-muted/40 border-0 rounded-xl focus-visible:ring-primary/20"
             />
           </form>
         </div>
@@ -370,29 +371,32 @@ function SearchPageContent() {
           </div>
         )}
 
-        {/* Browse without search */}
+        {/* Browse without search - Visually Rich Categories */}
         {!query && (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
             <div>
-              <h2 className="text-2xl font-bold mb-6">Browse all</h2>
+              <h2 className="text-2xl font-black mb-6 px-1 lg:text-3xl tracking-tight">Browse all</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {[
-                  { name: "Recently Played", color: "from-purple-600 to-purple-800", icon: Clock },
-                  { name: "Made For You", color: "from-blue-600 to-blue-800", icon: Music },
-                  { name: "Charts", color: "from-green-600 to-green-800", icon: TrendingUp },
-                  { name: "Pop", color: "from-pink-600 to-pink-800", icon: Music },
-                  { name: "Hip-Hop", color: "from-orange-600 to-orange-800", icon: Music },
-                  { name: "Rock", color: "from-red-600 to-red-800", icon: Music },
-                  { name: "Jazz", color: "from-yellow-600 to-yellow-800", icon: Music },
-                  { name: "Electronic", color: "from-cyan-600 to-cyan-800", icon: Music },
-                  { name: "Classical", color: "from-indigo-600 to-indigo-800", icon: Music },
-                  { name: "Country", color: "from-amber-600 to-amber-800", icon: Music },
+                  { name: "Recently Played", color: "from-indigo-600 to-indigo-900", icon: Clock },
+                  { name: "Made For You", color: "from-emerald-600 to-emerald-900", icon: Music },
+                  { name: "New Releases", color: "from-rose-600 to-rose-900", icon: TrendingUp },
+                  { name: "Hip-Hop", color: "from-amber-600 to-amber-900", icon: Music },
+                  { name: "Pop", color: "from-purple-600 to-purple-900", icon: Music },
+                  { name: "Electronic", color: "from-sky-600 to-sky-900", icon: Music },
+                  { name: "Jazz", color: "from-orange-600 to-orange-900", icon: Music },
+                  { name: "Classical", color: "from-slate-600 to-slate-900", icon: Music },
+                  { name: "Rock", color: "from-red-600 to-red-900", icon: Music },
+                  { name: "Latin", color: "from-pink-600 to-pink-900", icon: Music },
+                  { name: "Acoustic", color: "from-teal-600 to-teal-900", icon: Music },
+                  { name: "Focus", color: "from-blue-600 to-blue-900", icon: Headphones },
                 ].map((category, index) => (
-                  <Card key={index} className={`relative overflow-hidden cursor-pointer hover:scale-105 transition-transform bg-gradient-to-br ${category.color}`}>
-                    <CardContent className="p-6 h-24 flex items-end relative">
-                      <h3 className="font-bold text-white text-lg">{category.name}</h3>
-                      <category.icon className="absolute top-2 right-2 w-8 h-8 text-white/80 rotate-12" />
+                  <Card key={index} className={`relative overflow-hidden cursor-pointer active:scale-95 transition-all bg-gradient-to-br ${category.color} border-none aspect-[16/10] group rounded-3xl shadow-lg`}>
+                    <CardContent className="p-5 h-full flex flex-col justify-between relative z-10">
+                      <h3 className="font-black text-white text-xl tracking-tighter leading-none">{category.name}</h3>
+                      <category.icon className="absolute -bottom-2 -right-2 w-16 h-16 text-white/20 -rotate-12 group-hover:rotate-0 group-hover:scale-110 transition-transform duration-500" />
                     </CardContent>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                   </Card>
                 ))}
               </div>

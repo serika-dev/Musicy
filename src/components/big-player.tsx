@@ -228,10 +228,10 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
             const t = (romanizeEnabled && r && r !== l.text) ? r : l.text
             return Math.max(m, (t || '').length)
           }, 0)
-          const sizeClass = maxLen > 80 ? (isMobile ? 'text-xl' : 'text-2xl lg:text-3xl')
-                          : maxLen > 55 ? (isMobile ? 'text-2xl' : 'text-3xl lg:text-4xl')
-                          : maxLen > 35 ? (isMobile ? 'text-3xl' : 'text-4xl lg:text-5xl')
-                          : (isMobile ? 'text-4xl' : 'text-5xl lg:text-7xl')
+          const sizeClass = maxLen > 80 ? (isMobile ? 'text-2xl' : 'text-3xl lg:text-4xl')
+                          : maxLen > 55 ? (isMobile ? 'text-3xl' : 'text-4xl lg:text-5xl')
+                          : maxLen > 35 ? (isMobile ? 'text-4xl' : 'text-5xl lg:text-7xl')
+                          : (isMobile ? 'text-5xl' : 'text-7xl lg:text-9xl')
           return lyricsWithIds.map((line) => {
             const isCurrent = currentLyricId === line.id
             const romanized = romanizedLinesMap?.[line.id]
@@ -242,10 +242,10 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
                 key={line.id}
                 type="button"
                 data-lyric-id={line.id}
-                className={`block w-full ${sizeClass} leading-relaxed transition-all duration-500 font-medium text-center py-6 px-4 lg:px-8 rounded-lg break-words whitespace-normal [overflow-wrap:anywhere] ${
+                className={`block w-full ${sizeClass} leading-relaxed transition-all duration-500 font-medium text-center py-10 px-4 lg:px-8 rounded-lg break-words whitespace-normal [overflow-wrap:anywhere] ${
                   isCurrent ? 'text-white scale-[1.04] transform font-bold drop-shadow-2xl' : 'text-white/40 hover:text-white/70 hover:scale-[1.02]'
                 }`}
-                style={{ textShadow: isCurrent ? '0 0 30px rgba(255,255,255,0.8)' : 'none' }}
+                style={{ textShadow: isCurrent ? '0 0 40px rgba(255,255,255,0.9)' : 'none' }}
                 onClick={() => seekTo(line.time)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); seekTo(line.time) }

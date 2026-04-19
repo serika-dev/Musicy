@@ -11,11 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Play, Pause, Edit, Trash2, MoreHorizontal, Share, Heart, Clock, Users } from 'lucide-react'
-import { formatDuration } from '@/lib/utils'
+import { Play, Pause, Edit, Trash2, MoreHorizontal, Share, Heart, Clock, Users, ChevronLeft, Music } from 'lucide-react'
+import { formatDuration, cn } from '@/lib/utils'
+import { ShareMenu } from '@/components/share-menu'
 
 export default function PlaylistPage() {
   const params = useParams()
@@ -196,41 +198,69 @@ export default function PlaylistPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
-      {/* Playlist Header */}
-      <div className="flex flex-col lg:flex-row items-start space-y-6 lg:space-y-0 lg:space-x-8">
-        {/* Cover Art */}
-        <div className="relative">
+    <div className="flex flex-col -mt-16 pb-20 relative">
+      {/* Immersive Playlist Header */}
+      <div className="relative h-[45vh] lg:h-[50vh] w-full overflow-hidden">
+        <div className="absolute inset-0 bg-neutral-900" />
+        {playlist.coverImageUrl ? (
+          <div className="absolute inset-0">
+             <img 
+               src={playlist.coverImageUrl} 
+               alt="" 
+               className="w-full h-full object-cover blur-2xl opacity-40 scale-110"
+             />
+             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-background" />
+        )}
+
+        {/* Content Overlay */}
+        <div className="absolute inset-x-0 bottom-0 p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
           <div 
-            className={`w-64 h-64 bg-gradient-to-br from-primary/30 to-primary/60 rounded-lg flex items-center justify-center flex-shrink-0 ${
-              isOwner ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
-            } ${isUploadingCover ? 'opacity-50' : ''}`}
-            onClick={handleCoverClick}
+             className={cn(
+               "w-48 h-48 lg:w-64 lg:h-64 rounded-3xl overflow-hidden shadow-2xl border-4 border-background/20 mb-6 lg:mb-0 relative group",
+               isOwner && "cursor-pointer"
+             )}
+             onClick={handleCoverClick}
           >
             {playlist.coverImageUrl ? (
-              <img
-                src={playlist.coverImageUrl}
-                alt={playlist.name}
-                className="w-full h-full object-cover rounded-lg"
-              />
+              <img src={playlist.coverImageUrl} alt={playlist.name} className="w-full h-full object-cover" />
             ) : (
-              <div className="text-6xl opacity-50">🎵</div>
+              <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                <Music className="w-16 h-16 text-primary/40" />
+              </div>
             )}
-            
-            {/* Upload overlay for owners */}
             {isOwner && (
-              <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center opacity-0 hover:opacity-100">
-                <div className="text-white text-center">
-                  <div className="text-2xl mb-2">📷</div>
-                  <p className="text-sm font-medium">
-                    {isUploadingCover ? 'Uploading...' : 'Change Cover'}
-                  </p>
-                </div>
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <Edit className="h-8 w-8 text-white" />
               </div>
             )}
           </div>
           
-          {/* Hidden file input */}
+          <div className="space-y-4 lg:pb-4 flex-1 w-full">
+            <div className="space-y-1">
+              <Badge variant="secondary" className="bg-primary/20 text-primary border-none font-black text-[10px] py-0 px-2 uppercase tracking-widest">
+                Playlist
+              </Badge>
+              <h1 className="text-4xl lg:text-7xl font-black tracking-tight drop-shadow-2xl truncate">{playlist.name}</h1>
+            </div>
+            
+            <div className="flex items-center gap-4 text-xs font-bold text-foreground/70">
+              <span className="flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                {playlist.owner.displayName || playlist.owner.username}
+              </span>
+              <span>•</span>
+              <span>{playlist._count.tracks} tracks</span>
+              <span>•</span>
+              <span>{formatDuration(totalDuration)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons for owner (Mobile Overlay) */}
+        {isOwner && (
           <input
             ref={fileInputRef}
             type="file"
@@ -238,80 +268,76 @@ export default function PlaylistPage() {
             onChange={handleFileSelect}
             className="hidden"
           />
-        </div>
+        )}
 
-        {/* Playlist Info */}
-        <div className="flex-1 space-y-4">
-          <div>
-            <h1 className="text-4xl font-bold">{playlist.name}</h1>
-            {playlist.description && (
-              <p className="text-lg text-muted-foreground mt-2">{playlist.description}</p>
-            )}
-          </div>
+        {/* Back Button (Mobile) */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-20 left-4 z-20 rounded-full bg-black/20 backdrop-blur-md border border-white/10 lg:hidden"
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+      </div>
 
-          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-            <span className="flex items-center space-x-1">
-              <Users className="h-4 w-4" />
-              <span>{playlist.owner.displayName || playlist.owner.username}</span>
-            </span>
-            <span>•</span>
-            <span>{playlist._count.tracks} tracks</span>
-            <span>•</span>
-            <span className="flex items-center space-x-1">
-              <Clock className="h-4 w-4" />
-              <span>{formatDuration(totalDuration)}</span>
-            </span>
-            {playlist.isPublic && (
-              <>
-                <span>•</span>
-                <span>Public</span>
-              </>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-4">
+      {/* Sticky Action Bar */}
+      <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-xl border-b border-white/5 lg:static lg:bg-transparent lg:border-none">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6">
             <Button
               size="lg"
               onClick={handlePlayAll}
               disabled={!playlist.tracks || playlist.tracks.length === 0}
-              className="flex items-center space-x-2"
+              className="rounded-full w-14 h-14 lg:w-auto lg:h-14 lg:px-8 group shadow-2xl"
             >
               {currentTrack && playlist.tracks?.some(t => t.track.id === currentTrack.id) && isPlaying ? (
-                <Pause className="h-5 w-5" />
+                <Pause className="h-6 w-6 lg:mr-2 fill-current" />
               ) : (
-                <Play className="h-5 w-5" />
+                <Play className="h-6 w-6 lg:mr-2 fill-current" />
               )}
-              <span>Play All</span>
+              <span className="hidden lg:inline font-bold italic">Play</span>
             </Button>
 
-            <Button variant="outline" size="lg">
-              <Heart className="h-5 w-5 mr-2" />
-              Like
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="w-12 h-12 lg:w-auto lg:h-12 lg:px-6 rounded-full border-white/10 hover:bg-white/5 transition-all"
+            >
+              <Heart className="h-5 w-5 lg:mr-2" />
+              <span className="hidden lg:inline font-bold">Save</span>
             </Button>
-
-            <Button variant="outline" size="lg">
-              <Share className="h-5 w-5 mr-2" />
-              Share
-            </Button>
-
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <ShareMenu 
+              title={playlist.name} 
+              url={`/playlists/${playlist.id}`} 
+              id={playlist.id} 
+              type="playlist" 
+              trigger={
+                <Button variant="ghost" size="icon" className="w-12 h-12 rounded-full">
+                  <Share className="h-5 w-5" />
+                </Button>
+              }
+            />
             {isOwner && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="lg">
+                  <Button variant="ghost" size="icon" className="w-12 h-12 rounded-full">
                     <MoreHorizontal className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={handleEdit}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Playlist
+                <DropdownMenuContent align="end" className="w-56 rounded-2xl bg-neutral-900 border-white/5 p-2 shadow-2xl">
+                  <DropdownMenuItem onClick={handleEdit} className="rounded-xl font-bold py-3">
+                    <Edit className="h-4 w-4 mr-3" />
+                    Edit Details
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-destructive"
+                    className="rounded-xl font-bold py-3 text-destructive"
                   >
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 mr-3" />
                     Delete Playlist
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -321,20 +347,17 @@ export default function PlaylistPage() {
         </div>
       </div>
 
-      {/* Tracks List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tracks</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {playlist.tracks && playlist.tracks.length > 0 ? (
-            <div className="space-y-1">
-              {playlist.tracks.map((playlistTrack, index) => (
-                <div key={playlistTrack.id} className="flex items-center group">
-                  <div className="w-8 text-center text-sm text-muted-foreground px-4">
+      <div className="container mx-auto px-4 py-8 lg:px-6">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-black tracking-tight px-1">Tracks</h2>
+          <div className="space-y-1">
+            {playlist.tracks && playlist.tracks.length > 0 ? (
+              playlist.tracks.map((playlistTrack, index) => (
+                <div key={playlistTrack.id} className="flex items-center group/item hover:bg-white/5 rounded-2xl transition-colors pr-2">
+                  <div className="w-10 text-center text-xs font-bold text-muted-foreground group-hover/item:text-foreground shrink-0">
                     {index + 1}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 overflow-hidden">
                     <TrackListItem
                       track={playlistTrack.track}
                       isCurrentTrack={isCurrentTrack(playlistTrack.track.id)}
@@ -348,32 +371,33 @@ export default function PlaylistPage() {
                         })
                       }}
                       showAddButton={false}
+                      className="bg-transparent hover:bg-transparent border-none py-4"
                     />
                   </div>
                   {isOwner && (
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleRemoveTrack(playlistTrack.track.id)}
-                      className="opacity-0 group-hover:opacity-100 mr-4"
+                      className="opacity-0 group-hover/item:opacity-100 w-10 h-10 rounded-full hover:bg-destructive/10 hover:text-destructive transition-all"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="text-6xl opacity-20 mb-4">🎵</div>
-              <p className="text-lg text-muted-foreground">This playlist is empty</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {isOwner ? 'Start adding some tracks!' : 'No tracks have been added yet.'}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            ) : (
+              <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-white/10">
+                <Music className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+                <p className="text-xl font-bold">This playlist is empty</p>
+                <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+                  {isOwner ? 'Add some cinematic gems to get started!' : 'No tracks have been added yet.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

@@ -38,7 +38,7 @@ export function Header() {
   const avatarSrc = session?.user?.avatarUrl || session?.user?.image || ""
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-2xl">
+    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-2xl lg:border-b">
       <div className="w-full px-4 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link 
@@ -81,15 +81,6 @@ export function Header() {
 
         {/* Right Controls */}
         <div className="flex items-center gap-3 shrink-0">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="md:hidden h-10 w-10 hover:bg-secondary/50"
-            onClick={() => router.push('/search')}
-          >
-            <Search className="h-5 w-5" />
-          </Button>
-
           {status === "loading" ? (
             <div className="w-8 h-8 animate-spin rounded-full border-b-2 border-primary" />
           ) : session ? (

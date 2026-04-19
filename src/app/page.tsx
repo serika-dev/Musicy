@@ -57,130 +57,112 @@ export default function Home() {
   };
 
   if (session) {
-    // Pick the first album that has a cover for the spotlight
     const spotlightAlbum = albumsData?.albums?.find(a => a.coverImageUrl) || albumsData?.albums?.[0];
 
     return (
-      <div className="space-y-12 pb-12">
+      <div className="space-y-10 pb-20">
+        {/* Immersive Greeting */}
+        <section className="pt-4 lg:pt-0">
+          <h1 className="text-3xl lg:text-5xl font-black tracking-tighter animate-in fade-in slide-in-from-left duration-1000">
+            {greeting.split(',')[0]}<span className="text-primary">.</span>
+            <br />
+            <span className="text-muted-foreground/80 text-2xl lg:text-4xl">{greeting.split(',')[1]}</span>
+          </h1>
+        </section>
+
         {/* Hero Spotlight */}
         {spotlightAlbum && (
-          <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
+          <section className="animate-in fade-in zoom-in-95 duration-1000 -mx-4 lg:mx-0">
             <AlbumSpotlight album={spotlightAlbum} />
           </section>
         )}
 
-        {/* Quick Access & Greeting */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-black tracking-tight">{greeting}</h1>
-          </div>
+        {/* Quick Access */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold tracking-tight px-1">Jump Back In</h2>
           <QuickAccess />
         </section>
 
-        {/* Discovery Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
-          {/* Main Discovery Columns (2/3) */}
-          <div className="xl:col-span-2 space-y-12">
-            {/* Made For You */}
-            <section className="space-y-6 pt-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold tracking-tight">Made For You</h2>
-                <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground font-semibold" asChild>
-                  <Link href="/playlists">Show all</Link>
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 gap-8">
-                <FeaturedPlaylists />
-                <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <h3 className="text-lg font-semibold px-1">Your Daily Mixes</h3>
-                    <p className="text-muted-foreground text-xs font-medium px-1">Personalized collections based on your listening history</p>
+        {/* Made For You - Horizontal Scroll on Mobile */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-2xl font-bold tracking-tight">Made For You</h2>
+          </div>
+          <div className="flex flex-col gap-8">
+            <FeaturedPlaylists />
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold px-1">Your Daily Mixes</h3>
+              <DailyMixes />
+            </div>
+          </div>
+        </section>
+
+        {/* Top Albums - Horizontal Carousel on Mobile */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-2xl font-bold tracking-tight">Top Albums</h2>
+            <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
+              <Link href="/albums">See all</Link>
+            </Button>
+          </div>
+          <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar lg:mx-0 lg:px-0">
+            {albumsData?.albums?.map((album) => (
+              <Link key={album.id} href={`/albums/${album.id}`} className="group relative flex-shrink-0 w-[160px] lg:w-auto">
+                <div className="bg-card/20 hover:bg-card/40 p-3 rounded-2xl transition-all border border-border/5">
+                  <div className="aspect-square rounded-xl bg-muted overflow-hidden mb-3 relative shadow-lg">
+                    {album.coverImageUrl ? (
+                      <img src={album.coverImageUrl} alt={album.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    ) : ( <div className="w-full h-full flex items-center justify-center bg-secondary/30"> <Music2 className="w-8 h-8 text-muted-foreground" /> </div> )}
+                    <Button size="icon" className="absolute bottom-2 right-2 opacity-0 lg:group-hover:opacity-100 rounded-full bg-primary shadow-2xl scale-90 lg:scale-100" onClick={(e) => handlePlayAlbum(e, album.id)}>
+                      <Play className="w-4 h-4 fill-current" />
+                    </Button>
                   </div>
-                  <DailyMixes />
+                  <div className="space-y-0.5 px-0.5">
+                    <h3 className="font-bold text-sm truncate">{album.title}</h3>
+                    <p className="text-[11px] text-muted-foreground truncate">{album.artist.name}</p>
+                  </div>
                 </div>
-              </div>
-            </section>
-
-            {/* Albums */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between font-bold">
-                <h2 className="text-2xl tracking-tight">Top Albums</h2>
-                <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground font-semibold" asChild>
-                  <Link href="/albums">Show all</Link>
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {albumsData?.albums?.slice(0, 4).map((album) => (
-                  <Link key={album.id} href={`/albums/${album.id}`} className="group relative">
-                    <div className="bg-card/30 hover:bg-card/60 p-4 rounded-xl transition-all border border-border/10">
-                      <div className="aspect-square rounded-lg bg-muted overflow-hidden mb-4 relative shadow-md">
-                        {album.coverImageUrl ? (
-                          <img src={album.coverImageUrl} alt={album.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-secondary/50">
-                            <Music2 className="w-10 h-10 text-muted-foreground" />
-                          </div>
-                        )}
-                        <Button 
-                          size="icon" 
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all rounded-full bg-primary shadow-xl hover:scale-105 active:scale-95"
-                          onClick={(e) => handlePlayAlbum(e, album.id)}
-                        >
-                          <Play className="w-4 h-4 fill-current" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-sm truncate">{album.title}</h3>
-                        <p className="text-xs text-muted-foreground truncate">{album.artist.name}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
+              </Link>
+            ))}
           </div>
+        </section>
 
-          {/* Side Column (1/3) - Recently Added and Artists */}
-          <div className="space-y-12">
-            <section className="bg-card/20 rounded-2xl p-6 border border-border/10">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold tracking-tight">Recently Added</h2>
-                <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
-                  <Link href="/tracks">View all</Link>
-                </Button>
-              </div>
-              <RecentlyAdded />
-            </section>
-
-            <section className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold tracking-tight">Top Artists</h2>
-                <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
-                  <Link href="/artists">all</Link>
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {artistsData?.artists?.slice(0, 4).map((artist) => (
-                  <Link key={artist.id} href={`/artists/${artist.id}`} className="group flex flex-col items-center">
-                    <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-2 ring-transparent group-hover:ring-primary/40 transition-all duration-300">
-                      <ArtistImage
-                        artistId={artist.id}
-                        artistImageUrl={artist.imageUrl}
-                        artistName={artist.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        fallbackClassName="w-full h-full flex items-center justify-center bg-secondary"
-                      />
-                    </div>
-                    <div className="text-center w-full">
-                      <p className="text-xs font-bold truncate px-1">{artist.name}</p>
-                      <p className="text-[10px] text-muted-foreground">Artist</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
+        {/* Top Artists - Circular Horizontal Scroll */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-2xl font-bold tracking-tight">Favorite Artists</h2>
+            <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
+              <Link href="/artists">See all</Link>
+            </Button>
           </div>
-        </div>
+          <div className="flex lg:grid lg:grid-cols-6 gap-6 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar lg:mx-0 lg:px-0">
+            {artistsData?.artists?.map((artist) => (
+              <Link key={artist.id} href={`/artists/${artist.id}`} className="group flex flex-col items-center flex-shrink-0 w-24 lg:w-auto">
+                <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-1 ring-border/10 group-active:scale-95 transition-transform duration-300">
+                  <ArtistImage
+                    artistId={artist.id}
+                    artistImageUrl={artist.imageUrl}
+                    artistName={artist.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    fallbackClassName="w-full h-full flex items-center justify-center bg-secondary/30"
+                  />
+                </div>
+                <p className="text-[11px] font-bold truncate w-full text-center">{artist.name}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Recently Added Section */}
+        <section className="bg-gradient-to-b from-card/30 to-card/10 rounded-3xl p-6 border border-border/5">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold tracking-tight">Recently Added</h2>
+            <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
+              <Link href="/tracks">View all</Link>
+            </Button>
+          </div>
+          <RecentlyAdded />
+        </section>
       </div>
     );
   }
