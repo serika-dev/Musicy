@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Music, Play, Heart } from "lucide-react"
 import { usePlaylists } from "@/hooks/usePlaylist"
+import { useMusicPlayer } from "@/contexts/music-player-context"
 
 export function FeaturedPlaylists() {
   const { data: playlistsData, isLoading } = usePlaylists(false, 4, 0)
+  const { playTrack } = useMusicPlayer()
 
   if (isLoading) {
     return (
@@ -27,6 +29,19 @@ export function FeaturedPlaylists() {
   }
 
   const playlists = playlistsData?.playlists || []
+
+  const handlePlayPlaylist = (e: React.MouseEvent, playlistId: string, playlistName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    fetch(`/api/playlists/${playlistId}/tracks`)
+      .then(r => r.json())
+      .then(data => {
+        const tracks = data.tracks || []
+        if (tracks.length > 0) {
+          playTrack(tracks[0], tracks, { type: 'playlist', id: playlistId, name: playlistName })
+        }
+      })
+  }
 
   if (playlists.length === 0) {
     return (
@@ -67,8 +82,13 @@ export function FeaturedPlaylists() {
                   {playlist._count.tracks} tracks
                 </span>
                 <div className="flex space-x-2">
-                  <Button size="sm" variant="ghost" onClick={(e) => e.stopPropagation()}>
-                    <Play className="h-4 w-4" />
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="hover:bg-primary/20 hover:text-primary transition-colors"
+                    onClick={(e) => handlePlayPlaylist(e, playlist.id, playlist.name)}
+                  >
+                    <Play className="h-4 w-4 fill-current" />
                   </Button>
                   <Button size="sm" variant="ghost" onClick={(e) => e.stopPropagation()}>
                     <Heart className="h-4 w-4" />

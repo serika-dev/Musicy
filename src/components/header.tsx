@@ -38,52 +38,56 @@ export function Header() {
   const avatarSrc = session?.user?.avatarUrl || session?.user?.image || ""
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="container mx-auto px-4 lg:px-6 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-2xl">
+      <div className="w-full px-4 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link 
           href="/" 
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2.5 group transition-transform active:scale-95 shrink-0"
         >
-          <Music2 className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold tracking-tight">Serika Music</span>
+          <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+            <Music2 className="h-5 w-5 text-primary" />
+          </div>
+          <span className="text-xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Musicy
+          </span>
         </Link>
 
         {/* Nav Links */}
-        <nav className="hidden lg:flex items-center gap-6 ml-8">
-          <Link href="/playlists" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <nav className="hidden lg:flex items-center gap-8 ml-4">
+          <Link href="/playlists" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hover:translate-y-[-1px]">
             Playlists
           </Link>
-          <Link href="/artists" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/artists" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hover:translate-y-[-1px]">
             Artists
           </Link>
-          <Link href="/albums" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/albums" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hover:translate-y-[-1px]">
             Albums
           </Link>
         </nav>
 
         {/* Search */}
-        <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
-          <form onSubmit={handleSearch} className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="hidden md:flex items-center flex-1 max-w-xl mx-8">
+          <form onSubmit={handleSearch} className="relative w-full group">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search songs, artists, albums..."
-              className="w-full pl-9 h-9 bg-secondary/50 border-border/50 focus:border-primary/50 rounded-md text-sm"
+              className="w-full pl-10 h-10 bg-secondary/30 border-border/20 focus:border-primary/30 focus:bg-secondary/50 rounded-xl text-sm transition-all shadow-sm focus:shadow-md"
             />
           </form>
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 shrink-0">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="md:hidden h-8 w-8"
+            className="md:hidden h-10 w-10 hover:bg-secondary/50"
             onClick={() => router.push('/search')}
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-5 w-5" />
           </Button>
 
           {status === "loading" ? (

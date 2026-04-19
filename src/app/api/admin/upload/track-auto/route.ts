@@ -189,9 +189,15 @@ export async function POST(request: NextRequest) {
     let coverImageUrl = null
 
     if (finalData.albumTitle) {
+      // Improved lookup: Case-insensitive and trimmed to avoid duplicates like "Album " vs "Album"
+      const normalizedTitle = finalData.albumTitle.trim();
+      
       album = await prisma.album.findFirst({
         where: {
-          title: finalData.albumTitle,
+          title: {
+            equals: normalizedTitle,
+            mode: 'insensitive'
+          },
           artistId: artist.id
         }
       })
@@ -205,7 +211,7 @@ export async function POST(request: NextRequest) {
 
         album = await prisma.album.create({
           data: {
-            title: finalData.albumTitle,
+            title: normalizedTitle,
             artistId: artist.id,
             releaseDate: validReleaseDate,
             genre: finalData.genre || null,
@@ -213,7 +219,9 @@ export async function POST(request: NextRequest) {
             isPublic: finalData.isPublic,
           }
         })
-        console.log(`✅ Created new album: ${finalData.albumTitle}${validReleaseDate ? ` (Year: ${parsedYear})` : ''}`)
+        console.log(`✅ Created new album: ${normalizedTitle}${validReleaseDate ? ` (Year: ${parsedYear})` : ''}`)
+      } else {
+        console.log(`✅ Using existing album: ${album.title} (ID: ${album.id})`)
       }
 
       // Handle extracted cover art

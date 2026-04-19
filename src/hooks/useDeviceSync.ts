@@ -122,7 +122,7 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
       if (!isLeader && event.type === "state") return
 
       try {
-        await fetch("/api/sync/publish", {
+        const response = await fetch("/api/sync/publish", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -130,9 +130,13 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
             ...event,
           }),
           keepalive: true,
-        })
+        }).catch(() => null) // Silently catch network errors/aborts
+        
+        if (response && !response.ok) {
+          console.warn("sync publish returned non-ok status:", response.status)
+        }
       } catch (err) {
-        console.error("sync publish failed:", err)
+        // Silently catch errors to avoid UI crashes on network instability
       }
     },
     [deviceId, isLeader]

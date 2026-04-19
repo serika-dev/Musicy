@@ -1,212 +1,186 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { useSession } from "next-auth/react";
-import { Play, Heart, Clock, Shuffle, Music2, Headphones, ListMusic } from "lucide-react";
-import { FeaturedPlaylists } from "@/components/featured-playlists";
-import { RecentlyAdded } from "@/components/recently-added";
 import { useEffect, useState } from "react";
 import { useArtists } from "@/hooks/useArtists";
 import { useAlbums } from "@/hooks/useAlbums";
+import { AlbumSpotlight } from "@/components/album-spotlight";
+import { QuickAccess } from "@/components/quick-access";
+import { FeaturedPlaylists } from "@/components/featured-playlists";
+import { RecentlyAdded } from "@/components/recently-added";
 import { DailyMixes } from "@/components/daily-mixes";
 import { ArtistImage } from "@/components/artist-image";
+import { useMusicPlayer } from "@/contexts/music-player-context";
+import { Music2, Headphones, ListMusic, Play } from "lucide-react";
 
 export default function Home() {
   const { data: session } = useSession();
   const [greeting, setGreeting] = useState("");
   const { data: artistsData } = useArtists(undefined, 6, 0);
   const { data: albumsData } = useAlbums(undefined, 6, 0);
+  const { playTrack } = useMusicPlayer();
 
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 18) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
-  }, []);
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      const name = session?.user?.name?.split(" ")[0] || "there";
+      let baseGreeting = "Good afternoon";
+      
+      if (hour < 5) baseGreeting = "Good night";
+      else if (hour < 12) baseGreeting = "Good morning";
+      else if (hour < 18) baseGreeting = "Good afternoon";
+      else baseGreeting = "Good evening";
+      
+      setGreeting(`${baseGreeting}, ${name}`);
+    };
+
+    updateGreeting();
+    const interval = setInterval(updateGreeting, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [session]);
+
+  const handlePlayAlbum = (e: React.MouseEvent, albumId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // This is a shortcut. A proper implementation would fetch the album tracks first.
+    // However, since we're already on the homepage, we can use a redirect or 
+    // better yet, trigger a fetch and play.
+    fetch(`/api/albums/${albumId}`)
+      .then(r => r.json())
+      .then(album => {
+        if (album.tracks && album.tracks.length > 0) {
+          playTrack(album.tracks[0], album.tracks, { type: 'album', id: album.id, name: album.title });
+        }
+      });
+  };
 
   if (session) {
+    // Pick the first album that has a cover for the spotlight
+    const spotlightAlbum = albumsData?.albums?.find(a => a.coverImageUrl) || albumsData?.albums?.[0];
+
     return (
-      <div className="space-y-10 pb-8">
-        {/* Greeting */}
-        <section>
-          <h1 className="text-3xl font-bold mb-6">{greeting}</h1>
+      <div className="space-y-12 pb-12">
+        {/* Hero Spotlight */}
+        {spotlightAlbum && (
+          <section className="animate-in fade-in slide-in-from-top-4 duration-1000">
+            <AlbumSpotlight album={spotlightAlbum} />
+          </section>
+        )}
 
-          {/* Quick Access */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <Link href="/liked-songs" className="group">
-              <div className="flex items-center gap-3 bg-card/60 hover:bg-card rounded-md p-3 transition-colors">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary/80 to-primary rounded flex items-center justify-center flex-shrink-0">
-                  <Heart className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-medium text-sm truncate">Liked Songs</span>
-                <Button size="icon" variant="ghost" className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Play className="w-4 h-4" />
-                </Button>
-              </div>
-            </Link>
-
-            <div className="group">
-              <div className="flex items-center gap-3 bg-card/60 hover:bg-card rounded-md p-3 transition-colors">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-emerald-800 rounded flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-medium text-sm truncate">Recently Played</span>
-                <Button size="icon" variant="ghost" className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Play className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="group">
-              <div className="flex items-center gap-3 bg-card/60 hover:bg-card rounded-md p-3 transition-colors">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded flex items-center justify-center flex-shrink-0">
-                  <Shuffle className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-medium text-sm truncate">Discover Weekly</span>
-                <Button size="icon" variant="ghost" className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Play className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+        {/* Quick Access & Greeting */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-4xl font-black tracking-tight">{greeting}</h1>
           </div>
+          <QuickAccess />
         </section>
 
-        {/* Recently Added */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Recently Added</h2>
-            <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/tracks">Show all</Link>
-            </Button>
-          </div>
-          <RecentlyAdded />
-        </section>
-
-        {/* Made For You (Playlists & Mixes) */}
-        <section className="space-y-8">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Made For You</h2>
-              <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-                <Link href="/playlists">Show all</Link>
-              </Button>
-            </div>
-            
-            <div className="space-y-10">
-              <div className="space-y-4">
+        {/* Discovery Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+          {/* Main Discovery Columns (2/3) */}
+          <div className="xl:col-span-2 space-y-12">
+            {/* Made For You */}
+            <section className="space-y-6 pt-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold tracking-tight">Made For You</h2>
+                <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground font-semibold" asChild>
+                  <Link href="/playlists">Show all</Link>
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 gap-8">
                 <FeaturedPlaylists />
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex flex-col">
-                  <h3 className="text-lg font-semibold">Your Daily Mixes</h3>
-                  <p className="text-muted-foreground text-xs font-medium">Personalized collections based on your listening history</p>
+                <div className="space-y-4">
+                  <div className="flex flex-col">
+                    <h3 className="text-lg font-semibold px-1">Your Daily Mixes</h3>
+                    <p className="text-muted-foreground text-xs font-medium px-1">Personalized collections based on your listening history</p>
+                  </div>
+                  <DailyMixes />
                 </div>
-                <DailyMixes />
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
 
-
-        {/* Artists */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Artists</h2>
-            <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/artists">Show all</Link>
-            </Button>
+            {/* Albums */}
+            <section className="space-y-6">
+              <div className="flex items-center justify-between font-bold">
+                <h2 className="text-2xl tracking-tight">Top Albums</h2>
+                <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground font-semibold" asChild>
+                  <Link href="/albums">Show all</Link>
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {albumsData?.albums?.slice(0, 4).map((album) => (
+                  <Link key={album.id} href={`/albums/${album.id}`} className="group relative">
+                    <div className="bg-card/30 hover:bg-card/60 p-4 rounded-xl transition-all border border-border/10">
+                      <div className="aspect-square rounded-lg bg-muted overflow-hidden mb-4 relative shadow-md">
+                        {album.coverImageUrl ? (
+                          <img src={album.coverImageUrl} alt={album.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-secondary/50">
+                            <Music2 className="w-10 h-10 text-muted-foreground" />
+                          </div>
+                        )}
+                        <Button 
+                          size="icon" 
+                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all rounded-full bg-primary shadow-xl hover:scale-105 active:scale-95"
+                          onClick={(e) => handlePlayAlbum(e, album.id)}
+                        >
+                          <Play className="w-4 h-4 fill-current" />
+                        </Button>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-sm truncate">{album.title}</h3>
+                        <p className="text-xs text-muted-foreground truncate">{album.artist.name}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {artistsData?.artists && artistsData.artists.length > 0 ? (
-              artistsData.artists.map((artist) => (
-                <Link key={artist.id} href={`/artists/${artist.id}`} className="group">
-                  <div className="bg-card/40 hover:bg-card p-4 rounded-md transition-colors text-center space-y-3">
-                    <div className="w-full aspect-square rounded-full mx-auto overflow-hidden bg-muted">
+
+          {/* Side Column (1/3) - Recently Added and Artists */}
+          <div className="space-y-12">
+            <section className="bg-card/20 rounded-2xl p-6 border border-border/10">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold tracking-tight">Recently Added</h2>
+                <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
+                  <Link href="/tracks">View all</Link>
+                </Button>
+              </div>
+              <RecentlyAdded />
+            </section>
+
+            <section className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold tracking-tight">Top Artists</h2>
+                <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
+                  <Link href="/artists">all</Link>
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {artistsData?.artists?.slice(0, 4).map((artist) => (
+                  <Link key={artist.id} href={`/artists/${artist.id}`} className="group flex flex-col items-center">
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-2 ring-transparent group-hover:ring-primary/40 transition-all duration-300">
                       <ArtistImage
                         artistId={artist.id}
                         artistImageUrl={artist.imageUrl}
                         artistName={artist.name}
-                        className="w-full h-full object-cover"
-                        fallbackClassName="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/50"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        fallbackClassName="w-full h-full flex items-center justify-center bg-secondary"
                       />
                     </div>
-                    <div>
-                      <h3 className="font-medium text-sm truncate">
-                        {artist.name}
-                        {artist.verified && <span className="ml-1 text-primary text-xs">✓</span>}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">Artist</p>
+                    <div className="text-center w-full">
+                      <p className="text-xs font-bold truncate px-1">{artist.name}</p>
+                      <p className="text-[10px] text-muted-foreground">Artist</p>
                     </div>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-card/40 p-4 rounded-md text-center space-y-3">
-                  <div className="w-full aspect-square rounded-full mx-auto bg-muted flex items-center justify-center">
-                    <Music2 className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-sm truncate text-muted-foreground">No Artists Yet</h3>
-                    <p className="text-xs text-muted-foreground">Upload music</p>
-                  </div>
-                </div>
-              ))
-            )}
+                  </Link>
+                ))}
+              </div>
+            </section>
           </div>
-        </section>
-
-        {/* Albums */}
-
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Albums</h2>
-            <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/albums">Show all</Link>
-            </Button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {albumsData?.albums && albumsData.albums.length > 0 ? (
-              albumsData.albums.filter(album => album?.id && album?.title).map((album) => (
-                <Link key={album.id} href={`/albums/${album.id}`} className="group">
-                  <div className="bg-card/40 hover:bg-card p-4 rounded-md transition-colors space-y-3">
-                    <div className="w-full aspect-square rounded bg-muted overflow-hidden">
-                      {album.coverImageUrl ? (
-                        <img src={album.coverImageUrl} alt={album.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/30">
-                          <Music2 className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-sm truncate">{album.title}</h3>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {album.artist?.name || 'Unknown Artist'}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-card/40 p-4 rounded-md space-y-3">
-                  <div className="w-full aspect-square rounded bg-muted flex items-center justify-center">
-                    <Music2 className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-sm truncate text-muted-foreground">No Albums Yet</h3>
-                    <p className="text-xs text-muted-foreground">Upload music</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+        </div>
       </div>
     );
   }
@@ -244,7 +218,9 @@ export default function Home() {
             </Button>
           </div>
         </div>
-      </section>      {/* Features */}
+      </section>
+
+      {/* Features */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3 shadow-sm hover:shadow-md transition-shadow">
           <div className="w-14 h-14 bg-primary/10 rounded-xl mx-auto flex items-center justify-center">

@@ -16,7 +16,7 @@ import {
   ListMusic,
   Settings
 } from "lucide-react"
-import { usePlaylists } from "@/hooks/usePlaylist"
+import { usePlaylists, useCreatePlaylist } from "@/hooks/usePlaylist"
 import { useFollowedArtists } from "@/hooks/useFollowedArtists"
 import { useDailyMixes } from "@/hooks/useDailyMixes"
 import { useProfile } from "@/hooks/useProfile"
@@ -32,8 +32,16 @@ export function Sidebar({ className }: SidebarProps) {
   const { data: profile } = useProfile()
   const pathname = usePathname()
   const { data: playlistsData } = usePlaylists(true, 50, 0)
-  const { data: followedArtistsData } = useFollowedArtists(5, 0)
+  const { data: followedArtistsData } = useFollowedArtists(10, 0)
   const { data: dailyMixesData } = useDailyMixes()
+  const { mutate: createPlaylist, isPending: isCreating } = useCreatePlaylist()
+
+  const handleCreatePlaylist = () => {
+    createPlaylist({
+      name: `My Playlist #${(playlistsData?.total || 0) + 1}`,
+      isPublic: true
+    })
+  }
 
   const isActive = (path: string) => pathname === path
 
@@ -86,8 +94,14 @@ export function Sidebar({ className }: SidebarProps) {
             <Library className="h-4 w-4" />
             <span className="text-xs font-semibold uppercase tracking-wider">Library</span>
           </div>
-          <Button size="icon" variant="ghost" className="h-7 w-7">
-            <Plus className="h-3.5 w-3.5" />
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-7 w-7 hover:bg-white/10" 
+            onClick={handleCreatePlaylist}
+            disabled={isCreating}
+          >
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
 

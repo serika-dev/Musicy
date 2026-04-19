@@ -228,10 +228,10 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
             const t = (romanizeEnabled && r && r !== l.text) ? r : l.text
             return Math.max(m, (t || '').length)
           }, 0)
-          const sizeClass = maxLen > 80 ? (isMobile ? 'text-lg' : 'text-xl lg:text-2xl')
-                          : maxLen > 55 ? (isMobile ? 'text-xl' : 'text-2xl lg:text-3xl')
-                          : maxLen > 35 ? (isMobile ? 'text-2xl' : 'text-3xl lg:text-4xl')
-                          : (isMobile ? 'text-3xl' : 'text-4xl lg:text-5xl')
+          const sizeClass = maxLen > 80 ? (isMobile ? 'text-xl' : 'text-2xl lg:text-3xl')
+                          : maxLen > 55 ? (isMobile ? 'text-2xl' : 'text-3xl lg:text-4xl')
+                          : maxLen > 35 ? (isMobile ? 'text-3xl' : 'text-4xl lg:text-5xl')
+                          : (isMobile ? 'text-4xl' : 'text-5xl lg:text-7xl')
           return lyricsWithIds.map((line) => {
             const isCurrent = currentLyricId === line.id
             const romanized = romanizedLinesMap?.[line.id]
