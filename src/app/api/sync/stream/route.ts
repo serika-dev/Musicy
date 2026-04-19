@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         send(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
       })
 
-      // Heartbeat
+      // Heartbeat & Periodic Refresh
       const heartbeat = setInterval(() => {
         send(`: ping\n\n`)
         // Also bump lastSeenAt
@@ -90,6 +90,11 @@ export async function GET(request: NextRequest) {
           .catch(() => {})
       }, 20_000)
 
+      // Periodic broadcast of device list to catch stale devices
+      const listRefresh = setInterval(() => {
+        broadcastDeviceList().catch(() => {})
+      }, 60_000)
+
       // Kick off a device-list broadcast after attaching
       broadcastDeviceList().catch(() => {})
 
@@ -97,6 +102,7 @@ export async function GET(request: NextRequest) {
       request.signal.addEventListener("abort", async () => {
         closed = true
         clearInterval(heartbeat)
+        clearInterval(listRefresh)
         unsubscribe()
         try {
           // Mark inactive if this was the active device, leave record for later

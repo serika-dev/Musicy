@@ -85,16 +85,32 @@ export default function Home() {
           <RecentlyAdded />
         </section>
 
-        {/* Featured Playlists */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Made For You</h2>
-            <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-              <Link href="/playlists">Show all</Link>
-            </Button>
+        {/* Made For You (Playlists & Mixes) */}
+        <section className="space-y-8">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Made For You</h2>
+              <Button variant="link" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
+                <Link href="/playlists">Show all</Link>
+              </Button>
+            </div>
+            
+            <div className="space-y-10">
+              <div className="space-y-4">
+                <FeaturedPlaylists />
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex flex-col">
+                  <h3 className="text-lg font-semibold">Your Daily Mixes</h3>
+                  <p className="text-muted-foreground text-xs font-medium">Personalized collections based on your listening history</p>
+                </div>
+                <DailyMixes />
+              </div>
+            </div>
           </div>
-          <FeaturedPlaylists />
         </section>
+
 
         {/* Artists */}
         <section>
@@ -144,18 +160,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Daily Mixes */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold">Your Mixes</h2>
-              <p className="text-muted-foreground text-xs mt-0.5">Based on your listening</p>
-            </div>
-          </div>
-          <DailyMixes />
-        </section>
-
         {/* Albums */}
+
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Albums</h2>

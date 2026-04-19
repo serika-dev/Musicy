@@ -57,42 +57,39 @@ export function DailyMixes() {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
       {dailyMixes.map((mix) => (
         <Card 
           key={mix.id} 
-          className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 overflow-hidden cursor-pointer border-0 bg-gradient-to-br from-card via-card to-muted/20"
+          className="group hover:bg-card/60 transition-all duration-300 overflow-hidden cursor-pointer border-0 bg-transparent p-0 shadow-none"
         >
           <Link href={`/daily-mixes/${mix.id}`}>
-            <CardContent className="p-0">
+            <CardContent className="p-0 space-y-3">
               {/* Cover Image Container */}
-              <div className="relative aspect-square bg-gradient-to-br from-primary/20 via-primary/30 to-primary/40 overflow-hidden">
+              <div className="relative aspect-square bg-gradient-to-br from-primary/20 via-primary/30 to-primary/40 overflow-hidden rounded-md shadow-md">
                 {mix.coverImageUrl ? (
                   <Image
                     src={mix.coverImageUrl}
                     alt={mix.name}
                     fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                     priority={false}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted via-muted/80 to-muted/60">
-                    <div className="text-6xl opacity-40">🎵</div>
+                    <div className="text-4xl opacity-40">🎵</div>
                   </div>
                 )}
                 
-                {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
                 {/* Play Button Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
                   <Button
-                    size="lg"
-                    className={`rounded-full w-14 h-14 shadow-xl backdrop-blur-sm opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-300 ${
+                    size="icon"
+                    className={`rounded-full w-10 h-10 shadow-lg ${
                       isCurrentMixPlaying(mix) 
-                        ? 'bg-green-500 hover:bg-green-600 text-white' 
-                        : 'bg-white/90 hover:bg-white text-black'
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-primary text-primary-foreground'
                     }`}
                     onClick={(e) => {
                       e.preventDefault()
@@ -109,21 +106,18 @@ export function DailyMixes() {
                 </div>
               </div>
 
-              {/* Mix Info */}
-              <div className="p-5 space-y-3">
-                <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">
+              {/* Mix Info Compact */}
+              <div className="px-1">
+                <h3 className="font-bold text-sm leading-tight truncate">
                   {mix.name}
                 </h3>
-                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                <p className="text-xs text-muted-foreground line-clamp-1 mt-1 font-medium">
                   {mix.description}
                 </p>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground font-medium">
-                    {mix.tracks?.length || 0} tracks
-                  </p>
-                  <div className="text-xs text-muted-foreground">
-                    Daily Mix
-                  </div>
+                <div className="flex items-center mt-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold opacity-70">
+                    Daily Mix • {mix.tracks?.length || 0} tracks
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -131,5 +125,6 @@ export function DailyMixes() {
         </Card>
       ))}
     </div>
+
   )
 }
