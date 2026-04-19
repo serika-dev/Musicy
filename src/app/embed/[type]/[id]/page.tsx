@@ -73,11 +73,17 @@ export default function EmbedPage() {
       }
     }
 
+    const handlePlayPause = () => {
+      setIsPlaying(!audio.paused)
+    }
+
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('loadedmetadata', handleLoadedMetadata)
     audio.addEventListener('durationchange', handleDurationChange)
     audio.addEventListener('progress', handleDurationChange)
     audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('play', handlePlayPause)
+    audio.addEventListener('pause', handlePlayPause)
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate)
@@ -85,8 +91,10 @@ export default function EmbedPage() {
       audio.removeEventListener('durationchange', handleDurationChange)
       audio.removeEventListener('progress', handleDurationChange)
       audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('play', handlePlayPause)
+      audio.removeEventListener('pause', handlePlayPause)
     }
-  }, [])
+  }, [data])
 
   useEffect(() => {
     if (!audioRef.current) return
