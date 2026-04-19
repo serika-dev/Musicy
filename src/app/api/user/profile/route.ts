@@ -80,13 +80,21 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+
+    if (!currentUser) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 })
+    }
+
     // Check if username is already taken by another user
-    if (username !== session.user.username) {
+    if (username !== currentUser.username) {
       const existingUser = await prisma.user.findUnique({
         where: { username },
       })
 
-      if (existingUser && existingUser.id !== session.user.id) {
+      if (existingUser && existingUser.id !== userId) {
         return NextResponse.json(
           { message: "Username is already taken" },
           { status: 409 }
@@ -96,7 +104,7 @@ export async function PUT(request: NextRequest) {
 
     // Update user
     const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: {
         username,
         displayName,
