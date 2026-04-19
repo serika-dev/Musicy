@@ -53,24 +53,29 @@ export function TrackListItem({
       role="button"
       aria-label={`Play ${track.title} by ${track.artist.name}`}
     >
-      {/* Album Cover / Icon */}
+      {/* Album Cover / Artist Image */}
       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-        {track.album?.coverImageUrl ? (
-          <Image
-            src={track.album.coverImageUrl} 
-            alt={track.album?.title || 'Album cover'}
-            fill
-            className="object-cover rounded-md"
-            sizes="(max-width: 640px) 40px, 48px"
-            onError={() => {
-              // Handle error with fallback in parent div
-            }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 rounded-md flex items-center justify-center">
-            <div className="text-lg sm:text-2xl">🎵</div>
-          </div>
-        )}
+        {(() => {
+          // For compilations, prefer artist image over shared album cover
+          const isCompilation = (track.album as any)?.albumType === 'COMPILATION'
+          const imgUrl = isCompilation
+            ? ((track.artist as any)?.imageUrl || track.album?.coverImageUrl)
+            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl)
+          return imgUrl ? (
+            <Image
+              src={imgUrl}
+              alt={isCompilation ? track.artist.name : (track.album?.title || 'Album cover')}
+              fill
+              className="object-cover rounded-md"
+              sizes="(max-width: 640px) 40px, 48px"
+              onError={() => {}}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 rounded-md flex items-center justify-center">
+              <div className="text-lg sm:text-2xl">🎵</div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Track Info */}

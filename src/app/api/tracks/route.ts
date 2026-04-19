@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            imageUrl: true,
             verified: true,
           },
         },
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
             id: true,
             title: true,
             coverImageUrl: true,
+            albumType: true,
           },
         },
       },
