@@ -40,6 +40,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
             id: true,
             title: true,
             duration: true,
+            coverImageUrl: true,
             genre: true,
             format: true,
             filePath: true,
@@ -95,13 +96,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    if (!artist) {
-      return NextResponse.json(
-        { message: "Artist not found" },
-        { status: 404 }
-      )
-    }
-
     // Attach follow state
     let isFollowing = false
     if (session?.user?.id) {
@@ -122,7 +116,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     // Mask file paths for unauthorized access
     const returnedArtist = {
       ...artist,
-      tracks: artist.tracks.map(track => ({
+      tracks: (artist as any).tracks.map((track: any) => ({
         ...track,
         filePath: isAuthorized ? track.filePath : undefined
       }))

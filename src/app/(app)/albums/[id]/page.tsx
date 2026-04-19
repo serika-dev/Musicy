@@ -32,6 +32,7 @@ interface Album {
     id: string
     title: string
     duration: number
+    coverImageUrl?: string
     filePath: string
     format: string
     trackNumber?: number

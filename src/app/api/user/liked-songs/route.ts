@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
             duration: true,
             filePath: true,
             format: true,
+            coverImageUrl: true,
             bitRate: true,
             sampleRate: true,
             genre: true,
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
       where: { userId: session.user.id },
     })
 
-    const tracks = likedTracks.map(like => like.track)
+    const tracks = (likedTracks as any).map((like: any) => like.track)
 
     return NextResponse.json({
       tracks,

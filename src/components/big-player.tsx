@@ -159,9 +159,11 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
   // Extract colors from album cover for dynamic gradient
   useEffect(() => {
     const extractColors = async () => {
-      if (currentTrack?.album?.coverImageUrl) {
+      if (!currentTrack) return
+      const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+      if (imgUrl) {
         try {
-          const palette = await extractColorsFromImage(currentTrack.album.coverImageUrl)
+          const palette = await extractColorsFromImage(imgUrl)
           const gradient = generateGradientFromPalette(palette)
           setDynamicGradient(gradient)
         } catch (error) {
@@ -289,11 +291,15 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
         </DialogTitle>
         <div className="relative w-full h-full overflow-hidden bg-black flex flex-col">
           {/* Blurred Cover Background */}
-          {currentTrack.album?.coverImageUrl && (
-            <div className="absolute inset-0 -z-10 bg-black">
-              <Image src={currentTrack.album.coverImageUrl} alt="Cover" fill priority className="object-cover blur-[60px] scale-150 opacity-50" sizes="50vw" />
-            </div>
-          )}
+          {(() => {
+            const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+            if (imgUrl) return (
+              <div className="absolute inset-0 -z-10 bg-black">
+                <Image src={imgUrl} alt="Cover" fill priority className="object-cover blur-[60px] scale-150 opacity-50" sizes="50vw" />
+              </div>
+            )
+            return null
+          })()}
           {/* Dynamic Gradient Overlay */}
           <div className="absolute inset-0 transition-all duration-1000" style={{ background: dynamicGradient || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', mixBlendMode: 'multiply' }} />
           <div className="absolute inset-0 bg-black/40" />
@@ -322,9 +328,11 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
                 {/* Mini Header for Lyrics Mode */}
                 <div className="flex items-center space-x-4 mb-4 shrink-0">
                   <div className="w-14 h-14 bg-black/30 shadow-xl overflow-hidden relative rounded align-top">
-                    {currentTrack.album?.coverImageUrl ? (
-                      <Image src={currentTrack.album.coverImageUrl} alt="Cover" fill className="object-cover" sizes="56px" />
-                    ) : ( <div className="w-full h-full flex items-center justify-center text-xl">🎵</div> )}
+                    {(() => {
+                      const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+                      if (imgUrl) return <Image src={imgUrl} alt="Cover" fill className="object-cover" sizes="56px" />
+                      return <div className="w-full h-full flex items-center justify-center text-xl">🎵</div>
+                    })()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-base truncate text-white">{currentTrack.title}</h3>
@@ -366,9 +374,11 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex-1 flex items-center justify-center pb-4 min-h-0 w-full mt-2">
                   <div className="relative aspect-square mx-auto bg-black/30 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden rounded-xl" style={{ height: 'min(100%, 380px, 45vh)' }}>
-                    {currentTrack.album?.coverImageUrl ? (
-                      <Image src={currentTrack.album.coverImageUrl} alt="Cover" fill className="object-cover" sizes="400px" priority />
-                    ) : ( <div className="w-full h-full flex items-center justify-center text-7xl">🎵</div> )}
+                    {(() => {
+                      const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+                      if (imgUrl) return <Image src={imgUrl} alt="Cover" fill className="object-cover" sizes="400px" priority />
+                      return <div className="w-full h-full flex items-center justify-center text-7xl">🎵</div>
+                    })()}
                   </div>
                 </div>
                 {/* Control Panel */}
@@ -423,9 +433,11 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
               ) : (
                 <div className="flex flex-col lg:flex-row items-center justify-center space-y-8 lg:space-y-0 lg:space-x-16 text-white w-full max-w-6xl mx-auto px-12 h-full">
                   <div className="w-80 h-80 xl:w-96 xl:h-96 bg-black/30 rounded-2xl shadow-2xl overflow-hidden flex-shrink-0 relative">
-                    {currentTrack.album?.coverImageUrl ? (
-                      <Image src={currentTrack.album.coverImageUrl} alt="Cover" fill className="object-cover" sizes="400px" />
-                    ) : ( <div className="w-full h-full flex items-center justify-center text-8xl">🎵</div> )}
+                    {(() => {
+                      const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+                      if (imgUrl) return <Image src={imgUrl} alt="Cover" fill className="object-cover" sizes="400px" />
+                      return <div className="w-full h-full flex items-center justify-center text-8xl">🎵</div>
+                    })()}
                   </div>
                   <div className="flex flex-col items-center lg:items-start space-y-6 text-center lg:text-left w-full h-full justify-center">
                     <h1 className="text-5xl xl:text-7xl font-bold leading-tight">{currentTrack.title}</h1>
@@ -453,9 +465,11 @@ export function BigPlayer({ isOpen, onClose }: BigPlayerProps) {
                 <div className="flex items-center justify-between w-full pt-3">
                   <div className="flex items-center space-x-4 flex-1 min-w-0">
                     <div className="w-14 h-14 bg-black/30 rounded-lg overflow-hidden relative">
-                      {currentTrack.album?.coverImageUrl ? (
-                        <Image src={currentTrack.album.coverImageUrl} alt="Cover" fill className="object-cover" sizes="56px" />
-                      ) : ( <div className="w-full h-full flex items-center justify-center text-xl">🎵</div> )}
+                      {(() => {
+                        const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+                        if (imgUrl) return <Image src={imgUrl} alt="Cover" fill className="object-cover" sizes="56px" />
+                        return <div className="w-full h-full flex items-center justify-center text-xl">🎵</div>
+                      })()}
                     </div>
                     <div className="min-w-0">
                       <h3 className="text-white font-semibold truncate text-base">{currentTrack.title}</h3>

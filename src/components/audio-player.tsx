@@ -108,19 +108,23 @@ export function AudioPlayer() {
               className="w-10 h-10 rounded bg-muted flex-shrink-0 overflow-hidden relative cursor-pointer"
               onClick={() => setIsBigPlayerOpen(true)}
             >
-              {currentTrack.album?.coverImageUrl ? (
-                <Image
-                  src={currentTrack.album.coverImageUrl}
-                  alt={currentTrack.album?.title || 'Cover'}
-                  fill
-                  className="object-cover"
-                  sizes="40px"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
-                  <Music2 className="w-4 h-4 text-muted-foreground" />
-                </div>
-              )}
+              {(() => {
+                const imgUrl = currentTrack.coverImageUrl || currentTrack.album?.coverImageUrl
+                if (imgUrl) return (
+                  <Image
+                    src={imgUrl}
+                    alt={currentTrack.album?.title || currentTrack.title}
+                    fill
+                    className="object-cover"
+                    sizes="40px"
+                  />
+                )
+                return (
+                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+                    <Music2 className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )
+              })()}
             </div>
             <div className="min-w-0 pr-2 pb-1 md:pb-0">
               <p className="text-sm font-medium truncate">{currentTrack.title}</p>
