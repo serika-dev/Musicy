@@ -6,6 +6,7 @@ interface UserProfile {
   username?: string
   displayName?: string
   avatarUrl?: string
+  bannerUrl?: string
   isPremium: boolean
   role: 'ADMIN' | 'USER'
   createdAt: string
@@ -21,6 +22,7 @@ interface UpdateProfileData {
   username: string
   displayName: string
   avatarUrl?: string
+  bannerUrl?: string
 }
 
 interface ChangePasswordData {

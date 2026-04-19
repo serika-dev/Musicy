@@ -7,7 +7,7 @@ interface ArtistImageData {
 }
 
 export function useArtistImage(artistId?: string, artistImageUrl?: string) {
-  return useQuery({
+  return useQuery<ArtistImageData>({
     queryKey: ['artistImage', artistId],
     queryFn: async (): Promise<ArtistImageData> => {
       // If artist already has a profile picture, use it
@@ -36,7 +36,7 @@ export function useArtistImage(artistId?: string, artistImageUrl?: string) {
     },
     enabled: !!artistId,
     staleTime: 1000 * 60 * 15, // 15 minutes
-    cacheTime: 1000 * 60 * 60, // 1 hour
+    gcTime: 1000 * 60 * 60, // 1 hour
   })
 }
 

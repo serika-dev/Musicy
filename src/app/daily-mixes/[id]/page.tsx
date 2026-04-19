@@ -33,6 +33,8 @@ interface DailyMix {
     id: string
     title: string
     duration: number
+    filePath: string
+    format: string
     artist: {
       id: string
       name: string

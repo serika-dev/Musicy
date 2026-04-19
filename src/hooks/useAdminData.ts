@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 // Users management
 interface AdminUser {
@@ -190,6 +191,10 @@ export function useDeleteTrack() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tracks'] })
+      toast.success('Track deleted successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete track: ${error.message}`)
     },
   })
 }
@@ -212,6 +217,10 @@ export function useDeleteUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      toast.success('User deleted successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete user: ${error.message}`)
     },
   })
 }
@@ -236,8 +245,12 @@ export function useUpdateUserRole() {
 
       return response.json()
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      toast.success(`User role updated to ${data.role}`)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update user role: ${error.message}`)
     },
   })
 }
@@ -262,8 +275,12 @@ export function useToggleTrackVisibility() {
 
       return response.json()
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tracks'] })
+      toast.success(`Track visibility set to ${data.isPublic ? 'public' : 'private'}`)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update track visibility: ${error.message}`)
     },
   })
 }
@@ -310,6 +327,10 @@ export function useUpdateTrackLyrics() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tracks'] })
+      toast.success('Lyrics updated successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update lyrics: ${error.message}`)
     },
   })
 }

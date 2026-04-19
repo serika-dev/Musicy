@@ -31,6 +31,8 @@ interface Album {
     id: string
     title: string
     duration: number
+    filePath: string
+    format: string
     trackNumber?: number
     artist: {
       id: string

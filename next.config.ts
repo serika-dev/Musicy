@@ -5,15 +5,14 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'r2-musicy.serika.moe',
+        hostname: 'f003.backblazeb2.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 's3.eu-central-003.backblazeb2.com',
       },
     ],
   },
-  // Configure for large file uploads
-  experimental: {
-    serverComponentsExternalPackages: ['music-metadata'],
-  },
-  // Enable server actions for large file handling
   serverExternalPackages: ['music-metadata'],
 };
 

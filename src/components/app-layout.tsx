@@ -20,100 +20,75 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname()
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
-  // Don't show sidebar on auth pages
   const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register")
   const showSidebar = session && !isAuthPage
 
-  // Close mobile sidebar when route changes
   useEffect(() => {
     setIsMobileSidebarOpen(false)
   }, [pathname])
 
-  // Close mobile sidebar on window resize to desktop
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) { // lg breakpoint
-        setIsMobileSidebarOpen(false)
-      }
+      if (window.innerWidth >= 1024) setIsMobileSidebarOpen(false)
     }
-
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
+    <div className="flex flex-col h-screen bg-background">
       {!isAuthPage && <Header />}
-      
-      {/* Mobile Sidebar Button */}
+
+      {/* Mobile sidebar toggle */}
       {showSidebar && (
         <Button
           variant="ghost"
           size="icon"
-          className="fixed top-4 left-4 z-50 lg:hidden bg-background/80 backdrop-blur-sm border"
+          className="fixed top-3 left-3 z-50 lg:hidden h-8 w-8 bg-background/80 backdrop-blur-sm border border-border/50"
           onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         >
-          {isMobileSidebarOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Menu className="h-5 w-5" />
-          )}
+          {isMobileSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>
       )}
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile overlay */}
       {showSidebar && isMobileSidebarOpen && (
         <button
           type="button"
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsMobileSidebarOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setIsMobileSidebarOpen(false)
-            }
-          }}
+          onKeyDown={(e) => e.key === 'Escape' && setIsMobileSidebarOpen(false)}
           aria-label="Close sidebar"
         />
       )}
-      
-      {/* Main content area */}
+
       <div className="flex flex-1 overflow-hidden">
-        {/* Desktop Sidebar */}
+        {/* Desktop sidebar */}
         {showSidebar && (
-          <div className="hidden lg:flex w-72 flex-shrink-0 p-2 pl-2 pr-0">
-            <Sidebar className={`h-full ${currentTrack ? 'pb-28' : ''}`} />
+          <div className="hidden lg:flex w-64 flex-shrink-0 p-2 pr-0">
+            <Sidebar className={`h-full ${currentTrack ? 'pb-20' : ''}`} />
           </div>
         )}
 
-        {/* Mobile Sidebar */}
+        {/* Mobile sidebar */}
         {showSidebar && (
-          <div
-            className={`fixed top-0 left-0 z-50 h-full w-72 bg-background border-r transform transition-transform duration-300 ease-in-out lg:hidden ${
-              isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            }`}
-          >
-            <div className="p-2 h-full pt-16"> {/* pt-16 to account for mobile menu button */}
-              <Sidebar className={`h-full ${currentTrack ? 'pb-28' : ''}`} />
+          <div className={`fixed top-0 left-0 z-50 h-full w-64 bg-background border-r border-border/50 transform transition-transform duration-200 ease-out lg:hidden ${
+            isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}>
+            <div className="p-2 h-full pt-14">
+              <Sidebar className={`h-full ${currentTrack ? 'pb-20' : ''}`} />
             </div>
           </div>
         )}
-        
+
         {/* Main content */}
-        <div 
-          className={`flex-1 overflow-auto ${
-            currentTrack ? "pb-24" : "pb-0"
-          } ${
-            showSidebar ? "lg:pl-2" : ""
-          } ${
-            showSidebar ? "pt-16 lg:pt-0" : ""
-          }`}
-        >
-          {children}
-        </div>
+        <main className={`flex-1 overflow-auto ${currentTrack ? 'pb-20' : ''} ${showSidebar ? 'lg:pl-2' : ''} ${showSidebar ? 'pt-14 lg:pt-0' : ''}`}>
+          <div className="container mx-auto px-4 lg:px-6 py-6">
+            {children}
+          </div>
+        </main>
       </div>
-      
-      {/* Audio Player - always render, it handles its own visibility */}
+
       <AudioPlayer />
     </div>
   )

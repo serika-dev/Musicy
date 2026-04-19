@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { useProfile } from "@/hooks/useProfile"
 import { useAdminUsers, useAdminTracks, useAdminArtists, useDeleteTrack, useDeleteUser, useUpdateUserRole, useToggleTrackVisibility, useLrcLibSearch, useUpdateTrackLyrics } from "@/hooks/useAdminData"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { ImageUpload } from "@/components/image-upload"
 import { 
   Upload, 
   Music, 
@@ -58,6 +60,28 @@ export default function AdminPage() {
   const [conflictData, setConflictData] = useState<any>(null)
   const [showConflictDialog, setShowConflictDialog] = useState(false)
   const [selectedArtistInDialog, setSelectedArtistInDialog] = useState<string>('')
+  
+  // Artist editing state
+  const [editingArtist, setEditingArtist] = useState<any>(null)
+  const [editArtistForm, setEditArtistForm] = useState({
+    name: '',
+    bio: '',
+    website: '',
+    verified: false,
+    imageUrl: '',
+  })
+  const [isUpdatingArtist, setIsUpdatingArtist] = useState(false)
+  
+  // Track editing state
+  const [editingTrack, setEditingTrack] = useState<any>(null)
+  const [editTrackForm, setEditTrackForm] = useState({
+    title: '',
+    genre: '',
+    year: '',
+    trackNumber: '',
+  })
+  const [isUpdatingTrack, setIsUpdatingTrack] = useState(false)
+  
   const [uploadFormData, setUploadFormData] = useState({
     audioFile: null as File | null,
     coverImage: null as File | null,
@@ -284,7 +308,7 @@ export default function AdminPage() {
         } else if (value instanceof File) {
           formData.append(key, value)
         } else {
-          formData.append(key, value)
+          formData.append(key, String(value))
         }
       }
     })
@@ -426,6 +450,124 @@ This is specifically an audio file upload issue.`
     }
   }
 
+  // Handle artist edit click
+  const handleEditArtistClick = (artist: any) => {
+    setEditingArtist(artist)
+    setEditArtistForm({
+      name: artist.name || '',
+      bio: artist.bio || '',
+      website: artist.website || '',
+      verified: artist.verified || false,
+      imageUrl: artist.imageUrl || '',
+    })
+  }
+
+  // Handle artist update
+  const handleUpdateArtist = async () => {
+    if (!editingArtist) return
+    
+    setIsUpdatingArtist(true)
+    try {
+      const response = await fetch(`/api/admin/artists/${editingArtist.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editArtistForm.name,
+          bio: editArtistForm.bio,
+          website: editArtistForm.website,
+          verified: editArtistForm.verified,
+          imageUrl: editArtistForm.imageUrl,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success(`Artist "${editArtistForm.name}" updated successfully!`)
+        setEditingArtist(null)
+        refetchArtists()
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to update artist: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error updating artist:', error)
+      toast.error('Failed to update artist: Network error')
+    } finally {
+      setIsUpdatingArtist(false)
+    }
+  }
+
+  // Handle artist delete
+  const handleDeleteArtist = async (artistId: string, artistName: string) => {
+    if (!confirm(`Delete artist "${artistName}"? This will also delete all their tracks and albums. This action cannot be undone.`)) {
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/admin/artists/${artistId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast.success(`Artist "${artistName}" deleted successfully!`)
+        refetchArtists()
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to delete artist: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error deleting artist:', error)
+      toast.error('Failed to delete artist: Network error')
+    }
+  }
+
+  // Handle track edit click
+  const handleEditTrackClick = (track: any) => {
+    setEditingTrack(track)
+    setEditTrackForm({
+      title: track.title || '',
+      genre: track.genre || '',
+      year: track.year ? String(track.year) : '',
+      trackNumber: track.trackNumber ? String(track.trackNumber) : '',
+    })
+  }
+
+  // Handle track update
+  const handleUpdateTrack = async () => {
+    if (!editingTrack) return
+    
+    setIsUpdatingTrack(true)
+    try {
+      const response = await fetch(`/api/admin/tracks/${editingTrack.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editTrackForm.title,
+          genre: editTrackForm.genre || null,
+          year: editTrackForm.year ? parseInt(editTrackForm.year) : null,
+          trackNumber: editTrackForm.trackNumber ? parseInt(editTrackForm.trackNumber) : null,
+        }),
+      })
+
+      if (response.ok) {
+        toast.success(`Track "${editTrackForm.title}" updated successfully!`)
+        setEditingTrack(null)
+        refetchTracks()
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to update track: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error updating track:', error)
+      toast.error('Failed to update track: Network error')
+    } finally {
+      setIsUpdatingTrack(false)
+    }
+  }
+
   // Handle artist conflict resolution
   const handleArtistConflictResolution = async (action: 'existing' | 'new', selectedArtistId?: string) => {
     if (!conflictData) return
@@ -479,7 +621,7 @@ This is specifically an audio file upload issue.`
         } else if (value instanceof File) {
           formData.append(key, value)
         } else {
-          formData.append(key, value)
+          formData.append(key, String(value))
         }
       }
     })
@@ -756,7 +898,7 @@ This is specifically an audio file upload issue.`
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{tracksData?.tracks?.filter(t => t.isPublic).length || 0}</div>
+                    <div className="text-2xl font-bold">{tracksData?.tracks?.filter((t: any) => t.isPublic).length || 0}</div>
                   </CardContent>
                 </Card>
 
@@ -766,7 +908,7 @@ This is specifically an audio file upload issue.`
                     <Shield className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{usersData?.users?.filter(u => u.role === 'ADMIN').length || 0}</div>
+                    <div className="text-2xl font-bold">{usersData?.users?.filter((u: any) => u.role === 'ADMIN').length || 0}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -803,7 +945,7 @@ This is specifically an audio file upload issue.`
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tracksData?.tracks?.map((track) => (
+                      {tracksData?.tracks?.map((track: any) => (
                         <TableRow key={track.id}>
                           <TableCell className="font-medium">{track.title}</TableCell>
                           <TableCell>
@@ -819,6 +961,13 @@ This is specifically an audio file upload issue.`
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditTrackClick(track)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -885,7 +1034,7 @@ This is specifically an audio file upload issue.`
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {artistsData?.artists.map((artist) => (
+                      {artistsData?.artists.map((artist: any) => (
                         <TableRow key={artist.id}>
                           <TableCell className="font-medium">
                             <div className="flex items-center space-x-3">
@@ -931,7 +1080,11 @@ This is specifically an audio file upload issue.`
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleEditArtistClick(artist)}
+                              >
                                 <Edit className="w-4 h-4 mr-1" />
                                 Edit
                               </Button>
@@ -944,6 +1097,13 @@ This is specifically an audio file upload issue.`
                               >
                                 <Eye className="w-4 h-4 mr-1" />
                                 View
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                onClick={() => handleDeleteArtist(artist.id, artist.name)}
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -991,7 +1151,7 @@ This is specifically an audio file upload issue.`
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {usersData?.users?.map((user) => (
+                      {usersData?.users?.map((user: any) => (
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">{user.email}</TableCell>
                           <TableCell>{user.username || "—"}</TableCell>
@@ -1452,7 +1612,7 @@ This is specifically an audio file upload issue.`
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {tracksData.tracks.slice(0, 10).map((track) => (
+                      {tracksData.tracks.slice(0, 10).map((track: any) => (
                         <div key={track.id} className="flex items-center justify-between p-3 border rounded">
                           <div>
                             <p className="font-medium">{track.title}</p>
@@ -1613,6 +1773,30 @@ This is specifically an audio file upload issue.`
                           </div>
                         </div>
                       )}
+                      
+                      {/* Switch to Manual Mode Button */}
+                      <div className="pt-4 border-t">
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setManualLyricsMode(true)
+                            // Pre-fill with found data if available
+                            if (selectedTrackForLyrics.lrcData?.id) {
+                              setManualLyricsData(prev => ({
+                                ...prev,
+                                lrcId: String(selectedTrackForLyrics.lrcData.id),
+                                plainLyrics: selectedTrackForLyrics.lrcData.plainLyrics || '',
+                                syncedLyrics: selectedTrackForLyrics.lrcData.syncedLyrics || ''
+                              }))
+                            }
+                          }}
+                        >
+                          ✏️ Edit Lyrics Manually
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Switch to manual mode to customize or replace the found lyrics
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1658,7 +1842,7 @@ This is specifically an audio file upload issue.`
           {/* Artist Conflict Resolution Dialog */}
           <Dialog 
             open={showConflictDialog} 
-            onOpenChange={(open) => {
+            onOpenChange={(open: boolean) => {
               setShowConflictDialog(open)
               if (!open) {
                 setSelectedArtistInDialog('')
@@ -1736,6 +1920,187 @@ This is specifically an audio file upload issue.`
                   }}
                 >
                   ✅ Use This Existing Artist
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Artist Dialog */}
+          <Dialog 
+            open={!!editingArtist} 
+            onOpenChange={(open: boolean) => {
+              if (!open) {
+                setEditingArtist(null)
+                setEditArtistForm({ name: '', bio: '', website: '', verified: false, imageUrl: '' })
+              }
+            }}
+          >
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Edit Artist</DialogTitle>
+                <DialogDescription>
+                  Update artist information below
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                {/* Artist Profile Picture */}
+                <div className="flex flex-col items-center space-y-3">
+                  <Label className="text-sm font-medium self-start w-full">Profile Picture</Label>
+                  <ImageUpload
+                    currentImage={editArtistForm.imageUrl}
+                    onImageChange={(url: string) => setEditArtistForm({...editArtistForm, imageUrl: url})}
+                    type="profile"
+                    size="lg"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="artist-name">Name *</Label>
+                  <Input
+                    id="artist-name"
+                    value={editArtistForm.name}
+                    onChange={(e) => setEditArtistForm({...editArtistForm, name: e.target.value})}
+                    placeholder="Artist name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="artist-bio">Bio</Label>
+                  <Textarea
+                    id="artist-bio"
+                    value={editArtistForm.bio}
+                    onChange={(e) => setEditArtistForm({...editArtistForm, bio: e.target.value})}
+                    placeholder="Artist biography"
+                    rows={4}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="artist-website">Website</Label>
+                  <Input
+                    id="artist-website"
+                    value={editArtistForm.website}
+                    onChange={(e) => setEditArtistForm({...editArtistForm, website: e.target.value})}
+                    placeholder="https://artist-website.com"
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="artist-verified"
+                    checked={editArtistForm.verified}
+                    onChange={(e) => setEditArtistForm({...editArtistForm, verified: e.target.checked})}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="artist-verified" className="cursor-pointer">
+                    Verified Artist
+                  </Label>
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setEditingArtist(null)
+                    setEditArtistForm({ name: '', bio: '', website: '', verified: false, imageUrl: '' })
+                  }}
+                  disabled={isUpdatingArtist}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUpdateArtist}
+                  disabled={isUpdatingArtist || !editArtistForm.name.trim()}
+                >
+                  {isUpdatingArtist ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Track Dialog */}
+          <Dialog 
+            open={!!editingTrack} 
+            onOpenChange={(open: boolean) => {
+              if (!open) {
+                setEditingTrack(null)
+                setEditTrackForm({ title: '', genre: '', year: '', trackNumber: '' })
+              }
+            }}
+          >
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Edit Track</DialogTitle>
+                <DialogDescription>
+                  Update track metadata below
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="track-title">Title *</Label>
+                  <Input
+                    id="track-title"
+                    value={editTrackForm.title}
+                    onChange={(e) => setEditTrackForm({...editTrackForm, title: e.target.value})}
+                    placeholder="Track title"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="track-genre">Genre</Label>
+                    <Input
+                      id="track-genre"
+                      value={editTrackForm.genre}
+                      onChange={(e) => setEditTrackForm({...editTrackForm, genre: e.target.value})}
+                      placeholder="e.g., Pop, Rock, Jazz"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="track-year">Year</Label>
+                    <Input
+                      id="track-year"
+                      type="number"
+                      value={editTrackForm.year}
+                      onChange={(e) => setEditTrackForm({...editTrackForm, year: e.target.value})}
+                      placeholder="e.g., 2024"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="track-number">Track Number</Label>
+                  <Input
+                    id="track-number"
+                    type="number"
+                    value={editTrackForm.trackNumber}
+                    onChange={(e) => setEditTrackForm({...editTrackForm, trackNumber: e.target.value})}
+                    placeholder="e.g., 1"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setEditingTrack(null)
+                    setEditTrackForm({ title: '', genre: '', year: '', trackNumber: '' })
+                  }}
+                  disabled={isUpdatingTrack}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUpdateTrack}
+                  disabled={isUpdatingTrack || !editTrackForm.title.trim()}
+                >
+                  {isUpdatingTrack ? 'Saving...' : 'Save Changes'}
                 </Button>
               </DialogFooter>
             </DialogContent>

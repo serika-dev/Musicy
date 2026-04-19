@@ -11,13 +11,16 @@ interface Track {
   id: string
   title: string
   duration: number
+  filePath: string
   format: string
   genre?: string
   artist: {
+    id: string
     name: string
     verified: boolean
   }
   album?: {
+    id: string
     title: string
     coverImageUrl?: string
   }
@@ -29,7 +32,7 @@ interface StatsResponse {
 }
 
 export function useStats() {
-  return useQuery({
+  return useQuery<StatsResponse>({
     queryKey: ['stats'],
     queryFn: async (): Promise<StatsResponse> => {
       const response = await fetch('/api/stats')

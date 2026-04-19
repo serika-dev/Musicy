@@ -10,16 +10,16 @@ import { Button } from "@/components/ui/button"
 import { ImageUpload } from "@/components/image-upload"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useProfile, useUpdateProfile, useChangePassword } from "@/hooks/useProfile"
-import { User, Music, Heart, Users, Calendar, Crown, Mail, Edit } from "lucide-react"
-import { formatDuration } from "@/lib/utils"
-import { Header } from "@/components/header"
+import { User, Music, Heart, Users, Calendar, Crown, Mail, Edit, Shield, ListMusic, Check, X } from "lucide-react"
 
 const profileSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
   displayName: z.string().min(1, "Display name is required").max(50, "Display name must be less than 50 characters"),
   avatarUrl: z.string().optional(),
+  bannerUrl: z.string().optional(),
 })
 
 const passwordSchema = z.object({
@@ -35,25 +35,15 @@ type ProfileFormValues = z.infer<typeof profileSchema>
 type PasswordFormValues = z.infer<typeof passwordSchema>
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update: updateSession } = useSession()
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   
   const { data: profile, isLoading, error } = useProfile()
   const updateProfileMutation = useUpdateProfile()
   const changePasswordMutation = useChangePassword()
-
-  // Redirect to dynamic profile page for better URL structure
-  useEffect(() => {
-    if (session?.user?.id) {
-      // Only redirect if not already editing
-      const isEditingMode = window.location.search.includes('edit=true')
-      if (!isEditingMode) {
-        router.push(`/profile/${session.user.id}?edit=true`)
-      }
-    }
-  }, [session, router])
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -61,6 +51,7 @@ export default function ProfilePage() {
       username: "",
       displayName: "",
       avatarUrl: "",
+      bannerUrl: "",
     },
   })
 
@@ -85,6 +76,7 @@ export default function ProfilePage() {
         username: profile.username || "",
         displayName: profile.displayName || "",
         avatarUrl: profile.avatarUrl || "",
+        bannerUrl: profile.bannerUrl || "",
       })
     }
   }, [profile, form])
@@ -92,7 +84,10 @@ export default function ProfilePage() {
   const onSubmit = async (data: ProfileFormValues) => {
     try {
       await updateProfileMutation.mutateAsync(data)
+      await updateSession()
       setIsEditing(false)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
     } catch (error) {
       console.error("Failed to update profile:", error)
     }
@@ -106,37 +101,39 @@ export default function ProfilePage() {
       })
       setIsChangingPassword(false)
       passwordForm.reset()
-      // Show success message
-      alert("Password changed successfully!")
     } catch (error) {
       console.error("Error changing password:", error)
-      const errorMessage = error instanceof Error ? error.message : "Failed to change password"
-      alert(`Error: ${errorMessage}`)
     }
   }
 
+  const userInitials = profile?.displayName
+    ? profile.displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : profile?.email?.[0]?.toUpperCase() || "?"
+
+  const isAdmin = profile?.role === "ADMIN"
+  const memberSince = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : ""
+
   if (status === "loading" || isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-          </div>
-        </main>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-destructive">Failed to load profile</p>
-            </CardContent>
-          </Card>
-        </main>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="border-border/50 bg-card/50">
+          <CardContent className="p-8 text-center">
+            <p className="text-destructive">Failed to load profile</p>
+            <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -146,337 +143,323 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-6 py-8 max-w-4xl">
-        <div className="space-y-8">
-          {/* Profile Header */}
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Profile</h1>
-            {!isEditing && (
-              <Button onClick={() => setIsEditing(true)} variant="outline">
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Profile
-              </Button>
-            )}
-          </div>
+    <div className="w-full max-w-7xl mx-auto space-y-10 px-0 md:px-4 pb-12">
+      {/* Banner + Avatar Hero */}
+      <div className="relative">
+        {/* Banner */}
+        <div className="relative h-56 md:h-72 rounded-none md:rounded-2xl overflow-hidden bg-gradient-to-br from-primary/30 via-primary/10 to-background border-b md:border border-border/50 shadow-sm">
+          {profile.bannerUrl ? (
+            <img 
+              src={profile.bannerUrl} 
+              alt="Profile Banner" 
+              className="w-full h-full object-cover" 
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+          )}
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Profile Info */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>
-                    Your basic account information
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {isEditing ? (
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        {/* Avatar Upload */}
-                        <div className="flex justify-center">
-                          <ImageUpload
-                            currentImage={form.watch('avatarUrl')}
-                            onImageChange={(url) => form.setValue('avatarUrl', url)}
-                            type="profile"
-                            size="lg"
-                          />
-                        </div>
-                        <FormField
-                          control={form.control}
-                          name="displayName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Display Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Your display name" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                This is your public display name.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="username"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Username</FormLabel>
-                              <FormControl>
-                                <Input placeholder="your_username" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                Your unique username. This will be part of your profile URL.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="flex space-x-4">
-                          <Button 
-                            type="submit" 
-                            disabled={updateProfileMutation.isPending}
-                          >
-                            {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
-                          </Button>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            onClick={() => {
-                              setIsEditing(false)
-                              form.reset()
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-
-                        {updateProfileMutation.isError && (
-                          <p className="text-sm text-destructive">
-                            {updateProfileMutation.error?.message || "Failed to update profile"}
-                          </p>
-                        )}
-                      </form>
-                    </Form>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center overflow-hidden">
-                          {profile.avatarUrl ? (
-                            <img
-                              src={profile.avatarUrl}
-                              alt={profile.displayName || 'Profile'}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <User className="w-8 h-8 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-semibold">
-                            {profile.displayName || "No display name"}
-                            {profile.isPremium && (
-                              <Crown className="w-5 h-5 text-yellow-500 inline ml-2" />
-                            )}
-                          </h2>
-                          <p className="text-muted-foreground">
-                            @{profile.username || "No username"}
-                          </p>
-                          <p className="text-sm font-medium text-primary">
-                            {profile.role === 'ADMIN' ? '🔧 Administrator' : '👤 User'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
-                          <Mail className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">{profile.email}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            Joined {new Date(profile.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Activity Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Activity</CardTitle>
-                  <CardDescription>
-                    Your music library and social statistics
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <Music className="w-8 h-8 mx-auto mb-2 text-primary" />
-                      <div className="text-2xl font-bold">{profile._count.playlists}</div>
-                      <div className="text-sm text-muted-foreground">Playlists</div>
-                    </div>
-                    <div className="text-center">
-                      <Heart className="w-8 h-8 mx-auto mb-2 text-primary" />
-                      <div className="text-2xl font-bold">{profile._count.likedTracks}</div>
-                      <div className="text-sm text-muted-foreground">Liked Tracks</div>
-                    </div>
-                    <div className="text-center">
-                      <Users className="w-8 h-8 mx-auto mb-2 text-primary" />
-                      <div className="text-2xl font-bold">{profile._count.followers}</div>
-                      <div className="text-sm text-muted-foreground">Followers</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Avatar + Name overlay */}
+        <div className="absolute -bottom-16 left-6 md:left-10 flex items-end gap-6">
+          <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-2xl">
+            <AvatarImage src={profile.avatarUrl || ""} alt={profile.displayName || "Profile"} />
+            <AvatarFallback className="bg-primary/20 text-primary text-4xl md:text-5xl font-bold">
+              {userInitials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="mb-2 md:mb-4 drop-shadow-md">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl md:text-5xl font-black text-foreground tracking-tight">
+                {profile.displayName || "User"}
+              </h1>
+              {isAdmin && (
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20 backdrop-blur-sm">
+                  <Shield className="w-3.5 h-3.5" />
+                  Admin
+                </span>
+              )}
+              {profile.isPremium && (
+                <Crown className="w-6 h-6 text-yellow-500 drop-shadow-sm" />
+              )}
             </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Status</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Account Type</span>
-                    <div className="flex items-center space-x-2">
-                      {profile.isPremium && (
-                        <Crown className="w-4 h-4 text-yellow-500" />
-                      )}
-                      <span className={`text-sm px-2 py-1 rounded ${
-                        profile.isPremium 
-                          ? "bg-yellow-100 text-yellow-800" 
-                          : "bg-muted text-muted-foreground"
-                      }`}>
-                        {profile.isPremium ? "Premium" : "Free"}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {!profile.isPremium && (
-                    <Button className="w-full" variant="outline">
-                      <Crown className="w-4 h-4 mr-2" />
-                      Upgrade to Premium
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Playlists</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">{profile._count.playlists}</div>
-                    <div className="text-sm text-muted-foreground">Created playlists</div>
-                  </div>
-                  <Button className="w-full mt-4" variant="outline">
-                    View All Playlists
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Password Change Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Security</CardTitle>
-                  <CardDescription>
-                    Change your account password
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isChangingPassword ? (
-                    <Form {...passwordForm}>
-                      <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-                        <FormField
-                          control={passwordForm.control}
-                          name="currentPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Current Password</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="password"
-                                  placeholder="Enter current password"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={passwordForm.control}
-                          name="newPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>New Password</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="password"
-                                  placeholder="Enter new password"
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Password must be at least 6 characters
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={passwordForm.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirm New Password</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="password"
-                                  placeholder="Confirm new password"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="flex space-x-2">
-                          <Button 
-                            type="submit" 
-                            disabled={changePasswordMutation.isPending}
-                          >
-                            {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
-                          </Button>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            onClick={() => {
-                              setIsChangingPassword(false)
-                              passwordForm.reset()
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-
-                        {changePasswordMutation.isError && (
-                          <p className="text-sm text-destructive">
-                            {changePasswordMutation.error?.message || "Failed to change password"}
-                          </p>
-                        )}
-                      </form>
-                    </Form>
-                  ) : (
-                    <Button 
-                      className="w-full" 
-                      variant="outline"
-                      onClick={() => setIsChangingPassword(true)}
-                    >
-                      Change Password
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            <p className="text-muted-foreground text-base md:text-lg font-medium mt-1 opacity-90">@{profile.username || "unknown"}</p>
           </div>
         </div>
-      </main>
+
+        {/* Edit button top-right */}
+        {!isEditing && (
+          <div className="absolute top-4 right-4 md:top-6 md:right-6">
+            <Button
+              onClick={() => setIsEditing(true)}
+              variant="secondary"
+              className="bg-background/50 backdrop-blur-md border border-white/10 hover:bg-background/80 shadow-sm"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Profile
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Spacer for avatar overflow */}
+      <div className="h-12 md:h-16" />
+
+      {/* Success toast */}
+      {saveSuccess && (
+        <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-4 py-3">
+          <Check className="w-4 h-4" />
+          Profile updated successfully
+        </div>
+      )}
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { icon: ListMusic, label: "Playlists", value: profile._count.playlists },
+          { icon: Heart, label: "Liked Songs", value: profile._count.likedTracks },
+          { icon: Users, label: "Followers", value: profile._count.followers },
+          { icon: Users, label: "Following", value: profile._count.following },
+        ].map((stat) => (
+          <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <stat.icon className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <div className="text-lg font-bold leading-tight">{stat.value}</div>
+                <div className="text-xs text-muted-foreground">{stat.label}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {isEditing ? (
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Edit Profile</CardTitle>
+                <CardDescription>Update your profile information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                    <div className="space-y-3">
+                      <FormLabel className="text-sm font-medium">Profile Banner</FormLabel>
+                      <ImageUpload
+                        currentImage={form.watch('bannerUrl')}
+                        onImageChange={(url: string) => form.setValue('bannerUrl', url)}
+                        type="banner"
+                        size="banner"
+                      />
+                    </div>
+                    <div className="flex flex-col items-center justify-center space-y-3 pt-2">
+                      <FormLabel className="text-sm font-medium self-start w-full">Profile Avatar</FormLabel>
+                      <ImageUpload
+                        currentImage={form.watch('avatarUrl')}
+                        onImageChange={(url: string) => form.setValue('avatarUrl', url)}
+                        type="profile"
+                        size="lg"
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="displayName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Display Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your display name" {...field} className="bg-secondary/50 border-border/50" />
+                          </FormControl>
+                          <FormDescription>This is your public display name.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Username</FormLabel>
+                          <FormControl>
+                            <Input placeholder="your_username" {...field} className="bg-secondary/50 border-border/50" />
+                          </FormControl>
+                          <FormDescription>Your unique username for your profile URL.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex gap-3 pt-2">
+                      <Button type="submit" disabled={updateProfileMutation.isPending}>
+                        {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => { setIsEditing(false); form.reset() }}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                    {updateProfileMutation.isError && (
+                      <p className="text-sm text-destructive">
+                        {updateProfileMutation.error?.message || "Failed to update profile"}
+                      </p>
+                    )}
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">About</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                    <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Email</div>
+                      <div className="text-sm font-medium truncate">{profile.email}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                    <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Member since</div>
+                      <div className="text-sm font-medium">{memberSince}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                    <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Role</div>
+                      <div className="text-sm font-medium">{isAdmin ? "Administrator" : "User"}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Username</div>
+                      <div className="text-sm font-medium">@{profile.username || "—"}</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Account Type */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium">Account</span>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                  profile.isPremium 
+                    ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20" 
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {profile.isPremium ? "Premium" : "Free"}
+                </span>
+              </div>
+              {!profile.isPremium && (
+                <Button className="w-full mt-1" variant="outline" size="sm">
+                  <Crown className="w-3.5 h-3.5 mr-1.5" />
+                  Upgrade to Premium
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Security */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Security</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isChangingPassword ? (
+                <Form {...passwordForm}>
+                  <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-3">
+                    <FormField
+                      control={passwordForm.control}
+                      name="currentPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Current Password</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="password" placeholder="Current password" className="h-9 bg-secondary/50 border-border/50 text-sm" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">New Password</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="password" placeholder="New password" className="h-9 bg-secondary/50 border-border/50 text-sm" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Confirm Password</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="password" placeholder="Confirm password" className="h-9 bg-secondary/50 border-border/50 text-sm" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <Button type="submit" size="sm" disabled={changePasswordMutation.isPending}>
+                        {changePasswordMutation.isPending ? "..." : "Update"}
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => { setIsChangingPassword(false); passwordForm.reset() }}>
+                        Cancel
+                      </Button>
+                    </div>
+                    {changePasswordMutation.isError && (
+                      <p className="text-xs text-destructive">
+                        {changePasswordMutation.error?.message || "Failed to change password"}
+                      </p>
+                    )}
+                    {changePasswordMutation.isSuccess && (
+                      <p className="text-xs text-green-400">Password changed successfully</p>
+                    )}
+                  </form>
+                </Form>
+              ) : (
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsChangingPassword(true)}
+                >
+                  Change Password
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

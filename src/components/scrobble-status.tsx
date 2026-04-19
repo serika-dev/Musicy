@@ -19,7 +19,7 @@ export function ScrobbleStatus({ className }: ScrobbleStatusProps) {
       const hasWebScrobbler = !!(
         document.querySelector('[data-ext-name="web-scrobbler"]') ||
         document.querySelector('#web-scrobbler-root') ||
-        window.chrome?.runtime?.getManifest?.()?.name?.includes('Web Scrobbler') ||
+        (window as any).chrome?.runtime?.getManifest?.()?.name?.includes('Web Scrobbler') ||
         // Check for common Web Scrobbler elements
         document.querySelector('meta[name="web-scrobbler"]')
       )

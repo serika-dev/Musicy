@@ -131,7 +131,7 @@ export default function LikedSongsPage() {
                         name: 'Liked Songs' 
                       })}
                     >
-                      {isCurrentTrack(track) && isPlaying ? (
+                      {isCurrentTrack(track.id) && isPlaying ? (
                         <div className="w-4 h-4 flex items-center justify-center">
                           <div className="flex space-x-0.5">
                             <div className="w-0.5 h-4 bg-primary animate-bounce"></div>
@@ -149,7 +149,7 @@ export default function LikedSongsPage() {
                     <TrackListItem
                       track={track}
                       isPlaying={isPlaying}
-                      isCurrentTrack={isCurrentTrack(track)}
+                      isCurrentTrack={isCurrentTrack(track.id)}
                       onPlay={() => playTrack(track, tracks, { 
                         type: 'standalone', 
                         name: 'Liked Songs' 

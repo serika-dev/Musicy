@@ -47,6 +47,7 @@ export function useLikeTrack() {
       queryClient.invalidateQueries({ queryKey: ['liked-songs'] })
       // Also invalidate profile data since it includes liked tracks count
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      queryClient.invalidateQueries({ queryKey: ['track-liked'] })
     },
   })
 }
@@ -72,6 +73,7 @@ export function useUnlikeTrack() {
       queryClient.invalidateQueries({ queryKey: ['liked-songs'] })
       // Also invalidate profile data since it includes liked tracks count
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      queryClient.invalidateQueries({ queryKey: ['track-liked'] })
     },
   })
 }

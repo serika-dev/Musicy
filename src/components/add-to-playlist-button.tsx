@@ -102,7 +102,7 @@ export function AddToPlaylistButton({
             size="icon"
             onClick={(e) => {
               e.stopPropagation()
-              handleToggleLike(e)
+              handleToggleLike()
             }}
             disabled={likeTrackMutation.isPending || unlikeTrackMutation.isPending}
             className={isLiked ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground"}
@@ -205,7 +205,7 @@ export function AddToPlaylistButton({
                 <Checkbox
                   id="public"
                   checked={newPlaylistPublic}
-                  onCheckedChange={(checked) => setNewPlaylistPublic(checked as boolean)}
+                  onCheckedChange={(checked: boolean) => setNewPlaylistPublic(checked)}
                 />
                 <Label htmlFor="public">Make this playlist public</Label>
               </div>

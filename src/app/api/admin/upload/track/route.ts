@@ -102,12 +102,18 @@ export async function POST(request: NextRequest) {
       })
 
       if (!album) {
+        // Validate year before creating Date
+        const parsedYear = year ? parseInt(String(year)) : null
+        const validReleaseDate = parsedYear && !isNaN(parsedYear) && parsedYear > 1900 && parsedYear < 2100
+          ? new Date(parsedYear, 0, 1)
+          : null
+
         album = await prisma.album.create({
           data: {
             title: albumTitle,
             description: albumDescription || null,
             artistId: artist.id,
-            releaseDate: year ? new Date(parseInt(year), 0, 1) : null,
+            releaseDate: validReleaseDate,
             genre: genre || null,
             albumType: albumType as any,
             isPublic: isPublic,

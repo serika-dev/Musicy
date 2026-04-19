@@ -1,0 +1,34 @@
+{
+  "id": "/",
+  "name": "Musicy",
+  "short_name": "Musicy",
+  "description": "Premium Lossless Music Streaming",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Library",
+      "url": "/library",
+      "icons": [{ "src": "/music/album.png", "sizes": "96x96" }]
+    }
+  ],
+  "categories": ["music", "entertainment"],
+  "orientation": "portrait"
+}

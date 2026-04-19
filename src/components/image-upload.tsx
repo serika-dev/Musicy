@@ -3,16 +3,16 @@
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Upload, X, Camera, Music } from 'lucide-react'
+import { Upload, X, Camera, Music, Image as ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ImageUploadProps {
   currentImage?: string | null
   onImageChange: (imageUrl: string) => void
-  type: 'profile' | 'playlist'
+  type: 'profile' | 'playlist' | 'banner'
   entityId?: string
   className?: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'banner'
   disabled?: boolean
 }
 
@@ -32,7 +32,8 @@ export function ImageUpload({
   const sizeClasses = {
     sm: 'w-16 h-16',
     md: 'w-32 h-32',
-    lg: 'w-48 h-48'
+    lg: 'w-48 h-48',
+    banner: 'w-full h-56 md:h-72'
   }
 
   const handleFileSelect = () => {
@@ -107,16 +108,17 @@ export function ImageUpload({
   }
 
   const isCircular = type === 'profile'
+  const isBanner = type === 'banner'
 
   return (
-    <div className={cn('flex flex-col items-center space-y-4', className)}>
+    <div className={cn('flex flex-col items-center space-y-4', className, isBanner && 'w-full')}>
       <Card className={cn(
         'relative overflow-hidden cursor-pointer hover:opacity-80 transition-opacity',
         sizeClasses[size],
-        isCircular ? 'rounded-full' : 'rounded-lg',
+        isCircular ? 'rounded-full' : (isBanner ? 'rounded-xl' : 'rounded-lg'),
         disabled && 'opacity-50 cursor-not-allowed'
       )}>
-        <CardContent className="p-0 h-full">
+        <CardContent className="p-0 h-full w-full">
           {previewUrl ? (
             <>
               <img
@@ -124,13 +126,14 @@ export function ImageUpload({
                 alt={`${type} image`}
                 className={cn(
                   'w-full h-full object-cover',
-                  isCircular ? 'rounded-full' : 'rounded-lg'
+                  isCircular ? 'rounded-full' : (isBanner ? 'rounded-xl' : 'rounded-lg')
                 )}
               />
               {!disabled && (
                 <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                   <div className="flex space-x-2">
                     <Button
+                      type="button"
                       size="sm"
                       variant="secondary"
                       onClick={handleFileSelect}
@@ -139,6 +142,7 @@ export function ImageUpload({
                       <Camera className="w-4 h-4" />
                     </Button>
                     <Button
+                      type="button"
                       size="sm"
                       variant="destructive"
                       onClick={handleRemoveImage}
@@ -154,7 +158,7 @@ export function ImageUpload({
             <div
               className={cn(
                 'w-full h-full bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/30',
-                isCircular ? 'rounded-full' : 'rounded-lg',
+                isCircular ? 'rounded-full' : (isBanner ? 'rounded-xl' : 'rounded-lg'),
                 !disabled && 'hover:border-muted-foreground/50 hover:bg-muted/80'
               )}
               onClick={handleFileSelect}
@@ -165,12 +169,14 @@ export function ImageUpload({
                 <div className="flex flex-col items-center space-y-2 text-muted-foreground">
                   {type === 'profile' ? (
                     <Camera className="w-8 h-8" />
+                  ) : type === 'banner' ? (
+                    <ImageIcon className="w-8 h-8" />
                   ) : (
                     <Music className="w-8 h-8" />
                   )}
                   {size !== 'sm' && (
                     <span className="text-xs text-center">
-                      Upload {type === 'profile' ? 'Photo' : 'Cover'}
+                      Upload {type === 'profile' ? 'Photo' : type === 'banner' ? 'Banner' : 'Cover'}
                     </span>
                   )}
                 </div>
@@ -183,6 +189,7 @@ export function ImageUpload({
       {/* Upload button for smaller sizes */}
       {size === 'sm' && !previewUrl && !disabled && (
         <Button
+          type="button"
           size="sm"
           variant="outline"
           onClick={handleFileSelect}

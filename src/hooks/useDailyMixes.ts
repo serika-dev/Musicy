@@ -23,7 +23,7 @@ interface DailyMix {
 }
 
 export function useDailyMixes() {
-  return useQuery({
+  return useQuery<DailyMix[]>({
     queryKey: ['dailyMixes'],
     queryFn: async (): Promise<DailyMix[]> => {
       const response = await fetch('/api/daily-mixes')
@@ -33,6 +33,6 @@ export function useDailyMixes() {
       return response.json()
     },
     staleTime: 1000 * 60 * 30, // 30 minutes
-    cacheTime: 1000 * 60 * 60, // 1 hour
+    gcTime: 1000 * 60 * 60, // 1 hour
   })
 }

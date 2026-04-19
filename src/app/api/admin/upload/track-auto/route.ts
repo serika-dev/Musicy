@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         // Extract cover art if available
         const picture = fileMetadata.common.picture?.[0]
         if (picture) {
-          extractedCoverArt = picture.data
+          extractedCoverArt = Buffer.from(picture.data)
           console.log('🖼️ Found embedded cover art')
         }
 
@@ -197,17 +197,23 @@ export async function POST(request: NextRequest) {
       })
 
       if (!album) {
+        // Validate year before creating Date - must be a valid number
+        const parsedYear = finalData.year ? parseInt(String(finalData.year)) : null
+        const validReleaseDate = parsedYear && !isNaN(parsedYear) && parsedYear > 1900 && parsedYear < 2100
+          ? new Date(parsedYear, 0, 1)
+          : null
+
         album = await prisma.album.create({
           data: {
             title: finalData.albumTitle,
             artistId: artist.id,
-            releaseDate: finalData.year ? new Date(finalData.year, 0, 1) : null,
+            releaseDate: validReleaseDate,
             genre: finalData.genre || null,
             albumType: 'ALBUM',
             isPublic: finalData.isPublic,
           }
         })
-        console.log(`✅ Created new album: ${finalData.albumTitle}`)
+        console.log(`✅ Created new album: ${finalData.albumTitle}${validReleaseDate ? ` (Year: ${parsedYear})` : ''}`)
       }
 
       // Handle extracted cover art

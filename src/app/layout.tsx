@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers/session-provider";
 import { AppLayout } from "@/components/app-layout";
+import { Toaster } from "sonner";
+import { ServiceWorkerRegistration } from "@/components/sw-registration";
 import Script from "next/script";
 import "./globals.css";
 
@@ -16,8 +18,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Musicy - Lossless Music Streaming",
-  description: "High-quality lossless music streaming with playlists, social features, and more.",
+  title: "Serika Music - Lossless Streaming",
+  description: "High-quality lossless music streaming. Part of the Serika ecosystem.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Musicy",
+  },
+};
+
+export const viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -26,9 +42,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
-        {/* Web Scrobbler Connector for Last.fm integration */}
         <Script 
           src="/web-scrobbler-connector.js" 
           strategy="afterInteractive"
@@ -39,9 +54,22 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
+          <ServiceWorkerRegistration />
           <AppLayout>
             {children}
           </AppLayout>
+          <Toaster 
+            position="top-right"
+            richColors
+            closeButton
+            toastOptions={{
+              style: {
+                background: 'hsl(var(--background))',
+                border: '1px solid hsl(var(--border))',
+                color: 'hsl(var(--foreground))',
+              },
+            }}
+          />
         </Providers>
       </body>
     </html>

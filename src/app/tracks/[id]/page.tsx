@@ -15,6 +15,7 @@ interface Track {
   id: string
   title: string
   duration: number
+  filePath: string
   genre?: string
   playCount: number
   createdAt: string

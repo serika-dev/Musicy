@@ -17,6 +17,7 @@ model User {
   password     String?  // For credentials login
   displayName  String?
   avatarUrl    String?
+  bannerUrl    String?
   isPremium    Boolean  @default(false)
   role         UserRole @default(USER)
   createdAt    DateTime @default(now())
@@ -48,6 +49,10 @@ model User {
   
   // Daily Mixes
   dailyMixes            DailyMix[]
+
+  // Preferences & Devices
+  settings              UserSettings?
+  devices               Device[]
 
   @@map("users")
 }
@@ -155,6 +160,11 @@ model Track {
   lrcId         Int?     // LRCLib ID
   plainLyrics   String?  @db.Text
   syncedLyrics  String?  @db.Text
+
+  // Romanized lyrics cache (computed once by SerikaRomanizer)
+  romanizedPlain    String?  @db.Text
+  romanizedSynced   String?  @db.Text
+  romanizedLanguage String?  // "ja" | "ko" | "hi"
 
   // Relations
   artistId      String
@@ -347,6 +357,31 @@ model DailyMixTrack {
   
   @@unique([mixId, trackId])
   @@map("daily_mix_tracks")
+}
+
+// User Settings (per-user preferences, JSON-backed for flexibility)
+model UserSettings {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json     // merged with client-side defaults
+  updatedAt DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+// Multi-device playback coordination (Spotify Connect-style)
+model Device {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String   // e.g. "Chrome on Linux"
+  userAgent  String?  @db.Text
+  isActive   Boolean  @default(false) // the device that actually plays audio
+  lastSeenAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("devices")
 }
 
 // Enums

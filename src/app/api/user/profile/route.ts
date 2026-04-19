@@ -22,6 +22,7 @@ export async function GET() {
         username: true,
         displayName: true,
         avatarUrl: true,
+        bannerUrl: true,
         isPremium: true,
         role: true,
         createdAt: true,
@@ -64,7 +65,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const { username, displayName, avatarUrl } = await request.json()
+    const { username, displayName, avatarUrl, bannerUrl } = await request.json()
 
     // Validate input
     if (!username || !displayName) {
@@ -95,6 +96,7 @@ export async function PUT(request: NextRequest) {
         username,
         displayName,
         ...(avatarUrl !== undefined && { avatarUrl }),
+        ...(bannerUrl !== undefined && { bannerUrl }),
       },
       select: {
         id: true,
@@ -102,6 +104,7 @@ export async function PUT(request: NextRequest) {
         username: true,
         displayName: true,
         avatarUrl: true,
+        bannerUrl: true,
         isPremium: true,
         createdAt: true,
       },
