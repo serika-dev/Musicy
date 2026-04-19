@@ -315,13 +315,14 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     // Skip if src is already set for this track and we're just becoming active again
     // If the audio URL matches the track path, don't recreate it to avoid seeking resets
     if (audio.src) {
-      const filename = currentTrack.filePath.split('/').pop()
+      const filename = currentTrack.filePath.split('/').pop()?.split('?')[0]
       if (filename && audio.src.includes(filename)) {
         if (Math.abs(audio.currentTime - currentTimeRef.current) > 1) {
           audio.currentTime = currentTimeRef.current
         }
         
         if (shouldAutoPlayRef.current) {
+          console.log('▶️ Resuming matched source:', currentTrack.title)
           shouldAutoPlayRef.current = false
           audio.play().catch(error => {
             console.error('❌ Resume play error:', error)
@@ -373,11 +374,19 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     loadTrackSource()
     
     // Add event listener to handle when audio is ready to play
-    const handleCanPlayThrough = () => {
-      console.log('✅ Audio ready to play through')
+    const handleCanPlay = () => {
+      console.log('✅ Audio ready to play (canplay catch)')
+      
+      // Safety: Double check that the audio src still matches the currentTrack
+      const currentFilename = currentTrack.filePath.split('/').pop()?.split('?')[0]
+      if (currentFilename && !audio.src.includes(currentFilename)) {
+        console.warn('⚠️ canplay fired but src does not match currentTrack, ignoring.')
+        return
+      }
+
       // If we should be playing, start playing now that audio is ready
       if (shouldAutoPlayRef.current) {
-        console.log('▶️ Auto-playing newly loaded track')
+        console.log('▶️ Auto-playing newly loaded track:', currentTrack.title)
         shouldAutoPlayRef.current = false // Reset the flag
         const playPromise = audio.play()
         if (playPromise !== undefined) {
@@ -385,21 +394,21 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
             console.error('❌ Auto-play failed:', error)
             if (error.name === 'NotAllowedError') {
               handleAutoplayBlock()
-            } else {
+            } else if (error.name !== 'AbortError') {
               setIsPlaying(false)
             }
           })
         }
       }
       // Remove the event listener as it's only needed once per track load
-      audio.removeEventListener('canplaythrough', handleCanPlayThrough)
+      audio.removeEventListener('canplay', handleCanPlay)
     }
     
-    audio.addEventListener('canplaythrough', handleCanPlayThrough)
+    audio.addEventListener('canplay', handleCanPlay)
     
     // Cleanup function to remove event listener if component unmounts or track changes
     return () => {
-      audio.removeEventListener('canplaythrough', handleCanPlayThrough)
+      audio.removeEventListener('canplay', handleCanPlay)
     }
   }, [currentTrack, activeDeviceId])
 
@@ -424,8 +433,16 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     if (isPlaying) {
       // Only try to play if the audio source is already loaded and ready
       // This handles resume/play for already loaded tracks
-      if (audio.src && audio.readyState >= 3) { // HAVE_FUTURE_DATA or better (more strict for smooth playback)
-        console.log('▶️ Resuming/playing current track...')
+      if (audio.src && audio.readyState >= 2) { // HAVE_CURRENT_DATA or better
+        // CRITICAL: Ensure the current audio src matches the intended track
+        // to avoid playing the old track during a transition race condition.
+        const intendedFilename = currentTrack.filePath.split('/').pop()?.split('?')[0]
+        if (intendedFilename && !audio.src.includes(intendedFilename)) {
+          console.warn('⏳ isPlaying TRUE but src mismatch. Waiting for load effect to set correct src.')
+          return
+        }
+
+        console.log('▶️ Resuming/playing current track:', currentTrack.title)
         const playPromise = audio.play()
         if (playPromise !== undefined) {
           playPromise
