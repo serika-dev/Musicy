@@ -93,7 +93,11 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    return NextResponse.json(oembedResponse)
+    return new NextResponse(JSON.stringify(oembedResponse), {
+      headers: {
+        "Content-Type": "application/json+oembed"
+      }
+    })
   } catch (err) {
     if (err instanceof TypeError) {
       return NextResponse.json({ error: "Invalid URL provided" }, { status: 400 })
