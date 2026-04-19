@@ -15,7 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     where: { id },
     include: { 
       artist: true, 
-      album: true,
+      album: { include: { featuredArtists: true } },
+      featuredArtists: true,
       _count: { select: { likes: true } }
     }
   })

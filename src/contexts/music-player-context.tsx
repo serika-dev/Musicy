@@ -199,11 +199,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    // Normal queue navigation (looping back to start)
+    // Normal queue navigation
     setCurrentIndex(nextIndex)
     setCurrentTrack(queue[nextIndex])
+    // Explicitly set isPlaying and shouldAutoPlay to ensure continuation
     setIsPlaying(true)
-    shouldAutoPlayRef.current = true // Mark for auto-play when ready
+    shouldAutoPlayRef.current = true
   }, [queue, currentIndex, repeatMode, playbackContext, currentTrack, fetchRecommendedTracks])
 
   // Audio event handlers
@@ -238,13 +239,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         return
       }
       
-      setIsPlaying(false)
       // Auto-advance to next track if queue exists and not single track repeat
       if (queue.length > 1) {
-        // Small delay to prevent immediate replay
-        setTimeout(() => {
-          handleNextTrack()
-        }, 500)
+        // We don't set setIsPlaying(false) here because we want to continue playing the next track
+        handleNextTrack()
+      } else {
+        setIsPlaying(false)
       }
     }
     const handleCanPlay = () => {

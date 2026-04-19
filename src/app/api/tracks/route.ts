@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
         id: true,
         title: true,
         duration: true,
+        coverImageUrl: true,
         filePath: true,
         format: true,
         bitRate: true,
@@ -59,12 +60,26 @@ export async function GET(request: NextRequest) {
             verified: true,
           },
         },
+        featuredArtists: {
+          select: {
+            id: true,
+            name: true,
+            imageUrl: true,
+          },
+        },
         album: {
           select: {
             id: true,
             title: true,
             coverImageUrl: true,
             albumType: true,
+            featuredArtists: {
+              select: {
+                id: true,
+                name: true,
+                imageUrl: true,
+              },
+            },
           },
         },
       },

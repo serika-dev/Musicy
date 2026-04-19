@@ -117,10 +117,6 @@ export function AddToPlaylistButton({
               <Button 
                 variant={variant} 
                 size={size}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
               >
                 <Plus className="w-4 h-4" />
                 {showText && <span className="ml-1">Add to playlist</span>}

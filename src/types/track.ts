@@ -4,6 +4,7 @@ export interface Track {
   id: string
   title: string
   duration: number
+  coverImageUrl?: string
   filePath: string
   format: string
   bitRate?: number
@@ -15,10 +16,21 @@ export interface Track {
     verified?: boolean
     imageUrl?: string
   }
+  featuredArtists?: {
+    id: string
+    name: string
+    imageUrl?: string
+  }[]
   album?: {
     id: string
     title: string
     coverImageUrl?: string
+    albumType?: string
+    featuredArtists?: {
+      id: string
+      name: string
+      imageUrl?: string
+    }[]
   }
 }
 

@@ -150,6 +150,7 @@ model Track {
   id            String   @id @default(cuid())
   title         String
   duration      Int      // in seconds
+  coverImageUrl String?
   filePath      String
   fileSize      BigInt
   bitRate       Int?

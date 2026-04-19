@@ -8,8 +8,9 @@ import { formatDuration } from "@/lib/utils"
 import type { Track } from "@/types/track"
 import { AddToPlaylistButton } from "@/components/add-to-playlist-button"
 import { ShareMenu } from "@/components/share-menu"
-import { MoreVertical, Share2 } from "lucide-react"
+import { MoreVertical, Share2, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface TrackListItemProps {
   track: Track
@@ -56,11 +57,11 @@ export function TrackListItem({
       {/* Album Cover / Artist Image */}
       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden relative">
         {(() => {
-          // For compilations, prefer artist image over shared album cover
+          // Priority: 1. track.coverImageUrl, 2. (artist.imageUrl if compilation), 3. album.coverImageUrl, 4. artist.imageUrl
           const isCompilation = (track.album as any)?.albumType === 'COMPILATION'
-          const imgUrl = isCompilation
+          const imgUrl = track.coverImageUrl || (isCompilation 
             ? ((track.artist as any)?.imageUrl || track.album?.coverImageUrl)
-            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl)
+            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl))
           return imgUrl ? (
             <Image
               src={imgUrl}
@@ -87,21 +88,60 @@ export function TrackListItem({
         >
           {track.title}
         </Link>
-        <div className="text-sm text-muted-foreground truncate">
-          <Link 
-            href={`/artists/${track.artist.id}`}
-            className="hover:text-foreground hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {track.artist.name}
-            {track.artist.verified && " ✓"}
-          </Link>
+        <div className="text-sm text-muted-foreground truncate flex items-center gap-1">
+          {track.artist.name === "Various Artists" ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button 
+                  className="hover:text-foreground hover:underline flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {track.artist.name}
+                  <Users className="w-3 h-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3" onClick={(e) => e.stopPropagation()}>
+                <div className="space-y-3">
+                  <h4 className="font-bold text-sm border-b pb-2">Featured Artists</h4>
+                  <div className="grid gap-2">
+                    {(track.featuredArtists || track.album?.featuredArtists || []).map((art) => (
+                      <Link
+                        key={art.id}
+                        href={`/artists/${art.id}`}
+                        className="flex items-center gap-2 hover:bg-muted p-1 rounded-md transition-colors"
+                      >
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-muted relative shrink-0">
+                          {art.imageUrl ? (
+                            <Image src={art.imageUrl} alt={art.name} fill className="object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-primary/20 text-[10px]">
+                              {art.name[0]}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs font-medium truncate">{art.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Link 
+              href={`/artists/${track.artist.id}`}
+              className="hover:text-foreground hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {track.artist.name}
+              {track.artist.verified && " ✓"}
+            </Link>
+          )}
           {showAlbum && track.album && track.album.id && (
             <>
               <span> • </span>
               <Link 
                 href={`/albums/${track.album.id}`}
-                className="hover:text-foreground hover:underline"
+                className="hover:text-foreground hover:underline truncate"
                 onClick={(e) => e.stopPropagation()}
               >
                 {track.album.title}
