@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const { id } = await params
-    const { name, bio, website, verified, imageUrl } = await request.json()
+    const { name, bio, website, verified, imageUrl, bannerUrl } = await request.json()
 
     // Validate required fields
     if (!name || name.trim() === '') {
@@ -58,6 +58,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         ...(website !== undefined && { website: website || null }),
         ...(typeof verified === 'boolean' && { verified }),
         ...(imageUrl !== undefined && { imageUrl: imageUrl || null }),
+        ...(bannerUrl !== undefined && { bannerUrl: bannerUrl || null }),
       },
       select: {
         id: true,
@@ -66,6 +67,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         website: true,
         verified: true,
         imageUrl: true,
+        bannerUrl: true,
       },
     })
 

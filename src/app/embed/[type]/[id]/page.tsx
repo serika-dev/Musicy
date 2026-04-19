@@ -36,9 +36,9 @@ export default function EmbedPage() {
 
   const isLoading = trackQuery.isLoading || playlistQuery.isLoading || artistQuery.isLoading || albumQuery.isLoading
 
-  // Get the effective track to play
+  // Get the effective track to play — artists don't carry a tracks array
   const trackToPlay = type === 'tracks' ? data : 
-                    (data as any).tracks?.[0]?.track || (data as any).tracks?.[0] || null
+                    data ? ((data as any).tracks?.[0]?.track || (data as any).tracks?.[0] || null) : null
 
   useEffect(() => {
     if (trackToPlay?.duration && (duration === 0 || isNaN(duration))) {

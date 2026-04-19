@@ -108,6 +108,7 @@ model Artist {
   name        String   @unique
   bio         String?
   imageUrl    String?
+  bannerUrl   String?
   website     String?
   verified    Boolean  @default(false)
   createdAt   DateTime @default(now())

@@ -27,13 +27,13 @@ export function QuickAccess() {
       onPlay: handlePlayLiked
     },
     { 
-      name: "Discovery Radio", 
-      href: "/search", 
-      icon: Radio, 
+      name: "New Releases", 
+      href: "/tracks", 
+      icon: Sparkles, 
       color: "from-emerald-600 to-emerald-800" 
     },
     { 
-      name: "Your Mixes", 
+      name: "Your Playlists", 
       href: "/playlists", 
       icon: Music2, 
       color: "from-blue-600 to-blue-800" 
@@ -51,12 +51,13 @@ export function QuickAccess() {
       color: "from-amber-600 to-amber-800" 
     },
     { 
-      name: "Fresh Releases", 
-      href: "/albums", 
-      icon: Sparkles, 
+      name: "Search", 
+      href: "/search", 
+      icon: Radio, 
       color: "from-rose-600 to-rose-800" 
     },
   ]
+
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

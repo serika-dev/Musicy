@@ -167,7 +167,7 @@ export function AddToPlaylistButton({
                             <div className="text-left">
                               <p className="font-medium">{playlist.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                {playlist._count.tracks} tracks
+                                {playlist._count?.tracks || 0} tracks
                               </p>
                             </div>
                           </div>

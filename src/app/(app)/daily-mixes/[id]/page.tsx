@@ -179,206 +179,159 @@ export default function DailyMixPage() {
   const createdAt = new Date(dailyMix.createdDate)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Daily Mix Header */}
-        <div className="flex flex-col lg:flex-row items-start gap-8">
-          {/* Mix Cover */}
-          <div className="w-full sm:w-80 sm:mx-auto lg:mx-0 lg:w-80 lg:flex-shrink-0">
-            <div className="aspect-square w-full bg-gradient-to-br from-primary/20 via-primary/30 to-primary/40 rounded-2xl overflow-hidden shadow-2xl relative group">
-              {dailyMix.coverImageUrl ? (
-                <Image
-                  src={dailyMix.coverImageUrl}
-                  alt={dailyMix.name}
-                  fill
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 320px, 320px"
-                  priority
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-8xl opacity-40">🎵</div>
-                </div>
-              )}
-              {/* Gradient overlay for better text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-            </div>
+    <div className="flex flex-col pb-20 relative space-y-6">
+      {/* Immersive Mix Header */}
+      <div className="relative h-[40vh] lg:h-[45vh] w-full overflow-hidden rounded-3xl shadow-xl border border-white/5">
+        <div className="absolute inset-0 bg-neutral-900" />
+        {dailyMix.coverImageUrl ? (
+          <div className="absolute inset-0">
+             <Image 
+               src={dailyMix.coverImageUrl} 
+               alt="" 
+               fill
+               className="w-full h-full object-cover blur-2xl opacity-40 scale-110"
+             />
+             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
           </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-background" />
+        )}
 
-          {/* Mix Info */}
-          <div className="flex-1 space-y-6 lg:py-4">
-            <div className="space-y-3">
-              <Badge variant="secondary" className="text-xs font-medium px-3 py-1">
-                Daily Mix
-              </Badge>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight">
-                {dailyMix.name}
-              </h1>
-              {dailyMix.description && (
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  {dailyMix.description}
-                </p>
-              )}
-            </div>
-
-            {/* Stats */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              {dailyMix.user && (
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>
-                    {dailyMix.user.displayName || dailyMix.user.username || 'Musicy'}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>{createdAt.toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>{formatDuration(totalDuration)}</span>
-              </div>
-              <span className="font-medium">{dailyMix.tracks?.length || 0} tracks</span>
-            </div>
-
-            {expiresAt && (
-              <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
-                <Clock className="h-4 w-4 inline mr-2" />
-                Expires {expiresAt.toLocaleString()}
+        {/* Content Overlay */}
+        <div className="absolute inset-x-0 bottom-0 p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
+          <div className="w-48 h-48 lg:w-64 lg:h-64 rounded-3xl overflow-hidden shadow-2xl border-4 border-background/20 mb-6 lg:mb-0 relative group">
+            {dailyMix.coverImageUrl ? (
+              <Image src={dailyMix.coverImageUrl} alt={dailyMix.name} fill className="object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                <div className="text-6xl text-primary/40">🎵</div>
               </div>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                size="lg"
-                onClick={handlePlayAll}
-                disabled={!dailyMix.tracks || dailyMix.tracks.length === 0}
-                className="flex items-center gap-2 px-6 py-3 text-base font-semibold"
-              >
-                {currentTrack && dailyMix.tracks?.some(t => t.id === currentTrack.id) && isPlaying ? (
-                  <Pause className="h-5 w-5" />
-                ) : (
-                  <Play className="h-5 w-5" />
-                )}
-                <span>Play All</span>
-              </Button>
-
-              <Button variant="outline" size="lg" className="flex items-center gap-2">
-                <Heart className="h-5 w-5" />
-                <span className="hidden sm:inline">Like</span>
-              </Button>
-
-              {dailyMix.canSave && (
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="lg" onClick={handleDialogOpen} className="flex items-center gap-2">
-                      <Save className="h-5 w-5" />
-                      <span className="hidden sm:inline">Save as Playlist</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Save as Playlist</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="playlist-name" className="block text-sm font-medium mb-2">
-                          Playlist Name
-                        </label>
-                        <Input
-                          id="playlist-name"
-                          value={playlistName}
-                          onChange={(e) => setPlaylistName(e.target.value)}
-                          placeholder="Enter playlist name"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="playlist-description" className="block text-sm font-medium mb-2">
-                          Description (optional)
-                        </label>
-                        <Textarea
-                          id="playlist-description"
-                          value={playlistDescription}
-                          onChange={(e) => setPlaylistDescription(e.target.value)}
-                          placeholder="Enter playlist description"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex justify-end space-x-3">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setIsDialogOpen(false)}
-                          disabled={savePlaylistMutation.isPending}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          onClick={handleSavePlaylist}
-                          disabled={savePlaylistMutation.isPending || !playlistName.trim()}
-                        >
-                          {savePlaylistMutation.isPending ? 'Saving...' : 'Save Playlist'}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-
-              <Button variant="outline" size="lg" className="flex items-center gap-2">
-                <Share className="h-5 w-5" />
-                <span className="hidden sm:inline">Share</span>
-              </Button>
+          </div>
+          
+          <div className="space-y-4 lg:pb-4 flex-1 w-full">
+            <div className="space-y-1">
+              <Badge variant="secondary" className="bg-primary/20 text-primary border-none font-black text-[10px] py-0 px-2 uppercase tracking-widest">
+                Daily Mix
+              </Badge>
+              <h1 className="text-4xl lg:text-7xl font-black tracking-tight drop-shadow-2xl truncate">{dailyMix.name}</h1>
+            </div>
+            
+            <div className="flex items-center gap-4 text-xs font-bold text-foreground/70">
+              <span className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-primary" />
+                {dailyMix.user?.displayName || dailyMix.user?.username || 'Musicy'}
+              </span>
+              <span>•</span>
+              <span>{dailyMix.tracks?.length || 0} tracks</span>
+              <span>•</span>
+              <span>{formatDuration(totalDuration)}</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Tracks */}
-        <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-2xl font-bold flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Play className="h-4 w-4 text-primary" />
-              </div>
-              Tracks
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {dailyMix.tracks && dailyMix.tracks.length > 0 ? (
-              <div className="space-y-0">
-                {dailyMix.tracks.map((track, index) => (
-                  <div 
-                    key={track.id} 
-                    className="flex items-center group hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="w-12 text-center text-sm text-muted-foreground font-medium px-4 py-1">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <TrackListItem
-                        track={track}
-                        isCurrentTrack={isCurrentTrack(track.id)}
-                        isPlaying={isCurrentTrack(track.id) && isPlaying}
-                        onPlay={() => playTrack(track, dailyMix.tracks, {
-                          type: 'daily-mix',
-                          name: dailyMix.name
-                        })}
-                        showAddButton={true}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <div className="text-8xl opacity-20 mb-4">🎵</div>
-                <h3 className="text-xl font-semibold mb-2">No tracks in this mix</h3>
-                <p className="text-muted-foreground">This mix appears to be empty.</p>
+      {/* Sticky Action Bar */}
+      <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-xl border-b border-white/5 lg:static lg:bg-transparent lg:border-none">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6">
+            <Button
+              size="lg"
+              onClick={handlePlayAll}
+              disabled={!dailyMix.tracks || dailyMix.tracks.length === 0}
+              className="rounded-full w-14 h-14 lg:w-auto lg:h-14 lg:px-8 group shadow-2xl"
+            >
+              {currentTrack && dailyMix.tracks?.some(t => t.id === currentTrack.id) && isPlaying ? (
+                <Pause className="h-6 w-6 lg:mr-2 fill-current" />
+              ) : (
+                <Play className="h-6 w-6 lg:mr-2 fill-current" />
+              )}
+              <span className="hidden lg:inline font-bold italic">Play</span>
+            </Button>
+            <Button variant="outline" size="icon" className="w-12 h-12 lg:w-auto lg:h-12 lg:px-6 rounded-full border-white/10 hover:bg-white/5 transition-all">
+              <Heart className="h-5 w-5 lg:mr-2" />
+              <span className="hidden lg:inline font-bold">Like</span>
+            </Button>
+            {dailyMix.canSave && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={handleDialogOpen} className="w-12 h-12 lg:w-auto lg:h-12 lg:px-6 rounded-full border-white/10 hover:bg-white/5 transition-all">
+                    <Save className="h-5 w-5 lg:mr-2" />
+                    <span className="hidden lg:inline font-bold">Save</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md rounded-[2rem] border-white/10 shadow-2xl p-6">
+                   <DialogHeader>
+                      <DialogTitle className="text-2xl font-black mb-2">Save Mix to Library</DialogTitle>
+                   </DialogHeader>
+                   <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-black uppercase text-foreground/40 tracking-widest block mb-2">Playlist Name</label>
+                        <Input value={playlistName} onChange={(e) => setPlaylistName(e.target.value)} className="h-12 rounded-xl font-medium bg-white/5 border-white/10 focus-visible:ring-primary/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-black uppercase text-foreground/40 tracking-widest block mb-2">Description</label>
+                        <Textarea value={playlistDescription} onChange={(e) => setPlaylistDescription(e.target.value)} className="rounded-xl font-medium bg-white/5 border-white/10 focus-visible:ring-primary/50 resize-none" rows={3} />
+                      </div>
+                      <Button size="lg" className="w-full rounded-xl font-bold font-lg h-12" onClick={handleSavePlaylist} disabled={savePlaylistMutation.isPending || !playlistName.trim()}>
+                        {savePlaylistMutation.isPending ? 'Saving...' : 'Save Playlist'}
+                      </Button>
+                   </div>
+                </DialogContent>
+              </Dialog>
+            )}
+            <Button variant="outline" size="icon" className="w-12 h-12 rounded-full lg:hidden border-white/10 flex-shrink-0">
+               <Share className="h-5 w-5" />
+            </Button>
+            
+            {expiresAt && (
+              <div className="hidden lg:flex items-center text-sm font-bold text-amber-500 bg-amber-500/10 px-4 py-2 rounded-full ml-auto">
+                <Clock className="w-4 h-4 mr-2" />
+                Expires {expiresAt.toLocaleDateString()}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          
+          <Button variant="ghost" size="icon" className="w-12 h-12 rounded-full hidden lg:flex border-white/10 hover:bg-white/5">
+             <Share className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8 lg:px-6">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-black tracking-tight px-1">Tracks</h2>
+          <div className="space-y-1">
+            {dailyMix.tracks && dailyMix.tracks.length > 0 ? (
+              dailyMix.tracks.map((track, index) => (
+                <div key={track.id} className="flex items-center group/item hover:bg-white/5 rounded-2xl transition-colors pr-2">
+                  <div className="w-10 text-center text-xs font-bold text-muted-foreground group-hover/item:text-foreground shrink-0">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <TrackListItem
+                      track={track as any}
+                      isCurrentTrack={isCurrentTrack(track.id)}
+                      isPlaying={isCurrentTrack(track.id) && isPlaying}
+                      onPlay={() => playTrack(track as any, dailyMix.tracks as any, {
+                        type: 'daily-mix',
+                        id: dailyMix.id,
+                        name: dailyMix.name
+                      })}
+                      showAddButton={true}
+                      className="bg-transparent hover:bg-transparent border-none py-4"
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-20 bg-card/10 rounded-3xl border border-dashed border-white/10">
+                <div className="text-6xl mx-auto mb-4 opacity-20">🎵</div>
+                <p className="text-xl font-bold">This mix is empty</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -75,6 +75,7 @@ export default function AdminPage() {
     website: '',
     verified: false,
     imageUrl: '',
+    bannerUrl: '',
   })
   const [isUpdatingArtist, setIsUpdatingArtist] = useState(false)
   
@@ -512,6 +513,7 @@ This is specifically an audio file upload issue.`
       website: artist.website || '',
       verified: artist.verified || false,
       imageUrl: artist.imageUrl || '',
+      bannerUrl: artist.bannerUrl || '',
     })
   }
 
@@ -532,6 +534,7 @@ This is specifically an audio file upload issue.`
           website: editArtistForm.website,
           verified: editArtistForm.verified,
           imageUrl: editArtistForm.imageUrl,
+          bannerUrl: editArtistForm.bannerUrl,
         }),
       })
 
@@ -2049,7 +2052,7 @@ This is specifically an audio file upload issue.`
             onOpenChange={(open: boolean) => {
               if (!open) {
                 setEditingArtist(null)
-                setEditArtistForm({ name: '', bio: '', website: '', verified: false, imageUrl: '' })
+                setEditArtistForm({ name: '', bio: '', website: '', verified: false, imageUrl: '', bannerUrl: '' })
               }
             }}
           >
@@ -2069,6 +2072,17 @@ This is specifically an audio file upload issue.`
                     currentImage={editArtistForm.imageUrl}
                     onImageChange={(url: string) => setEditArtistForm({...editArtistForm, imageUrl: url})}
                     type="profile"
+                    size="lg"
+                  />
+                </div>
+
+                {/* Artist Banner */}
+                <div className="flex flex-col items-center space-y-3">
+                  <Label className="text-sm font-medium self-start w-full">Banner Image</Label>
+                  <ImageUpload
+                    currentImage={editArtistForm.bannerUrl}
+                    onImageChange={(url: string) => setEditArtistForm({...editArtistForm, bannerUrl: url})}
+                    type="banner"
                     size="lg"
                   />
                 </div>
@@ -2123,7 +2137,7 @@ This is specifically an audio file upload issue.`
                   variant="outline" 
                   onClick={() => {
                     setEditingArtist(null)
-                    setEditArtistForm({ name: '', bio: '', website: '', verified: false, imageUrl: '' })
+                    setEditArtistForm({ name: '', bio: '', website: '', verified: false, imageUrl: '', bannerUrl: '' })
                   }}
                   disabled={isUpdatingArtist}
                 >

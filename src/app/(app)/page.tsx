@@ -83,16 +83,19 @@ export default function Home() {
           <QuickAccess />
         </section>
 
-        {/* Made For You - Horizontal Scroll on Mobile */}
+        {/* Discover - Horizontal Scroll on Mobile */}
         <section className="space-y-6">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-2xl font-bold tracking-tight">Made For You</h2>
+            <h2 className="text-2xl font-bold tracking-tight">Discover</h2>
           </div>
           <div className="flex flex-col gap-8">
-            <FeaturedPlaylists />
             <div className="space-y-4">
               <h3 className="text-lg font-bold px-1">Your Daily Mixes</h3>
               <DailyMixes />
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold px-1">Community Playlists</h3>
+              <FeaturedPlaylists />
             </div>
           </div>
         </section>
@@ -105,9 +108,9 @@ export default function Home() {
               <Link href="/albums">See all</Link>
             </Button>
           </div>
-          <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar lg:mx-0 lg:px-0">
+          <div className="flex lg:grid lg:grid-cols-5 xl:grid-cols-6 gap-4 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar lg:mx-0 lg:px-0">
             {albumsData?.albums?.map((album) => (
-              <Link key={album.id} href={`/albums/${album.id}`} className="group relative flex-shrink-0 w-[160px] lg:w-auto">
+              <Link key={album.id} href={`/albums/${album.id}`} className="group relative flex-shrink-0 w-[130px] lg:w-auto">
                 <div className="bg-card/20 hover:bg-card/40 p-3 rounded-2xl transition-all border border-border/5">
                   <div className="aspect-square rounded-xl bg-muted overflow-hidden mb-3 relative shadow-lg">
                     {album.coverImageUrl ? (
@@ -153,10 +156,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Recently Added Section */}
+        {/* Quick List Section */}
         <section className="bg-gradient-to-b from-card/30 to-card/10 rounded-3xl p-6 border border-border/5">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold tracking-tight">Recently Added</h2>
+            <h2 className="text-xl font-bold tracking-tight">New Releases</h2>
             <Button variant="link" size="sm" className="text-muted-foreground font-semibold" asChild>
               <Link href="/tracks">View all</Link>
             </Button>

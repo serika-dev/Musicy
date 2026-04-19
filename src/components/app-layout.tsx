@@ -39,7 +39,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           currentTrack ? 'pb-32 lg:pb-24' : 'pb-20 lg:pb-0',
           showSidebar ? 'lg:pl-2' : ''
         )}>
-          <div className="container mx-auto px-4 lg:px-8 py-6 mb-8">
+          <div className="w-full h-full px-4 lg:px-8 py-6 mb-8">
             {children}
           </div>
         </main>
