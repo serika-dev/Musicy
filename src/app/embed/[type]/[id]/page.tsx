@@ -108,7 +108,7 @@ export default function EmbedPage() {
     <div className="flex items-center h-screen bg-neutral-900 text-white p-4 overflow-hidden select-none">
       <audio 
         ref={audioRef} 
-        src={trackToPlay?.filePath ? `${trackToPlay.filePath}?t=${Date.now()}` : undefined} 
+        src={trackToPlay?.filePath || undefined} 
       />
       
       <div className="relative w-[120px] h-[120px] shrink-0 rounded-lg overflow-hidden shadow-2xl mr-4 group">
@@ -147,8 +147,11 @@ export default function EmbedPage() {
               onChange={(e) => {
                 const val = parseFloat(e.target.value)
                 setProgress(val)
-                if (audioRef.current && audioRef.current.duration) {
-                  audioRef.current.currentTime = (val / 100) * audioRef.current.duration
+                if (audioRef.current) {
+                  const targetDuration = audioRef.current.duration || duration
+                  if (targetDuration && !isNaN(targetDuration)) {
+                    audioRef.current.currentTime = (val / 100) * targetDuration
+                  }
                 }
               }}
               className="absolute inset-0 w-full h-1 opacity-0 cursor-pointer"
