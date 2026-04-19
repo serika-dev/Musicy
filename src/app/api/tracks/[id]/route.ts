@@ -8,7 +8,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const session = await getServerSession(authOptions)
   const apiKeyUser = await validateApiKey(req)
-  if (!session && !apiKeyUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // Allow public access for basic metadata (needed for Embeds)
+  // We'll check isPublic later
 
   const track = await prisma.track.findUnique({
     where: { id },
@@ -20,6 +21,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   })
 
   if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 })
+
+  // Check if track is public or user is authorized
+  if (!track.isPublic && !session && !apiKeyUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   return NextResponse.json({
     ...track,

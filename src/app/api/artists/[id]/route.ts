@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { validateApiKey } from "@/lib/api-utils"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -11,12 +12,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      )
-    }
+    const apiKeyUser = await validateApiKey(request)
+    // Allow public access for basic metadata (needed for Embeds)
 
     const { id } = await params
 

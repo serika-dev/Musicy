@@ -29,12 +29,14 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
   const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${url}` : ''
   const embedCode = typeof window !== 'undefined' ? `<iframe width="100%" height="152" title="Musicy Embed: ${title}" style="border-radius: 12px" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" src="${window.location.origin}/embed/${type}s/${id}"></iframe>` : ''
 
-  const handleShareTwitter = () => {
+  const handleShareTwitter = (e: React.MouseEvent) => {
+    e.stopPropagation()
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Listening to ${title} on Musicy`)}&url=${encodeURIComponent(fullUrl)}`
     window.open(twitterUrl, '_blank')
   }
 
-  const handleShareFacebook = () => {
+  const handleShareFacebook = (e: React.MouseEvent) => {
+    e.stopPropagation()
     const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(fullUrl)}`
     window.open(fbUrl, '_blank')
   }
@@ -98,7 +100,7 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
 
       <Dialog open={isEmbedOpen} onOpenChange={setIsEmbedOpen}>
         <DialogContent 
-          className="max-w-xl bg-neutral-900 border-white/10 rounded-[2rem] overflow-hidden"
+          className="max-w-md w-[90vw] bg-neutral-900 border-white/10 rounded-[2rem] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader>
