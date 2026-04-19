@@ -25,13 +25,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       type: 'music.song',
     },
     twitter: {
-      card: 'summary_large_image',
+      card: 'player',
       title,
       description: `Listen to ${track.title} on Musicy.`,
       images: [image],
     },
+    alternates: {
+      types: {
+        'application/json+oembed': `${appUrl}/api/oembed?url=${appUrl}/tracks/${id}`
+      }
+    },
     other: {
-      'alternate': `${appUrl}/api/oembed?url=${appUrl}/tracks/${track.id}`
+      'twitter:player': `${appUrl}/embed/tracks/${id}`,
+      'twitter:player:width': '456',
+      'twitter:player:height': '152',
     }
   }
 }
