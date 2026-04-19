@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ['music-metadata'],
+  async redirects() {
+    return [
+      {
+        source: '/developer',
+        destination: '/developers',
+        permanent: true,
+      },
+    ]
+  },
 };
 
 export default nextConfig;

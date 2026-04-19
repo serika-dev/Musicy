@@ -54,6 +54,9 @@ model User {
   settings              UserSettings?
   devices               Device[]
 
+  // API Keys
+  apiKeys               ApiKey[]
+  
   @@map("users")
 }
 
@@ -399,6 +402,18 @@ model SystemSetting {
   value String @db.Text
   
   @@map("system_settings")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  name      String   // e.g. "My Discord Bot"
+  key       String   @unique @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  lastUsed  DateTime?
+  
+  @@map("api_keys")
 }
 
 enum UserRole {

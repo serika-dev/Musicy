@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers/session-provider";
-import { AppLayout } from "@/components/app-layout";
 import { Toaster } from "sonner";
 import { ServiceWorkerRegistration } from "@/components/sw-registration";
 import Script from "next/script";
@@ -52,13 +51,11 @@ export default function RootLayout({
         <link rel="alternate" type="application/json+oembed" title="Musicy oEmbed Profile" href="/api/oembed?url={url}" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary/30`}
       >
         <Providers>
           <ServiceWorkerRegistration />
-          <AppLayout>
-            {children}
-          </AppLayout>
+          {children}
           <Toaster 
             position="top-right"
             richColors

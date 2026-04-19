@@ -12,8 +12,9 @@ import { formatDuration } from "@/lib/utils"
 
 export default function EmbedPage() {
   const params = useParams()
-  const type = params.type as string
+  const rawType = params.type as string
   const id = params.id as string
+  const type = rawType.endsWith('s') ? rawType : `${rawType}s`
 
   // We need to fetch data based on type
   // This is a simplified version of the main player for iframes

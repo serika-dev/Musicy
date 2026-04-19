@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Play, Pause, Heart, Share, Clock, Music } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
+import { ShareMenu } from '@/components/share-menu'
 
 interface Track {
   id: string
@@ -185,10 +186,18 @@ export default function TrackPage() {
               Like
             </Button>
 
-            <Button variant="outline" size="lg">
-              <Share className="h-5 w-5 mr-2" />
-              Share
-            </Button>
+            <ShareMenu
+              title={track.title}
+              url={`/tracks/${track.id}`}
+              id={track.id}
+              type="track"
+              trigger={
+                <Button variant="outline" size="lg">
+                  <Share className="h-5 w-5 mr-2" />
+                  Share
+                </Button>
+              }
+            />
           </div>
         </div>
       </div>

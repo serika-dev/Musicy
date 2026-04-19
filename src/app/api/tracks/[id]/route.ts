@@ -1,78 +1,32 @@
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/db"
+import { validateApiKey } from "@/lib/api-utils"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/db"
 
-interface RouteContext {
-  params: Promise<{ id: string }>
-}
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const session = await getServerSession(authOptions)
+  const apiKeyUser = await validateApiKey(req)
+  if (!session && !apiKeyUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session) {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401 }
-      )
+  const track = await prisma.track.findUnique({
+    where: { id },
+    include: { 
+      artist: true, 
+      album: true,
+      _count: { select: { likes: true } }
     }
+  })
 
-    const { id } = await params
+  if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 })
 
-    const track = await prisma.track.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        duration: true,
-        genre: true,
-        playCount: true,
-        createdAt: true,
-        format: true,
-        bitRate: true,
-        sampleRate: true,
-        filePath: true,
-        isPublic: true,
-        artist: {
-          select: {
-            id: true,
-            name: true,
-            verified: true,
-          },
-        },
-        album: {
-          select: {
-            id: true,
-            title: true,
-            coverImageUrl: true,
-            releaseDate: true,
-          },
-        },
-      },
-    })
-
-    if (!track) {
-      return NextResponse.json(
-        { message: "Track not found" },
-        { status: 404 }
-      )
-    }
-
-    // Check if track is public
-    if (!track.isPublic) {
-      return NextResponse.json(
-        { message: "Track not available" },
-        { status: 403 }
-      )
-    }
-
-    return NextResponse.json(track)
-  } catch (error) {
-    console.error("Error fetching track:", error)
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500 }
-    )
-  }
+  return NextResponse.json({
+    ...track,
+    fileSize: track.fileSize.toString(),
+    external_urls: {
+      musicy: `${process.env.NEXT_PUBLIC_APP_URL}/tracks/${track.id}`
+    },
+    popularity: track.playCount > 100 ? 100 : track.playCount, // Mocked parity
+  })
 }

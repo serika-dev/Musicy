@@ -134,16 +134,19 @@ export function TrackListItem({
           url={`/tracks/${track.id}`}
           id={track.id}
           type="track"
-          trigger={
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="h-8 w-8 sm:h-9 sm:w-9 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-          }
+              trigger={
+                <Button 
+                   size="sm" 
+                   variant="ghost" 
+                   className="h-8 w-8 sm:h-9 sm:w-9 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                   onClick={(e) => {
+                     e.preventDefault()
+                     e.stopPropagation()
+                   }}
+                >
+                  <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
+              }
         />
         
         <Button 

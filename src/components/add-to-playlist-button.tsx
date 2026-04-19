@@ -101,6 +101,7 @@ export function AddToPlaylistButton({
             variant="ghost"
             size="icon"
             onClick={(e) => {
+              e.preventDefault()
               e.stopPropagation()
               handleToggleLike()
             }}
@@ -116,7 +117,10 @@ export function AddToPlaylistButton({
               <Button 
                 variant={variant} 
                 size={size}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
               >
                 <Plus className="w-4 h-4" />
                 {showText && <span className="ml-1">Add to playlist</span>}

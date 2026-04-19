@@ -26,8 +26,18 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
   const [isEmbedOpen, setIsEmbedOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
 
-  const fullUrl = `${window.location.origin}${url}`
-  const embedCode = `<iframe width="100%" height="152" title="Musicy Embed: ${title}" style="border-radius: 12px" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" src="${window.location.origin}/embed/${type}s/${id}"></iframe>`
+  const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${url}` : ''
+  const embedCode = typeof window !== 'undefined' ? `<iframe width="100%" height="152" title="Musicy Embed: ${title}" style="border-radius: 12px" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" src="${window.location.origin}/embed/${type}s/${id}"></iframe>` : ''
+
+  const handleShareTwitter = () => {
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Listening to ${title} on Musicy`)}&url=${encodeURIComponent(fullUrl)}`
+    window.open(twitterUrl, '_blank')
+  }
+
+  const handleShareFacebook = () => {
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(fullUrl)}`
+    window.open(fbUrl, '_blank')
+  }
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(fullUrl)
@@ -54,20 +64,32 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56 rounded-2xl bg-neutral-900 border-white/5 p-2 shadow-2xl">
-          <DropdownMenuItem onClick={handleCopyLink} className="rounded-xl font-bold py-3 cursor-pointer">
+          <DropdownMenuItem 
+            onClick={(e) => {
+              e.stopPropagation()
+              handleCopyLink()
+            }} 
+            className="rounded-xl font-bold py-3 cursor-pointer"
+          >
             {copiedLink ? <Check className="h-4 w-4 mr-3 text-emerald-500" /> : <LinkIcon className="h-4 w-4 mr-3" />}
             Copy Link
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setIsEmbedOpen(true)} className="rounded-xl font-bold py-3 cursor-pointer">
+          <DropdownMenuItem 
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsEmbedOpen(true)
+            }} 
+            className="rounded-xl font-bold py-3 cursor-pointer"
+          >
             <Code className="h-4 w-4 mr-3" />
             Embed {type}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-white/5" />
-          <DropdownMenuItem className="rounded-xl font-bold py-3 cursor-pointer">
+          <DropdownMenuItem onClick={handleShareTwitter} className="rounded-xl font-bold py-3 cursor-pointer">
             <Twitter className="h-4 w-4 mr-3" />
             Post to Twitter
           </DropdownMenuItem>
-          <DropdownMenuItem className="rounded-xl font-bold py-3 cursor-pointer">
+          <DropdownMenuItem onClick={handleShareFacebook} className="rounded-xl font-bold py-3 cursor-pointer">
             <Facebook className="h-4 w-4 mr-3" />
             Share on Facebook
           </DropdownMenuItem>
@@ -75,7 +97,10 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
       </DropdownMenu>
 
       <Dialog open={isEmbedOpen} onOpenChange={setIsEmbedOpen}>
-        <DialogContent className="max-w-2xl bg-neutral-900 border-white/10 rounded-[2rem]">
+        <DialogContent 
+          className="max-w-xl bg-neutral-900 border-white/10 rounded-[2rem] overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
           <DialogHeader>
             <DialogTitle className="text-2xl font-black italic">Embed {type}</DialogTitle>
             <DialogDescription className="font-medium text-white/60">
@@ -83,7 +108,7 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6 pt-4">
+          <div className="space-y-6 pt-4 max-w-full overflow-hidden">
             <div className="bg-black rounded-2xl border border-white/5 overflow-hidden">
                <div className="p-4 bg-white/5 border-b border-white/5 flex items-center justify-between">
                   <span className="text-xs font-black uppercase tracking-widest text-white/40">Preview</span>
@@ -101,14 +126,14 @@ export function ShareMenu({ title, url, id, type, trigger }: ShareMenuProps) {
                </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-full">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black uppercase tracking-widest text-white/40">Embed Code</label>
                 <Button variant="ghost" size="sm" onClick={handleCopyEmbed} className="text-primary font-bold hover:bg-primary/10">
                    Copy Code
                 </Button>
               </div>
-              <pre className="p-4 bg-black rounded-xl border border-white/5 overflow-x-auto text-[10px] font-mono leading-relaxed text-emerald-400/80">
+              <pre className="p-4 bg-black rounded-xl border border-white/5 overflow-x-auto text-[10px] font-mono leading-relaxed text-emerald-400/80 whitespace-pre-wrap break-all">
                 {embedCode}
               </pre>
             </div>

@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing url parameter" }, { status: 400 })
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
+
   // Parse Musicy URL (e.g., https://musicy.app/tracks/123)
   try {
     const url = new URL(targetUrl)
@@ -81,7 +83,7 @@ export async function GET(req: NextRequest) {
       thumbnail_height: 300,
       width: 456,
       height: 152,
-      html: `<iframe width="100%" height="152" title="Musicy Embed: ${title}" style="border-radius: 12px" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" src="${url.origin}/embed/${type}/${id}"></iframe>`
+      html: `<iframe width="100%" height="152" title="Musicy Embed: ${title}" style="border-radius: 12px" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" src="${appUrl}/embed/${type}/${id}"></iframe>`
     }
 
     if (format === "xml") {
@@ -93,6 +95,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(oembedResponse)
   } catch (err) {
+    if (err instanceof TypeError) {
+      return NextResponse.json({ error: "Invalid URL provided" }, { status: 400 })
+    }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
