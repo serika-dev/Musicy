@@ -152,11 +152,11 @@ export default function PlaylistsPage() {
 
         {/* Results */}
         {isLoading && page === 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={`playlist-skeleton-${i}`} className="animate-pulse">
-                <CardContent className="p-4 space-y-3">
-                  <div className="w-full aspect-square bg-muted rounded-lg" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <Card key={`playlist-skeleton-${i}`} className="p-4 animate-pulse border-0 bg-transparent shadow-none">
+                <CardContent className="p-0">
+                  <div className="w-full aspect-square bg-muted rounded-md mb-4" />
                   <div className="space-y-2">
                     <div className="h-4 bg-muted rounded w-3/4" />
                     <div className="h-3 bg-muted rounded w-1/2" />
@@ -191,77 +191,58 @@ export default function PlaylistsPage() {
         ) : (
           <>
             {/* Playlists Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {data.playlists.map((playlist) => (
-                <Card key={playlist.id} className="group hover:bg-accent/50 transition-colors cursor-pointer" asChild>
+                <Card key={playlist.id} className="group hover:bg-card/60 transition-all duration-300 overflow-hidden cursor-pointer border-0 bg-transparent p-0 shadow-none" asChild>
                   <Link href={`/playlists/${playlist.id}`}>
-                    <CardContent className="p-4 space-y-4">
-                      <div className="relative">
-                        <div className="w-full aspect-square bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg mx-auto flex items-center justify-center overflow-hidden">
-                          {playlist.coverImageUrl ? (
-                            <Image
-                              src={playlist.coverImageUrl}
-                              alt={playlist.name}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                            />
-                          ) : (
-                            <span className="text-white text-4xl font-bold">
+                    <CardContent className="p-0 space-y-3">
+                      <div className="relative aspect-square bg-gradient-to-br from-blue-400 to-blue-600 overflow-hidden rounded-md shadow-md">
+                        {playlist.coverImageUrl ? (
+                          <Image
+                            src={playlist.coverImageUrl}
+                            alt={playlist.name}
+                            fill
+                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted via-muted/80 to-muted/60">
+                            <span className="text-white text-4xl font-bold opacity-40">
                               {playlist.name.charAt(0).toUpperCase()}
                             </span>
-                          )}
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                          <Button
+                            size="icon"
+                            className="rounded-full w-10 h-10 shadow-lg bg-primary text-primary-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Play className="w-5 h-5 ml-0.5" />
+                          </Button>
                         </div>
-                        <Button
-                          size="icon"
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full shadow-lg"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
                       </div>
                       
-                      <div className="space-y-2">
+                      <div className="px-1">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-semibold truncate text-lg">
+                          <h3 className="font-bold text-sm leading-tight truncate">
                             {playlist.name}
                           </h3>
-                          <div className="flex gap-1">
-                            {!playlist.isPublic && (
-                              <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                            )}
-                            {playlist.isCollaborative && (
-                              <Users className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                            )}
-                          </div>
                         </div>
                         
-                        {playlist.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {playlist.description}
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-1 font-medium hover:underline">
+                          by {playlist.owner.displayName || playlist.owner.username || 'Unknown'}
+                        </p>
                         
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <span>
-                            by {playlist.owner.displayName || playlist.owner.username || 'Unknown'}
+                        <div className="flex items-center mt-1 gap-1">
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold opacity-70">
+                            Playlist • {playlist._count.tracks}
                           </span>
-                          <span>{playlist._count.tracks} tracks</span>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {playlist._count.likes} likes
-                          </Badge>
-                          {playlist.isCollaborative && (
-                            <Badge variant="outline" className="text-xs">
-                              Collaborative
-                            </Badge>
-                          )}
                           {!playlist.isPublic && (
-                            <Badge variant="outline" className="text-xs">
-                              Private
-                            </Badge>
+                            <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0 opacity-70" />
+                          )}
+                          {playlist.isCollaborative && (
+                            <Users className="w-3 h-3 text-muted-foreground flex-shrink-0 opacity-70" />
                           )}
                         </div>
                       </div>

@@ -107,7 +107,21 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    return NextResponse.json(playlist)
+    const isAuthorized = session || apiKeyUser;
+
+    // Mask file paths for unauthorized access
+    const returnedPlaylist = {
+      ...playlist,
+      tracks: playlist.tracks.map(pt => ({
+        ...pt,
+        track: {
+          ...pt.track,
+          filePath: isAuthorized ? pt.track.filePath : undefined
+        }
+      }))
+    }
+
+    return NextResponse.json(returnedPlaylist)
   } catch (error) {
     console.error("Error fetching playlist:", error)
     return NextResponse.json(

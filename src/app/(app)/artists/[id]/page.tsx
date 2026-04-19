@@ -119,9 +119,9 @@ export default function ArtistPage() {
   }
 
   return (
-    <div className="flex flex-col -mt-16 pb-20 relative">
+    <div className="flex flex-col pb-20 relative space-y-6">
       {/* Immersive Header Background */}
-      <div className="relative h-[45vh] lg:h-[50vh] w-full overflow-hidden">
+      <div className="relative h-[40vh] lg:h-[45vh] w-full overflow-hidden rounded-3xl shadow-xl border border-white/5">
         <div className="absolute inset-0 bg-neutral-900" />
         {artist.imageUrl ? (
           <div className="absolute inset-0">

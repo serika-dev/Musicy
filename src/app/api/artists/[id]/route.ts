@@ -117,7 +117,18 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       isFollowing = !!follow
     }
 
-    return NextResponse.json({ ...artist, isFollowing })
+    const isAuthorized = session || apiKeyUser;
+    
+    // Mask file paths for unauthorized access
+    const returnedArtist = {
+      ...artist,
+      tracks: artist.tracks.map(track => ({
+        ...track,
+        filePath: isAuthorized ? track.filePath : undefined
+      }))
+    }
+
+    return NextResponse.json({ ...returnedArtist, isFollowing })
   } catch (error) {
     console.error("Error fetching artist:", error)
     return NextResponse.json(

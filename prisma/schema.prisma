@@ -117,6 +117,8 @@ model Artist {
   tracks      Track[]
   albums      Album[]
   followers   ArtistFollow[]
+  featuredInTracks Track[] @relation("TrackFeatures")
+  featuredInAlbums Album[] @relation("AlbumFeatures")
 
   @@map("artists")
 }
@@ -136,6 +138,7 @@ model Album {
   // Relations
   artistId     String
   artist       Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  featuredArtists Artist[] @relation("AlbumFeatures")
   tracks       Track[]
 
   @@unique([title, artistId])
@@ -172,6 +175,7 @@ model Track {
   // Relations
   artistId      String
   artist        Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  featuredArtists Artist[] @relation("TrackFeatures")
   albumId       String?
   album         Album?   @relation(fields: [albumId], references: [id])
 

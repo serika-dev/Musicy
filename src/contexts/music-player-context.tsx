@@ -8,6 +8,7 @@ import { useDeviceSync, type RemoteDevice } from '@/hooks/useDeviceSync'
 import { useSettings } from '@/hooks/useSettings'
 import { AutoplayWarning } from '@/components/autoplay-warning'
 import { getOfflineTrackBlob } from '@/lib/offline-storage'
+import { toast } from 'sonner'
 
 interface MusicPlayerContextType {
   // Current track state
@@ -737,6 +738,18 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       setPlaybackContext({ type: 'standalone' })
     }
     
+    // Check if track has a file path (restricted for logged-out users)
+    if (!track.filePath) {
+      toast.error('Authentication Required', {
+        description: 'Please log in to listen to full tracks and create playlists.',
+        action: {
+          label: 'Log in',
+          onClick: () => window.location.href = '/login'
+        }
+      })
+      return
+    }
+
     if (currentTrack?.id === track.id) {
       // If it's the same track, toggle play/pause
       setIsPlaying(!isPlaying)

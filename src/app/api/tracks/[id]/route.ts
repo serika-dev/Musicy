@@ -22,13 +22,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 })
 
+  const isAuthorized = session || apiKeyUser;
+
   // Check if track is public or user is authorized
-  if (!track.isPublic && !session && !apiKeyUser) {
+  if (!track.isPublic && !isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  // Mask filePath if not authorized
+  const { filePath, ...trackData } = track;
+  const returnedFilePath = isAuthorized ? filePath : undefined;
+
   return NextResponse.json({
-    ...track,
+    ...trackData,
+    filePath: returnedFilePath,
     fileSize: track.fileSize.toString(),
     external_urls: {
       musicy: `${process.env.NEXT_PUBLIC_APP_URL}/tracks/${track.id}`

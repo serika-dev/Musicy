@@ -52,13 +52,19 @@ export default function EmbedPage() {
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime)
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-        setProgress((audio.currentTime / audio.duration) * 100)
+      // Use trackToPlay.duration as fallback if audio.duration is Infinity or NaN (common for FLAC streams)
+      const validDuration = (audio.duration && isFinite(audio.duration)) ? audio.duration : trackToPlay?.duration
+      if (validDuration) {
+        setProgress((audio.currentTime / validDuration) * 100)
       }
     }
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration)
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration)
+      } else if (trackToPlay?.duration) {
+        setDuration(trackToPlay.duration)
+      }
     }
 
     const handleEnded = () => {
@@ -68,7 +74,7 @@ export default function EmbedPage() {
     }
 
     const handleDurationChange = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      if (audio.duration && isFinite(audio.duration)) {
         setDuration(audio.duration)
       }
     }

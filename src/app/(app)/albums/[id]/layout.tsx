@@ -32,8 +32,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     },
     alternates: {
       types: {
-        'application/json+oembed': `${appUrl}/api/oembed?url=${appUrl}/albums/${id}`,
-        'text/xml+oembed': `${appUrl}/api/oembed?url=${appUrl}/albums/${id}&format=xml`,
+        'application/json+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(`${appUrl}/albums/${id}`)}`,
+        'text/xml+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(`${appUrl}/albums/${id}`)}&format=xml`,
       }
     },
     other: {

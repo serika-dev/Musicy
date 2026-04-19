@@ -76,9 +76,18 @@ export async function POST(request: NextRequest) {
         
         const fileMetadata = await musicMetadata.parseBuffer(audioBuffer, audioFile.type)
         
+        const rawArtistStr = fileMetadata.common.artist || 'Unknown Artist'
+        const rawArtists = fileMetadata.common.artists || rawArtistStr.split(/, | & | feat\. | ft\. | featuring /i).map(a => a.trim()).filter(Boolean)
+        const primaryArtist = rawArtists[0] || 'Unknown Artist'
+        const featuredArtistsList = rawArtists.slice(1)
+        const compilation = fileMetadata.common.compilation || false
+        const rawAlbumArtist = fileMetadata.common.albumartist || (compilation ? 'Various Artists' : primaryArtist)
+
         metadata = {
           title: fileMetadata.common.title || audioFile.name.replace(/\.[^/.]+$/, ''),
-          artist: fileMetadata.common.artist || 'Unknown Artist',
+          artist: primaryArtist,
+          featuredArtists: featuredArtistsList,
+          albumArtist: rawAlbumArtist,
           album: fileMetadata.common.album || undefined,
           trackNumber: fileMetadata.common.track?.no || undefined,
           year: fileMetadata.common.year || undefined,
@@ -99,6 +108,8 @@ export async function POST(request: NextRequest) {
         console.log('✅ Extracted metadata:', {
           title: metadata.title,
           artist: metadata.artist,
+          featuredArtists: metadata.featuredArtists,
+          albumArtist: metadata.albumArtist,
           album: metadata.album,
           duration: metadata.duration,
           format: metadata.format
@@ -116,6 +127,8 @@ export async function POST(request: NextRequest) {
     const finalData = {
       title: titleOverride || metadata.title || audioFile.name.replace(/\.[^/.]+$/, ''),
       artistName: artistNameOverride || metadata.artist || 'Unknown Artist',
+      albumArtistName: metadata.albumArtist || artistNameOverride || metadata.artist || 'Unknown Artist',
+      featuredArtistsNames: metadata.featuredArtists || [],
       albumTitle: albumTitleOverride || metadata.album || undefined,
       trackNumber: trackNumberOverride || metadata.trackNumber || undefined,
       year: yearOverride || metadata.year || undefined,
@@ -184,6 +197,29 @@ export async function POST(request: NextRequest) {
       console.log(`✅ Created new artist: ${finalData.artistName}`)
     }
 
+    // Resolve Album Artist
+    let albumArtist = artist;
+    if (finalData.albumArtistName !== finalData.artistName) {
+      const existingAlbumArtist = await prisma.artist.findFirst({
+        where: { name: finalData.albumArtistName }
+      });
+      if (existingAlbumArtist) {
+        albumArtist = existingAlbumArtist;
+      } else {
+        albumArtist = await prisma.artist.create({
+          data: { name: finalData.albumArtistName, verified: false }
+        });
+      }
+    }
+
+    // Resolve Featured Artists
+    const featuredArtists: any[] = [];
+    for (const faName of finalData.featuredArtistsNames) {
+      let fa = await prisma.artist.findFirst({ where: { name: faName } });
+      if (!fa) fa = await prisma.artist.create({ data: { name: faName, verified: false } });
+      featuredArtists.push(fa);
+    }
+
     // Create or find album if provided
     let album = null
     let coverImageUrl = null
@@ -198,7 +234,7 @@ export async function POST(request: NextRequest) {
             equals: normalizedTitle,
             mode: 'insensitive'
           },
-          artistId: artist.id
+          artistId: albumArtist.id
         }
       })
 
@@ -212,16 +248,29 @@ export async function POST(request: NextRequest) {
         album = await prisma.album.create({
           data: {
             title: normalizedTitle,
-            artistId: artist.id,
+            artistId: albumArtist.id,
             releaseDate: validReleaseDate,
             genre: finalData.genre || null,
             albumType: 'ALBUM',
             isPublic: finalData.isPublic,
+            featuredArtists: featuredArtists.length > 0 ? {
+              connect: featuredArtists.map(f => ({ id: f.id }))
+            } : undefined
           }
         })
         console.log(`✅ Created new album: ${normalizedTitle}${validReleaseDate ? ` (Year: ${parsedYear})` : ''}`)
       } else {
         console.log(`✅ Using existing album: ${album.title} (ID: ${album.id})`)
+        if (featuredArtists.length > 0) {
+          await prisma.album.update({
+            where: { id: album.id },
+            data: {
+              featuredArtists: {
+                connect: featuredArtists.map(f => ({ id: f.id }))
+              }
+            }
+          })
+        }
       }
 
       // Handle extracted cover art
@@ -282,6 +331,9 @@ export async function POST(request: NextRequest) {
         genre: finalData.genre || null,
         isPublic: finalData.isPublic,
         artistId: artist.id,
+        featuredArtists: featuredArtists.length > 0 ? {
+          connect: featuredArtists.map(f => ({ id: f.id }))
+        } : undefined,
         albumId: album?.id || null,
       },
       include: {
