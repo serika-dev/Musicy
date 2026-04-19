@@ -100,7 +100,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Top Albums - Horizontal Carousel on Mobile */}
+        {/* Top Albums */}
         <section className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-2xl font-bold tracking-tight">Top Albums</h2>
@@ -108,21 +108,30 @@ export default function Home() {
               <Link href="/albums">See all</Link>
             </Button>
           </div>
-          <div className="flex lg:grid lg:grid-cols-5 xl:grid-cols-6 gap-4 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar lg:mx-0 lg:px-0">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {albumsData?.albums?.map((album) => (
-              <Link key={album.id} href={`/albums/${album.id}`} className="group relative flex-shrink-0 w-[130px] lg:w-auto">
-                <div className="bg-card/20 hover:bg-card/40 p-3 rounded-2xl transition-all border border-border/5">
-                  <div className="aspect-square rounded-xl bg-muted overflow-hidden mb-3 relative shadow-lg">
+              <Link key={album.id} href={`/albums/${album.id}`} className="group cursor-pointer">
+                <div className="space-y-3">
+                  <div className="relative aspect-square bg-gradient-to-br from-muted via-muted/80 to-muted/60 overflow-hidden rounded-md shadow-md">
                     {album.coverImageUrl ? (
-                      <img src={album.coverImageUrl} alt={album.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                    ) : ( <div className="w-full h-full flex items-center justify-center bg-secondary/30"> <Music2 className="w-8 h-8 text-muted-foreground" /> </div> )}
-                    <Button size="icon" className="absolute bottom-2 right-2 opacity-0 lg:group-hover:opacity-100 rounded-full bg-primary shadow-2xl scale-90 lg:scale-100" onClick={(e) => handlePlayAlbum(e, album.id)}>
-                      <Play className="w-4 h-4 fill-current" />
-                    </Button>
+                      <img src={album.coverImageUrl} alt={album.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 className="w-10 h-10 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                      <Button size="icon" className="rounded-full w-10 h-10 shadow-lg bg-primary text-primary-foreground" onClick={(e) => handlePlayAlbum(e, album.id)}>
+                        <Play className="w-5 h-5 ml-0.5 fill-current" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-0.5 px-0.5">
-                    <h3 className="font-bold text-sm truncate">{album.title}</h3>
-                    <p className="text-[11px] text-muted-foreground truncate">{album.artist.name}</p>
+                  <div className="px-1">
+                    <h3 className="font-bold text-sm leading-tight truncate">{album.title}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-1 mt-1 font-medium">{album.artist.name}</p>
+                    <div className="flex items-center mt-1">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold opacity-70">Album</span>
+                    </div>
                   </div>
                 </div>
               </Link>
