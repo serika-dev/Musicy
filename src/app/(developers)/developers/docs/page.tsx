@@ -18,7 +18,6 @@ export default function DevelopersDocs() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
-    toast.success("Snippet copied")
   }
 
   return (
