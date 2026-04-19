@@ -95,33 +95,39 @@ export function AddToPlaylistButton({
   }
 
   return (
-    <div className="flex items-center space-x-1">
+    <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
       {/* Like Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              handleToggleLike()
-            }}
-            disabled={likeTrackMutation.isPending || unlikeTrackMutation.isPending}
-            className={isLiked ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground"}
-          >
-            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-          </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          handleToggleLike()
+        }}
+        disabled={likeTrackMutation.isPending || unlikeTrackMutation.isPending}
+        className={isLiked ? "text-red-500 hover:text-red-600" : "text-muted-foreground hover:text-foreground"}
+      >
+        <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+      </Button>
 
-          {/* Add to Playlist Button */}
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                variant={variant} 
-                size={size}
-              >
-                <Plus className="w-4 h-4" />
-                {showText && <span className="ml-1">Add to playlist</span>}
-              </Button>
-            </DialogTrigger>
+      {/* Add to Playlist Button */}
+      <Button 
+        variant={variant} 
+        size={size}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setIsOpen(true)
+        }}
+      >
+        <Plus className="w-4 h-4" />
+        {showText && <span className="ml-1">Add to playlist</span>}
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add to playlist</DialogTitle>

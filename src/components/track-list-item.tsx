@@ -40,7 +40,8 @@ export function TrackListItem({
       )}
       onClick={(e) => {
         // Only trigger play if clicking on the main area, not on buttons or links
-        if (!(e.target as Element).closest('button, a')) {
+        const target = e.target as HTMLElement
+        if (!target.closest('button, a, [role="button"]')) {
           onPlay()
         }
       }}
@@ -166,6 +167,7 @@ export function TrackListItem({
           className={`transition-opacity ${
             showAddButton ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
           }`}
+          onClick={(e) => e.stopPropagation()}
         >
           <AddToPlaylistButton trackId={track.id} />
         </div>
