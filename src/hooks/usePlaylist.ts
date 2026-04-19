@@ -220,12 +220,8 @@ export function useRemoveFromPlaylist() {
       playlistId: string
       trackId: string
     }) => {
-      const response = await fetch(`/api/playlists/${playlistId}/tracks`, {
+      const response = await fetch(`/api/playlists/${playlistId}/tracks?trackId=${trackId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ trackId }),
       })
 
       if (!response.ok) {
