@@ -54,6 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
                 title: true,
                 duration: true,
                 format: true,
+                coverImageUrl: true,
                 filePath: true,
                 bitRate: true,
                 sampleRate: true,

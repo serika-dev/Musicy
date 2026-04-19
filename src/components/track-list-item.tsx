@@ -58,23 +58,32 @@ export function TrackListItem({
       {/* Album Cover / Artist Image */}
       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden relative">
         {(() => {
-          // Priority: 1. track.coverImageUrl, 2. (artist.imageUrl if compilation), 3. album.coverImageUrl, 4. artist.imageUrl
-          const isCompilation = (track.album as any)?.albumType === 'COMPILATION'
-          const imgUrl = track.coverImageUrl || (isCompilation 
-            ? ((track.artist as any)?.imageUrl || track.album?.coverImageUrl)
-            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl))
-          return imgUrl ? (
-            <Image
-              src={imgUrl}
-              alt={isCompilation ? track.artist.name : (track.album?.title || 'Album cover')}
-              fill
-              className="object-cover rounded-md"
-              sizes="(max-width: 640px) 40px, 48px"
-              onError={() => {}}
+          // Explicitly prioritize track-specific artwork
+          if (track.coverImageUrl) return (
+            <img 
+              src={track.coverImageUrl} 
+              alt={track.title} 
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
             />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 rounded-md flex items-center justify-center">
-              <div className="text-lg sm:text-2xl">🎵</div>
+          )
+
+          // Fallback logic
+          const isCompilation = (track.album as any)?.albumType === 'COMPILATION' || (track.album as any)?.type === 'COMPILATION'
+          const imgUrl = isCompilation 
+            ? ((track.artist as any)?.imageUrl || track.album?.coverImageUrl)
+            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl)
+          
+          if (imgUrl) return (
+            <img 
+              src={imgUrl} 
+              alt={track.title} 
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+            />
+          )
+          
+          return (
+            <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+              <Music className="w-5 h-5 text-neutral-600" />
             </div>
           )
         })()}
