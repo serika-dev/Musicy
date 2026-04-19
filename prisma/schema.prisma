@@ -393,6 +393,14 @@ enum AlbumType {
   MIXTAPE
 }
 
+// Global System Settings
+model SystemSetting {
+  key   String @id
+  value String @db.Text
+  
+  @@map("system_settings")
+}
+
 enum UserRole {
   ADMIN
   USER

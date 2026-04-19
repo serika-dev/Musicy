@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { ImageUpload } from "@/components/image-upload"
 import { 
   Upload, 
@@ -60,6 +61,11 @@ export default function AdminPage() {
   const [conflictData, setConflictData] = useState<any>(null)
   const [showConflictDialog, setShowConflictDialog] = useState(false)
   const [selectedArtistInDialog, setSelectedArtistInDialog] = useState<string>('')
+  
+  // System Settings state
+  const [systemSettings, setSystemSettings] = useState<Record<string, string>>({})
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+  const [isSettingsLoading, setIsSettingsLoading] = useState(false)
   
   // Artist editing state
   const [editingArtist, setEditingArtist] = useState<any>(null)
@@ -152,6 +158,53 @@ export default function AdminPage() {
       loadAlbums()
     }
   }, [activeTab])
+
+  // Load system settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      setIsSettingsLoading(true)
+      try {
+        const response = await fetch('/api/admin/settings')
+        if (response.ok) {
+          const data = await response.json()
+          setSystemSettings(data.settings || {})
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error)
+      } finally {
+        setIsSettingsLoading(false)
+      }
+    }
+
+    if (activeTab === 'settings') {
+      loadSettings()
+    }
+  }, [activeTab])
+
+  const handleUpdateSystemSetting = async (key: string, value: string) => {
+    setIsUpdatingSettings(true)
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ key, value }),
+      })
+
+      if (response.ok) {
+        toast.success(`System setting updated!`)
+        setSystemSettings(prev => ({ ...prev, [key]: value }))
+      } else {
+        toast.error('Failed to update system setting')
+      }
+    } catch (error) {
+      console.error('Error updating system setting:', error)
+      toast.error('Network error')
+    } finally {
+      setIsUpdatingSettings(false)
+    }
+  }
 
   // Auto-fetch lyrics when LRC ID is provided
   useEffect(() => {
@@ -860,13 +913,14 @@ This is specifically an audio file upload issue.`
 
           {/* Admin Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tracks">Manage Tracks</TabsTrigger>
               <TabsTrigger value="artists">Manage Artists</TabsTrigger>
               <TabsTrigger value="users">Manage Users</TabsTrigger>
               <TabsTrigger value="upload">Upload Track</TabsTrigger>
               <TabsTrigger value="lyrics">Lyrics Manager</TabsTrigger>
+              <TabsTrigger value="settings">System Settings</TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
@@ -1631,6 +1685,70 @@ This is specifically an audio file upload issue.`
                   </CardContent>
                 </Card>
               )}
+            </TabsContent>
+            <TabsContent value="settings" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Global System Settings</h2>
+                  <p className="text-muted-foreground text-sm">Manage platform-wide configurations</p>
+                </div>
+                {isSettingsLoading && <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-primary/20 bg-primary/5 shadow-lg">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2 text-primary">
+                      <Shield className="w-5 h-5" />
+                      <CardTitle className="text-lg">Access Control</CardTitle>
+                    </div>
+                    <CardDescription>Security and registration management</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6 pt-4">
+                    <div className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-border/50">
+                      <div className="space-y-1 pr-4">
+                        <Label htmlFor="allow-reg" className="text-base font-semibold">User Registration</Label>
+                        <p className="text-sm text-muted-foreground leading-snug">
+                          Toggle new account creation. If disabled, visitors will see a "Maintenance" notice on the sign-up page.
+                        </p>
+                      </div>
+                      <Switch 
+                        id="allow-reg" 
+                        checked={systemSettings.allow_registration !== "false"}
+                        onCheckedChange={(checked) => handleUpdateSystemSetting("allow_registration", checked.toString())}
+                        disabled={isUpdatingSettings || isSettingsLoading}
+                        className="data-[state=checked]:bg-primary"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-border/50 opacity-50 cursor-not-allowed">
+                      <div className="space-y-1 pr-4">
+                        <Label className="text-base font-semibold">Public API Access</Label>
+                        <p className="text-sm text-muted-foreground leading-snug">
+                          Enable unauthenticated access to public metadata endpoints. (Coming soon)
+                        </p>
+                      </div>
+                      <Switch disabled checked={false} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50 bg-card">
+                  <CardHeader>
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <Settings className="w-5 h-5" />
+                      <CardTitle className="text-lg">Maintenance & Operations</CardTitle>
+                    </div>
+                    <CardDescription>Server-side system flags</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-4">
+                     <div className="p-4 bg-muted/30 rounded-lg border border-dashed border-border flex flex-col items-center justify-center text-center space-y-2 py-8">
+                       <Shield className="w-8 h-8 text-muted-foreground/30" />
+                       <p className="text-xs text-muted-foreground max-w-[200px]">More system-wide controls will be available in future updates.</p>
+                     </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
 

@@ -238,42 +238,28 @@ export default function Home() {
             </Button>
           </div>
         </div>
-      </section>
-
-      {/* Features */}
+      </section>      {/* Features */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3">
-          <div className="w-12 h-12 bg-primary/10 rounded-md mx-auto flex items-center justify-center">
-            <Headphones className="w-6 h-6 text-primary" />
+        <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="w-14 h-14 bg-primary/10 rounded-xl mx-auto flex items-center justify-center">
+            <Headphones className="w-7 h-7 text-primary" />
           </div>
-          <h3 className="font-semibold">Lossless Audio</h3>
-          <p className="text-sm text-muted-foreground">FLAC and high-quality streaming with full fidelity</p>
+          <h3 className="font-bold text-lg">Lossless Audio</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed font-medium">Experience your library in full FLAC fidelity. No compression, just pure sound.</p>
         </div>
-        <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3">
-          <div className="w-12 h-12 bg-primary/10 rounded-md mx-auto flex items-center justify-center">
-            <ListMusic className="w-6 h-6 text-primary" />
+        <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="w-14 h-14 bg-primary/10 rounded-xl mx-auto flex items-center justify-center">
+            <ListMusic className="w-7 h-7 text-primary" />
           </div>
-          <h3 className="font-semibold">Smart Playlists</h3>
-          <p className="text-sm text-muted-foreground">Organize your library with intelligent features</p>
+          <h3 className="font-bold text-lg">Smart Playlists</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed font-medium">Organize your music with intelligent automated mixes and collections.</p>
         </div>
-        <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3">
-          <div className="w-12 h-12 bg-primary/10 rounded-md mx-auto flex items-center justify-center">
-            <Music2 className="w-6 h-6 text-primary" />
+        <div className="bg-card/50 border border-border/50 rounded-md p-6 text-center space-y-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="w-14 h-14 bg-primary/10 rounded-xl mx-auto flex items-center justify-center">
+            <Music2 className="w-7 h-7 text-primary" />
           </div>
-          <h3 className="font-semibold">Synced Lyrics</h3>
-          <p className="text-sm text-muted-foreground">Follow along with real-time synchronized lyrics</p>
-        </div>
-      </section>
-
-      {/* Featured Content */}
-      <section className="space-y-10">
-        <div>
-          <h2 className="text-xl font-bold mb-4">Featured Playlists</h2>
-          <FeaturedPlaylists />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold mb-4">Recently Added</h2>
-          <RecentlyAdded />
+          <h3 className="font-bold text-lg">Full PWA Support</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed font-medium">Install Musicy on your mobile device for a native app experience with offline support.</p>
         </div>
       </section>
     </div>

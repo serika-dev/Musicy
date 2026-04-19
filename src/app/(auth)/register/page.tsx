@@ -7,7 +7,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Music } from "lucide-react"
+import { Music, Shield } from "lucide-react"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -16,8 +16,27 @@ export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [isRegistrationAllowed, setIsRegistrationAllowed] = useState<boolean | null>(null)
   const router = useRouter()
   const { status } = useSession()
+
+  // Check if registration is allowed
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        const response = await fetch('/api/settings/public')
+        if (response.ok) {
+          const data = await response.json()
+          setIsRegistrationAllowed(data.settings?.allow_registration !== "false")
+        } else {
+          setIsRegistrationAllowed(true)
+        }
+      } catch (error) {
+        setIsRegistrationAllowed(true)
+      }
+    }
+    checkRegistrationStatus()
+  }, [])
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -75,65 +94,83 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-md">
-                {error}
+          {isRegistrationAllowed === false ? (
+            <div className="space-y-6 text-center py-4">
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-full w-16 h-16 flex items-center justify-center mx-auto">
+                <Shield className="h-8 w-8 text-orange-500" />
               </div>
-            )}
-            
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <div className="space-y-2">
+                <h3 className="font-bold text-lg text-foreground">Registration Closed</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  New user registration is currently disabled by the site administrator. 
+                  Please check back later or contact the host if you believe this is an error.
+                </p>
+              </div>
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/">Back to Home</Link>
+              </Button>
             </div>
-            
-            <div className="space-y-2">
-              <Input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Input
-                type="text"
-                placeholder="Display Name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
-            
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
-            </Button>
-          </form>
-          
-          <div className="text-center text-sm">
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
-              Sign in
-            </Link>
-          </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-md">
+                  {error}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  placeholder="Display Name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={loading || isRegistrationAllowed === null}>
+                {loading ? "Creating account..." : "Create account"}
+              </Button>
+
+              <div className="text-center text-sm">
+                Already have an account?{" "}
+                <Link href="/login" className="text-primary hover:underline">
+                  Sign in
+                </Link>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

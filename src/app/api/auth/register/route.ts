@@ -4,6 +4,20 @@ import { prisma } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if registration is allowed
+    const model = (prisma as any).systemSetting || (prisma as any).system_setting || (prisma as any).SystemSetting;
+    const registrationSetting = model ? await model.findUnique({
+      where: { key: "allow_registration" }
+    }) : null;
+    
+    // Default to true if not set, but if set to "false", block registration
+    if (registrationSetting?.value === "false") {
+      return NextResponse.json(
+        { message: "Registration is currently disabled by administrator" },
+        { status: 403 }
+      )
+    }
+
     const { email, password, username, displayName } = await request.json()
 
     // Validate input
