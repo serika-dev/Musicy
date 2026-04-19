@@ -98,7 +98,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     }
 
     // Check if user can access this playlist
-    const isOwner = session?.user?.id === playlist.owner.id
+    const isOwner = session?.user?.id === (playlist as any).owner.id
     const isPublic = playlist.isPublic
 
     if (!isOwner && !isPublic && !apiKeyUser) {
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     // Mask file paths for unauthorized access
     const returnedPlaylist = {
       ...playlist,
-      tracks: playlist.tracks.map(pt => ({
+      tracks: (playlist as any).tracks.map((pt: any) => ({
         ...pt,
         track: {
           ...pt.track,

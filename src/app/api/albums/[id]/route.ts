@@ -94,7 +94,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     // Mask file paths for unauthorized access
     const returnedAlbum = {
       ...album,
-      tracks: album.tracks.map(track => ({
+      tracks: (album as any).tracks.map((track: any) => ({
         ...track,
         filePath: isAuthorized ? track.filePath : undefined
       }))

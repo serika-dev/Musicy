@@ -8,7 +8,7 @@ import { formatDuration } from "@/lib/utils"
 import type { Track } from "@/types/track"
 import { AddToPlaylistButton } from "@/components/add-to-playlist-button"
 import { ShareMenu } from "@/components/share-menu"
-import { MoreVertical, Share2, Users } from "lucide-react"
+import { MoreVertical, Share2, Users, Music } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -59,25 +59,19 @@ export function TrackListItem({
       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden relative">
         {(() => {
           // Explicitly prioritize track-specific artwork
-          if (track.coverImageUrl) return (
-            <img 
-              src={track.coverImageUrl} 
-              alt={track.title} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-            />
-          )
-
-          // Fallback logic
           const isCompilation = (track.album as any)?.albumType === 'COMPILATION' || (track.album as any)?.type === 'COMPILATION'
-          const imgUrl = isCompilation 
-            ? ((track.artist as any)?.imageUrl || track.album?.coverImageUrl)
-            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl)
           
+          const imgUrl = track.coverImageUrl || (isCompilation 
+            ? ((track.artist as any)?.imageUrl || track.album?.coverImageUrl)
+            : (track.album?.coverImageUrl || (track.artist as any)?.imageUrl))
+
           if (imgUrl) return (
-            <img 
-              src={imgUrl} 
-              alt={track.title} 
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+            <Image
+              src={imgUrl}
+              alt={track.title}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-110"
+              sizes="(max-width: 640px) 40px, 48px"
             />
           )
           
