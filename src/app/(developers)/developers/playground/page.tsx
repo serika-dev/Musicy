@@ -19,7 +19,7 @@ const ENDPOINTS = [
   { id: "get-playlist", name: "Get Playlist", method: "GET", path: "/api/playlists/{id}", category: "Playlists", params: ["id"] },
   { id: "search", name: "Search", method: "GET", path: "/api/search", category: "Search", params: ["q", "type", "limit"] },
   { id: "get-daily", name: "Daily Mixes", method: "GET", path: "/api/daily-mixes", category: "Discovery", params: [] },
-  { id: "get-me", name: "Get Current User", method: "GET", path: "/api/user", category: "Users", params: [] },
+  { id: "get-me", name: "Get Current User", method: "GET", path: "/api/user/profile", category: "Users", params: [] },
   { id: "get-stats", name: "Platform Stats", method: "GET", path: "/api/stats", category: "Analytics", params: [] },
   { id: "get-apikeys", name: "List API Keys", method: "GET", path: "/api/api-keys", category: "Self", params: [] },
   { id: "get-oembed", name: "oEmbed Lookup", method: "GET", path: "/api/oembed", category: "Embeds", params: ["url"] },
@@ -83,16 +83,25 @@ export default function ApiPlayground() {
       const res = await fetch(path, {
         headers: apiKey ? { "Authorization": `Bearer ${apiKey}` } : {}
       })
-      const data = await res.json()
-      setResponse(data)
+      
       setStatus(res.status)
       setResponseTime(Date.now() - start)
+
+      let data
+      try {
+        data = await res.json()
+      } catch (e) {
+        data = { error: "Invalid JSON response from server" }
+      }
+      
+      setResponse(data)
       
       if (!res.ok) {
-        toast.error(`Request failed with status ${res.status}`)
+        toast.error(`Error ${res.status}: ${data.error || data.message || 'Request failed'}`)
       }
-    } catch (err) {
-      toast.error("Endpoint unreachable")
+    } catch (err: any) {
+      toast.error("Execution failed. Check your network or credentials.")
+      console.error(err)
     } finally {
       setIsLoading(false)
     }

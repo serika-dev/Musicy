@@ -2,18 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { validateApiKey } from "@/lib/api-utils"
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    const today = new Date().toISOString().split('T')[0] // Get YYYY-MM-DD format
+    const apiKeyUser = await validateApiKey(request)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id && !apiKeyUser) {
       // Return or generate popular mixes for non-authenticated users
-      return getOrCreatePopularMixes(today)
+      return getOrCreatePopularMixes(new Date().toISOString().split('T')[0])
     }
 
-    const userId = session.user.id
+    const userId = session?.user?.id || apiKeyUser?.id
+    if (!userId) {
+       return getOrCreatePopularMixes(new Date().toISOString().split('T')[0])
+    }
     
     // Temporarily disable database-stored daily mixes until Prisma is regenerated
     // Create dynamic mixes for now

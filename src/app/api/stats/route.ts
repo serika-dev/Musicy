@@ -2,12 +2,14 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { validateApiKey } from "@/lib/api-utils"
 
-export async function GET() {
+export async function GET(req: any) {
   try {
     const session = await getServerSession(authOptions)
+    const apiKeyUser = await validateApiKey(req)
     
-    if (!session) {
+    if (!session && !apiKeyUser) {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401 }

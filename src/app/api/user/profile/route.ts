@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { validateApiKey } from "@/lib/api-utils"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
+    const apiKeyUser = await validateApiKey(req)
+    const userId = session?.user?.id || apiKeyUser?.id
+
+    if (!userId) {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401 }
@@ -15,7 +18,7 @@ export async function GET() {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -57,8 +60,10 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+    const apiKeyUser = await validateApiKey(request)
+    const userId = session?.user?.id || apiKeyUser?.id
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401 }
