@@ -41,12 +41,20 @@ export default function EmbedPage() {
                     (data as any).tracks?.[0]?.track || (data as any).tracks?.[0] || null
 
   useEffect(() => {
+    if (trackToPlay?.duration && (duration === 0 || isNaN(duration))) {
+      setDuration(trackToPlay.duration)
+    }
+  }, [trackToPlay, duration])
+
+  useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime)
-      setProgress((audio.currentTime / audio.duration) * 100)
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        setProgress((audio.currentTime / audio.duration) * 100)
+      }
     }
 
     const handleLoadedMetadata = () => {
@@ -59,13 +67,23 @@ export default function EmbedPage() {
       setCurrentTime(0)
     }
 
+    const handleDurationChange = () => {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        setDuration(audio.duration)
+      }
+    }
+
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('durationchange', handleDurationChange)
+    audio.addEventListener('progress', handleDurationChange)
     audio.addEventListener('ended', handleEnded)
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate)
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('durationchange', handleDurationChange)
+      audio.removeEventListener('progress', handleDurationChange)
       audio.removeEventListener('ended', handleEnded)
     }
   }, [])
@@ -137,8 +155,8 @@ export default function EmbedPage() {
             />
           </div>
           <div className="flex justify-between text-[10px] font-black text-white/30 font-mono tracking-tighter">
-             <span>{formatDuration(currentTime * 1000)}</span>
-             <span>{formatDuration(duration * 1000)}</span>
+             <span>{formatDuration(currentTime)}</span>
+             <span>{formatDuration(duration)}</span>
           </div>
         </div>
       </div>
