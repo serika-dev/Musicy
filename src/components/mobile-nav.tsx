@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Search, Library } from "lucide-react"
+import { Download, Home, Search, Library } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function MobileNav() {
@@ -27,10 +27,16 @@ export function MobileNav() {
       href: "/playlists",
       active: pathname?.startsWith("/playlists") || pathname?.startsWith("/artists") || pathname?.startsWith("/albums") || pathname === "/liked-songs",
     },
+    {
+      label: "Downloads",
+      icon: Download,
+      href: "/downloads",
+      active: pathname === "/downloads",
+    },
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-background/80 backdrop-blur-xl border-t border-border/40 px-6 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-background/80 backdrop-blur-xl border-t border-border/40 px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
       <div className="flex items-center justify-around max-w-md mx-auto">
         {navItems.map((item) => (
           <Link

@@ -140,6 +140,16 @@ body {
   overflow-y: scroll;
 }
 
+body[data-native="true"] {
+  background: #050505;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body[data-native="true"] main {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
 /* View Transitions */
 @view-transition {
   navigation: auto;

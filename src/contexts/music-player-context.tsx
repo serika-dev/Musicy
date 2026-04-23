@@ -8,6 +8,7 @@ import { useDeviceSync, type RemoteDevice } from '@/hooks/useDeviceSync'
 import { useSettings } from '@/hooks/useSettings'
 import { AutoplayWarning } from '@/components/autoplay-warning'
 import { getOfflineTrackBlob } from '@/lib/offline-storage'
+import { getNativeTrackFileSrc } from '@/lib/native-downloads'
 import { toast } from 'sonner'
 
 interface MusicPlayerContextType {
@@ -106,11 +107,20 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   
   const audioRef = useRef<HTMLAudioElement>(null)
   const shouldAutoPlayRef = useRef<boolean>(false)
+  const loadedTrackIdRef = useRef<string | null>(null)
+  const loadedObjectUrlRef = useRef<string | null>(null)
 
   // Multi-device sync state (declared early so effects can reference it)
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null)
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false)
   const [remoteBlockedDevices, setRemoteBlockedDevices] = useState<string[]>([])
+
+  const clearLoadedObjectUrl = useCallback(() => {
+    if (loadedObjectUrlRef.current) {
+      URL.revokeObjectURL(loadedObjectUrlRef.current)
+      loadedObjectUrlRef.current = null
+    }
+  }, [])
   const deviceIdRef = useRef<string>('')
   const isActiveRef = useRef<boolean>(false)
   const handlingRemoteRef = useRef<boolean>(false)
@@ -289,7 +299,18 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   // Handle track changes
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !currentTrack) return
+    if (!audio) return
+
+    if (!currentTrack) {
+      if (audio.src) {
+        audio.pause()
+        audio.removeAttribute('src')
+        audio.load()
+      }
+      loadedTrackIdRef.current = null
+      clearLoadedObjectUrl()
+      return
+    }
 
     // If we are NOT the active device, never actually play audio locally.
     // The UI will still display the state mirrored from the active device.
@@ -299,6 +320,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         audio.pause()
         audio.removeAttribute('src')
         audio.load()
+        loadedTrackIdRef.current = null
+        clearLoadedObjectUrl()
       }
       return
     }
@@ -308,31 +331,31 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         audio.pause()
         audio.removeAttribute('src')
         audio.load()
+        loadedTrackIdRef.current = null
+        clearLoadedObjectUrl()
       }
       return
     }
 
-    // Skip if src is already set for this track and we're just becoming active again
-    // If the audio URL matches the track path, don't recreate it to avoid seeking resets
-    if (audio.src) {
-      const filename = currentTrack.filePath.split('/').pop()?.split('?')[0]
-      if (filename && audio.src.includes(filename)) {
-        if (Math.abs(audio.currentTime - currentTimeRef.current) > 1) {
-          audio.currentTime = currentTimeRef.current
-        }
-        
-        if (shouldAutoPlayRef.current) {
-          console.log('▶️ Resuming matched source:', currentTrack.title)
-          shouldAutoPlayRef.current = false
-          audio.play().catch(error => {
-            console.error('❌ Resume play error:', error)
-            if (error.name === 'NotAllowedError') {
-              handleAutoplayBlock()
-            }
-          })
-        }
-        return
+    // Skip if src is already set for this track and we're just becoming active again.
+    // Track IDs are more reliable than URL matching because offline sources are blob:
+    // URLs or Capacitor file URLs.
+    if (audio.src && loadedTrackIdRef.current === currentTrack.id) {
+      if (Math.abs(audio.currentTime - currentTimeRef.current) > 1) {
+        audio.currentTime = currentTimeRef.current
       }
+      
+      if (shouldAutoPlayRef.current) {
+        console.log('▶️ Resuming matched source:', currentTrack.title)
+        shouldAutoPlayRef.current = false
+        audio.play().catch(error => {
+          console.error('❌ Resume play error:', error)
+          if (error.name === 'NotAllowedError') {
+            handleAutoplayBlock()
+          }
+        })
+      }
+      return
     }
 
     console.log('🔄 Loading new track:', currentTrack.title)
@@ -345,28 +368,44 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     // Check if track has a valid file path
     if (!currentTrack.filePath) {
       console.error('❌ Track has no file path:', currentTrack.title)
+      loadedTrackIdRef.current = null
+      clearLoadedObjectUrl()
       setIsPlaying(false)
       return
     }
+
+    let cancelled = false
     
     // Set new audio source and load with cache-busting parameter
     const loadTrackSource = async () => {
-      // Check for offline version first
-      const offlineBlob = await getOfflineTrackBlob(currentTrack.id)
+      // Check for native/offline versions before falling back to the network.
+      const nativeAudioSrc = await getNativeTrackFileSrc(currentTrack.id)
+      const offlineBlob = nativeAudioSrc ? null : await getOfflineTrackBlob(currentTrack.id)
+      if (cancelled) return
       
-      if (offlineBlob) {
+      if (nativeAudioSrc) {
+        console.log('📱 Playing from native storage:', currentTrack.title)
+        clearLoadedObjectUrl()
+        audio.src = nativeAudioSrc
+      } else if (offlineBlob) {
         console.log('📦 Playing from offline storage:', currentTrack.title)
-        audio.src = URL.createObjectURL(offlineBlob)
+        clearLoadedObjectUrl()
+        const objectUrl = URL.createObjectURL(offlineBlob)
+        loadedObjectUrlRef.current = objectUrl
+        audio.src = objectUrl
       } else {
+        clearLoadedObjectUrl()
         let audioSrc = currentTrack.filePath
         if (audioSrc.includes('?')) {
-          audioSrc = audioSrc + '&t=' + Date.now()
+          audioSrc = `${audioSrc}&t=${Date.now()}`
         } else {
-          audioSrc = audioSrc + '?t=' + Date.now()
+          audioSrc = `${audioSrc}?t=${Date.now()}`
         }
         audio.src = audioSrc
         console.log('🌐 Loading track from network:', currentTrack.title)
       }
+
+      loadedTrackIdRef.current = currentTrack.id
       
       audio.load()
     }
@@ -377,10 +416,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const handleCanPlay = () => {
       console.log('✅ Audio ready to play (canplay catch)')
       
-      // Safety: Double check that the audio src still matches the currentTrack
-      const currentFilename = currentTrack.filePath.split('/').pop()?.split('?')[0]
-      if (currentFilename && !audio.src.includes(currentFilename)) {
-        console.warn('⚠️ canplay fired but src does not match currentTrack, ignoring.')
+      // Safety: Double check that the loaded source still belongs to this track.
+      if (loadedTrackIdRef.current !== currentTrack.id) {
+        console.warn('⚠️ canplay fired for a stale track source, ignoring.')
         return
       }
 
@@ -408,9 +446,14 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     
     // Cleanup function to remove event listener if component unmounts or track changes
     return () => {
+      cancelled = true
       audio.removeEventListener('canplay', handleCanPlay)
     }
-  }, [currentTrack, activeDeviceId])
+  }, [currentTrack, activeDeviceId, clearLoadedObjectUrl])
+
+  useEffect(() => {
+    return () => clearLoadedObjectUrl()
+  }, [clearLoadedObjectUrl])
 
   // Handle play/pause changes (for same track toggle, not new track loads)
   useEffect(() => {
@@ -436,9 +479,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       if (audio.src && audio.readyState >= 2) { // HAVE_CURRENT_DATA or better
         // CRITICAL: Ensure the current audio src matches the intended track
         // to avoid playing the old track during a transition race condition.
-        const intendedFilename = currentTrack.filePath.split('/').pop()?.split('?')[0]
-        if (intendedFilename && !audio.src.includes(intendedFilename)) {
-          console.warn('⏳ isPlaying TRUE but src mismatch. Waiting for load effect to set correct src.')
+        if (loadedTrackIdRef.current !== currentTrack.id) {
+          console.warn('⏳ isPlaying TRUE but track source is still loading.')
           return
         }
 

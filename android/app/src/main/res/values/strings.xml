@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Musicy</string>
+    <string name="title_activity_main">Musicy</string>
+    <string name="package_name">app.serika.musicy</string>
+    <string name="custom_url_scheme">app.serika.musicy</string>
+</resources>

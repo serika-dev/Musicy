@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
   Home, 
   Search, 
+  Download,
   Library, 
   Plus, 
   Heart,
@@ -120,6 +121,22 @@ export function Sidebar({ className }: SidebarProps) {
                 <div className="flex flex-col items-start text-left min-w-0">
                   <span className="text-sm">Liked Songs</span>
                   <span className="text-[11px] text-muted-foreground">Playlist</span>
+                </div>
+              </Link>
+            </Button>
+
+            <Button
+              variant={isActive("/downloads") ? "secondary" : "ghost"}
+              className="w-full justify-start h-auto py-2"
+              asChild
+            >
+              <Link href="/downloads">
+                <div className="w-8 h-8 mr-2 bg-gradient-to-br from-emerald-500/80 to-cyan-500 rounded flex items-center justify-center flex-shrink-0">
+                  <Download className="h-3.5 w-3.5 text-white" />
+                </div>
+                <div className="flex flex-col items-start text-left min-w-0">
+                  <span className="text-sm">Downloads</span>
+                  <span className="text-[11px] text-muted-foreground">Offline library</span>
                 </div>
               </Link>
             </Button>

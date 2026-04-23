@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers/session-provider";
 import { Toaster } from "sonner";
 import { ServiceWorkerRegistration } from "@/components/sw-registration";
+import { NativeAppBridge } from "@/components/native-app-bridge";
 import Script from "next/script";
 import "./globals.css";
 
@@ -54,6 +55,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary/30`}
       >
         <Providers>
+          <NativeAppBridge />
           <ServiceWorkerRegistration />
           {children}
           <Toaster 
