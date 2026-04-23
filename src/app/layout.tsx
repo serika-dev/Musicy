@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Providers } from "@/components/providers/session-provider";
-import { Toaster } from "sonner";
-import { ServiceWorkerRegistration } from "@/components/sw-registration";
-import { NativeAppBridge } from "@/components/native-app-bridge";
 import Script from "next/script";
+import { Toaster } from "sonner";
+import { NativeAppBridge } from "@/components/native-app-bridge";
+import { Providers } from "@/components/providers/session-provider";
+import { ServiceWorkerRegistration } from "@/components/sw-registration";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,9 +17,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Serika Music - Lossless Streaming",
-  description: "High-quality lossless music streaming. Part of the Serika ecosystem.",
+  description:
+    "High-quality lossless music streaming. Part of the Serika ecosystem.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -44,12 +48,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        <Script 
-          src="/web-scrobbler-connector.js" 
+        <Script
+          src="/web-scrobbler-connector.js"
           strategy="afterInteractive"
           id="web-scrobbler-connector"
         />
-        <link rel="alternate" type="application/json+oembed" title="Musicy oEmbed Profile" href="/api/oembed?url={url}" />
+        <link
+          rel="alternate"
+          type="application/json+oembed"
+          title="Musicy oEmbed Profile"
+          href="/api/oembed?url={url}"
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary/30`}
@@ -58,15 +67,15 @@ export default function RootLayout({
           <NativeAppBridge />
           <ServiceWorkerRegistration />
           {children}
-          <Toaster 
+          <Toaster
             position="top-right"
             richColors
             closeButton
             toastOptions={{
               style: {
-                background: 'hsl(var(--background))',
-                border: '1px solid hsl(var(--border))',
-                color: 'hsl(var(--foreground))',
+                background: "hsl(var(--background))",
+                border: "1px solid hsl(var(--border))",
+                color: "hsl(var(--foreground))",
               },
             }}
           />

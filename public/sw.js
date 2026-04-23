@@ -1,86 +1,37 @@
-const CACHE_NAME = "musicy-v5";
-const STATIC_ASSETS = [
-  "/",
-  "/dashboard",
-  "/liked-songs",
-  "/downloads",
-  "/offline",
-  "/manifest.json",
-  "/icon.svg",
-  "/icon.png",
-];
+const CURRENT_CACHE = "musicy-network-v6";
 
-// Cache static assets on install
-self.addEventListener("install", (event) => {
+self.addEventListener("install", () => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn("Failed to pre-cache some assets:", err);
-      });
-    }),
-  );
 });
 
-// Clear old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-          return undefined;
-        }),
-      );
-    }),
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames
+            .filter((cacheName) => cacheName !== CURRENT_CACHE)
+            .map((cacheName) => caches.delete(cacheName)),
+        ),
+      )
+      .then(() => self.clients.claim())
+      .then(() =>
+        self.clients.matchAll({ type: "window" }).then((clients) =>
+          Promise.all(
+            clients.map((client) => {
+              if ("navigate" in client) {
+                return client.navigate(client.url);
+              }
+
+              return undefined;
+            }),
+          ),
+        ),
+      ),
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  const isNextAsset = url.pathname.startsWith("/_next/static/");
-  const isImage = url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp)$/);
-  const isFont = url.pathname.match(/\.(woff|woff2|eot|ttf|otf)$/);
-
-  // 1. Navigation requests: Network-first, fall back to cached index
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() =>
-        caches
-          .match(url.pathname)
-          .then((response) => response || caches.match("/")),
-      ),
-    );
-    return;
-  }
-
-  // 2. Static Assets (Next.js chunks, images, fonts): Stale-While-Revalidate
-  if (
-    isNextAsset ||
-    isImage ||
-    isFont ||
-    STATIC_ASSETS.includes(url.pathname)
-  ) {
-    event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          const fetchedResponse = fetch(event.request).then(
-            (networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                cache.put(event.request, networkResponse.clone());
-              }
-              return networkResponse;
-            },
-          );
-
-          return cachedResponse || fetchedResponse;
-        });
-      }),
-    );
-    return;
-  }
-
-  // 3. Default: Network only (API, etc.)
+self.addEventListener("fetch", () => {
+  // Network-only. This worker exists to evict older app-shell caches.
 });
