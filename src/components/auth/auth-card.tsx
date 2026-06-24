@@ -148,22 +148,20 @@ export function AuthCard({ initialMode }: { initialMode: Mode }) {
         </div>
 
         {/* Animated segmented toggle */}
-        <div className="segmented mx-auto grid w-full max-w-xs grid-cols-2 rounded-full border border-white/10 bg-white/5 text-sm font-semibold backdrop-blur-xl">
+        <div className="segmented mx-auto flex w-full max-w-xs rounded-full border border-white/10 bg-white/5 text-sm font-semibold backdrop-blur-xl">
           <span
             className="segmented-thumb"
             style={{
               width: "calc(50% - 0.25rem)",
               transform:
-                mode === "login"
-                  ? "translateX(0)"
-                  : "translateX(calc(100% + 0rem))",
+                mode === "login" ? "translateX(0)" : "translateX(100%)",
             }}
           />
           <button
             type="button"
             onClick={() => switchMode("login")}
             className={cn(
-              "relative z-10 rounded-full py-2 transition-colors",
+              "relative z-10 flex-1 rounded-full py-2 transition-colors",
               mode === "login" ? "text-foreground" : "text-muted-foreground",
             )}
           >
@@ -173,7 +171,7 @@ export function AuthCard({ initialMode }: { initialMode: Mode }) {
             type="button"
             onClick={() => switchMode("register")}
             className={cn(
-              "relative z-10 rounded-full py-2 transition-colors",
+              "relative z-10 flex-1 rounded-full py-2 transition-colors",
               mode === "register" ? "text-foreground" : "text-muted-foreground",
             )}
           >

@@ -495,12 +495,12 @@ body[data-scroll-locked] {
 /* Animated segmented toggle (auth + filters) */
 .segmented {
   position: relative;
-  display: inline-flex;
   padding: 0.25rem;
   border-radius: 9999px;
 }
 .segmented-thumb {
   position: absolute;
+  left: 0.25rem;
   top: 0.25rem;
   bottom: 0.25rem;
   border-radius: 9999px;
