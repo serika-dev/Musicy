@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { ImageUpload } from "@/components/image-upload"
+import { EmptyState } from "@/components/shared/empty-state"
 import { 
   Upload, 
   Music, 
@@ -865,40 +866,25 @@ This is specifically an audio file upload issue.`
 
   if (status === "loading" || profileLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-          </div>
-        </main>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   if (!session || !profile || profile.role !== 'ADMIN') {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Crown className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-              <p className="text-muted-foreground mb-4">
-                This area is restricted to administrators only.
-              </p>
-              <Button onClick={() => router.push("/")}>
-                Go to Home
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
+      <EmptyState
+        icon={<Crown />}
+        title="Access denied"
+        description="This area is restricted to administrators only."
+        action={<Button onClick={() => router.push("/")}>Go to home</Button>}
+      />
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-6 py-8 max-w-7xl">
+    <div className="mx-auto max-w-7xl">
         <div className="space-y-8">
           {/* Page Header */}
           <div className="flex items-center justify-between">
@@ -2238,7 +2224,6 @@ This is specifically an audio file upload issue.`
             </DialogContent>
           </Dialog>
         </div>
-      </main>
     </div>
   )
 }
