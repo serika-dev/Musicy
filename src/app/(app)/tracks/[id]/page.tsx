@@ -1,109 +1,103 @@
-'use client'
+"use client";
 
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import Image from 'next/image'
-import { useQuery } from '@tanstack/react-query'
-import { useMusicPlayer } from '@/contexts/music-player-context'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Play, Pause, Heart, Share, Clock, Music } from 'lucide-react'
-import { formatDuration } from '@/lib/utils'
-import { ShareMenu } from '@/components/share-menu'
+import { useQuery } from "@tanstack/react-query";
+import { Clock, Heart, Music, Pause, Play, Share } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { ShareMenu } from "@/components/share-menu";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMusicPlayer } from "@/contexts/music-player-context";
+import { formatDuration } from "@/lib/utils";
 
 interface Track {
-  id: string
-  title: string
-  duration: number
-  filePath: string
-  genre?: string
-  playCount: number
-  createdAt: string
-  format: string
-  bitRate?: number
-  sampleRate?: number
+  id: string;
+  title: string;
+  duration: number;
+  filePath: string;
+  genre?: string;
+  playCount: number;
+  createdAt: string;
+  format: string;
+  bitRate?: number;
+  sampleRate?: number;
   artist: {
-    id: string
-    name: string
-    verified: boolean
-  }
+    id: string;
+    name: string;
+    verified: boolean;
+  };
   album?: {
-    id: string
-    title: string
-    coverImageUrl?: string
-    releaseDate?: string
-  }
+    id: string;
+    title: string;
+    coverImageUrl?: string;
+    releaseDate?: string;
+  };
 }
 
 function useTrack(id: string) {
   return useQuery<Track>({
-    queryKey: ['track', id],
+    queryKey: ["track", id],
     queryFn: async () => {
-      const response = await fetch(`/api/tracks/${id}`)
+      const response = await fetch(`/api/tracks/${id}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch track')
+        throw new Error("Failed to fetch track");
       }
-      return response.json()
+      return response.json();
     },
     enabled: !!id,
-  })
+  });
 }
 
 export default function TrackPage() {
-  const params = useParams()
-  const trackId = params.id as string
-  
-  const { data: track, isLoading, error } = useTrack(trackId)
-  const { playTrack, isCurrentTrack, isPlaying } = useMusicPlayer()
+  const params = useParams();
+  const trackId = params.id as string;
+
+  const { data: track, isLoading, error } = useTrack(trackId);
+  const { playTrack, isCurrentTrack, isPlaying } = useMusicPlayer();
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="flex items-start space-x-6">
-            <div className="w-64 h-64 bg-muted rounded-lg"></div>
-            <div className="flex-1 space-y-4">
-              <div className="h-8 bg-muted rounded w-1/2"></div>
-              <div className="h-4 bg-muted rounded w-1/4"></div>
-              <div className="h-4 bg-muted rounded w-1/3"></div>
-            </div>
+      <div className="animate-pulse space-y-6">
+        <div className="flex flex-col lg:flex-row items-start gap-8">
+          <div className="w-64 h-64 bg-muted rounded-2xl"></div>
+          <div className="flex-1 space-y-4 w-full">
+            <div className="h-10 bg-muted rounded w-1/2"></div>
+            <div className="h-4 bg-muted rounded w-1/4"></div>
+            <div className="h-4 bg-muted rounded w-1/3"></div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !track) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">Track Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              This track doesn't exist or is not available.
-            </p>
-            <Button onClick={() => window.history.back()}>Go Back</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+      <EmptyState
+        icon={<Music />}
+        title="Track not found"
+        description="This track doesn't exist or is not available."
+        action={<Button onClick={() => window.history.back()}>Go back</Button>}
+      />
+    );
   }
 
   const handlePlay = () => {
-    playTrack(track)
-  }
+    playTrack(track);
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="space-y-8">
       {/* Track Header */}
-      <div className="flex flex-col lg:flex-row items-start space-y-6 lg:space-y-0 lg:space-x-8">
+      <div className="flex flex-col lg:flex-row items-start gap-8">
         {/* Album Cover */}
-        <div className="w-64 h-64 bg-gradient-to-br from-primary/30 to-primary/60 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+        <div className="w-64 h-64 bg-gradient-to-br from-primary/30 to-primary/60 rounded-2xl shadow-2xl shadow-primary/20 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
           {track.album?.coverImageUrl ? (
             <Image
               src={track.album.coverImageUrl}
-              alt={track.album.title || 'Album cover'}
+              alt={track.album.title || "Album cover"}
               fill
               className="object-cover"
               sizes="256px"
@@ -121,12 +115,14 @@ export default function TrackPage() {
             </Badge>
             <h1 className="text-4xl font-bold mb-2">{track.title}</h1>
             <div className="flex items-center space-x-2 text-lg">
-              <Link 
+              <Link
                 href={`/artists/${track.artist.id}`}
                 className="text-muted-foreground hover:text-foreground hover:underline"
               >
                 {track.artist.name}
-                {track.artist.verified && <span className="ml-1 text-primary">✓</span>}
+                {track.artist.verified && (
+                  <span className="ml-1 text-primary">✓</span>
+                )}
               </Link>
               {track.album && (
                 <>
@@ -178,7 +174,9 @@ export default function TrackPage() {
               ) : (
                 <Play className="h-5 w-5" />
               )}
-              <span>{isCurrentTrack(track.id) && isPlaying ? 'Pause' : 'Play'}</span>
+              <span>
+                {isCurrentTrack(track.id) && isPlaying ? "Pause" : "Play"}
+              </span>
             </Button>
 
             <Button variant="outline" size="lg">
@@ -257,12 +255,14 @@ export default function TrackPage() {
             <CardContent className="space-y-3">
               <div>
                 <div className="text-sm text-muted-foreground">Artist</div>
-                <Link 
+                <Link
                   href={`/artists/${track.artist.id}`}
                   className="font-medium hover:underline"
                 >
                   {track.artist.name}
-                  {track.artist.verified && <span className="ml-1 text-primary">✓</span>}
+                  {track.artist.verified && (
+                    <span className="ml-1 text-primary">✓</span>
+                  )}
                 </Link>
               </div>
               {track.album && (
@@ -281,5 +281,5 @@ export default function TrackPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
