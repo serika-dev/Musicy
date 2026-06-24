@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ============================================================================
    DESIGN TOKENS - Serika Music Theme (matching SerikaStreaming)
@@ -30,7 +31,7 @@
   --chart-3: 197 37% 24%;
   --chart-4: 43 74% 66%;
   --chart-5: 27 87% 67%;
-  --radius: 0.2rem;
+  --radius: 0.75rem;
   --sidebar-background: 0 0% 98%;
   --sidebar-foreground: 240 5.3% 26.1%;
   --sidebar-primary: 240 5.9% 10%;
@@ -46,25 +47,25 @@
    ============================================================================ */
 
 .dark {
-  --background: 0 0% 3.9%;
+  --background: 240 10% 4%;
   --foreground: 0 0% 98%;
-  --card: 0 0% 6%;
+  --card: 240 8% 7.5%;
   --card-foreground: 0 0% 98%;
-  --popover: 0 0% 6%;
+  --popover: 240 9% 8%;
   --popover-foreground: 0 0% 98%;
-  --primary: 263 70% 50%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 3.7% 15.9%;
+  --primary: 263 85% 64%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 14%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
+  --muted: 240 5% 14%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 263 60% 22%;
   --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 263 70% 50%;
+  --border: 240 5% 16%;
+  --input: 240 5% 17%;
+  --ring: 263 85% 64%;
   --chart-1: 220 70% 50%;
   --chart-2: 160 60% 45%;
   --chart-3: 30 80% 55%;
@@ -267,4 +268,109 @@ body.modal-open { overflow: hidden; }
 body[data-scroll-locked] {
   overflow: visible !important;
   margin-right: 0 !important;
+}
+
+/* ============================================================================
+   SURFACES, ELEVATION & GRADIENTS
+   ============================================================================ */
+
+.surface {
+  background: hsl(var(--card) / 0.6);
+  border: 1px solid hsl(var(--border) / 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.surface-hover {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.surface-hover:hover {
+  background: hsl(var(--card) / 0.9);
+  border-color: hsl(var(--border));
+}
+
+.glass-strong {
+  background: hsl(var(--popover) / 0.85);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+}
+
+.elevate {
+  box-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.3),
+    0 8px 24px -8px hsl(0 0% 0% / 0.5);
+}
+.elevate-lg {
+  box-shadow:
+    0 2px 4px hsl(0 0% 0% / 0.3),
+    0 24px 48px -12px hsl(0 0% 0% / 0.6);
+}
+
+.text-gradient {
+  background: linear-gradient(
+    100deg,
+    hsl(var(--foreground)),
+    hsl(var(--foreground) / 0.65)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-primary {
+  background: linear-gradient(
+    100deg,
+    hsl(var(--primary)),
+    hsl(290 85% 68%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-aurora {
+  background:
+    radial-gradient(60% 80% at 12% 0%, hsl(var(--primary) / 0.18), transparent 60%),
+    radial-gradient(50% 60% at 92% 8%, hsl(290 85% 60% / 0.14), transparent 55%);
+}
+
+/* ============================================================================
+   MOTION UTILITIES
+   ============================================================================ */
+
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-enter {
+  animation: enter-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hover-lift {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

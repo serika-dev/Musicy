@@ -1,6 +1,6 @@
 "use client"
 
-import { AudioPlayer } from "@/components/audio-player"
+import { PlayerBar } from "@/components/player/player-bar"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
@@ -33,10 +33,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         )}
 
-        {/* Main content */}
+        {/* Main content. Bottom padding accounts for the mobile nav + the
+            floating player bar (which sits above the nav on phones). */}
         <main className={cn(
           "flex-1 overflow-auto",
-          currentTrack ? 'pb-32 lg:pb-24' : 'pb-20 lg:pb-0',
+          currentTrack ? 'pb-44 lg:pb-28' : 'pb-24 lg:pb-0',
           showSidebar ? 'lg:pl-2' : ''
         )}>
           <div className="w-full h-full px-4 lg:px-8 py-6 mb-8">
@@ -46,7 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {showSidebar && <MobileNav />}
-      <AudioPlayer />
+      <PlayerBar />
     </div>
   )
 }
