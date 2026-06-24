@@ -365,6 +365,152 @@ body[data-scroll-locked] {
   transform: translateY(-4px);
 }
 
+/* Springy press feedback for interactive elements */
+.press {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.press:hover {
+  transform: scale(1.06);
+}
+.press:active {
+  transform: scale(0.92);
+}
+
+/* ============================================================================
+   KAWAII / DELIGHT ANIMATIONS
+   ============================================================================ */
+
+/* Heart pop on like — a bouncy overshoot */
+@keyframes heart-pop {
+  0% { transform: scale(1); }
+  25% { transform: scale(0.8); }
+  50% { transform: scale(1.35) rotate(-8deg); }
+  70% { transform: scale(0.95) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.animate-heart-pop {
+  animation: heart-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Burst ring that radiates outward from a liked heart */
+@keyframes heart-burst {
+  0% { transform: scale(0); opacity: 0.75; }
+  80% { opacity: 0.2; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.animate-heart-burst {
+  animation: heart-burst 0.5s ease-out forwards;
+}
+
+/* Sparkle particles flung outward on like */
+@keyframes sparkle-fly {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; }
+  30% { opacity: 1; }
+  100% {
+    transform: translate(var(--spark-x), var(--spark-y)) scale(1);
+    opacity: 0;
+  }
+}
+.animate-sparkle {
+  animation: sparkle-fly 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Gentle idle float for hero marks/logos */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Playful wiggle on hover */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-7deg); }
+  75% { transform: rotate(7deg); }
+}
+.hover-wiggle:hover {
+  animation: wiggle 0.4s ease-in-out;
+}
+
+/* Springy pop-in for newly mounted cards */
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.92) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.02) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-pop-in {
+  animation: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Slow conic shimmer used behind liquid-glass surfaces */
+@keyframes aurora-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   LIQUID GLASS
+   ============================================================================ */
+
+.liquid-glass {
+  position: relative;
+  background:
+    linear-gradient(
+      135deg,
+      hsl(0 0% 100% / 0.12) 0%,
+      hsl(0 0% 100% / 0.04) 40%,
+      hsl(0 0% 100% / 0.02) 100%
+    );
+  border: 1px solid hsl(0 0% 100% / 0.12);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  box-shadow:
+    0 8px 32px -8px hsl(0 0% 0% / 0.55),
+    inset 0 1px 0 0 hsl(0 0% 100% / 0.18),
+    inset 0 -1px 0 0 hsl(0 0% 100% / 0.04);
+}
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    hsl(0 0% 100% / 0.4),
+    transparent 35%,
+    transparent 65%,
+    hsl(var(--primary) / 0.35)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Animated segmented toggle (auth + filters) */
+.segmented {
+  position: relative;
+  display: inline-flex;
+  padding: 0.25rem;
+  border-radius: 9999px;
+}
+.segmented-thumb {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  border-radius: 9999px;
+  background: hsl(0 0% 100% / 0.14);
+  border: 1px solid hsl(0 0% 100% / 0.18);
+  box-shadow: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

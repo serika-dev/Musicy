@@ -4,7 +4,6 @@ import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   BadgeCheck,
   ChevronDown,
-  Heart,
   Mic2,
   Minimize2,
   Music2,
@@ -13,14 +12,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DownloadButton } from "@/components/download-button";
+import { LikeButton } from "@/components/shared/like-button";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import {
-  useIsTrackLiked,
-  useLikeTrack,
-  useUnlikeTrack,
-} from "@/hooks/useLikedSongs";
 import {
   extractColorsFromImage,
   generateGradientFromPalette,
@@ -42,14 +37,6 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
   const { currentTrack } = useMusicPlayer();
   const [showLyrics, setShowLyrics] = useState(true);
   const [gradient, setGradient] = useState<string | null>(null);
-
-  const { data: isLiked } = useIsTrackLiked(currentTrack?.id || "");
-  const { mutate: likeTrack } = useLikeTrack();
-  const { mutate: unlikeTrack } = useUnlikeTrack();
-  const [localLike, setLocalLike] = useState(false);
-  useEffect(() => {
-    if (isLiked !== undefined) setLocalLike(isLiked);
-  }, [isLiked]);
 
   const hasLyrics = useHasLyrics(currentTrack?.id);
   const artwork = getTrackArtwork(currentTrack);
@@ -80,13 +67,6 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
   }, [currentTrack, isOpen, artwork]);
 
   if (!currentTrack || !isOpen) return null;
-
-  const handleLikeToggle = () => {
-    const next = !localLike;
-    setLocalLike(next);
-    if (next) likeTrack(currentTrack.id);
-    else unlikeTrack(currentTrack.id);
-  };
 
   const showLyricsPane = showLyrics && hasLyrics;
 
@@ -221,20 +201,11 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
                         {currentTrack.artist.name}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleLikeToggle}
-                      aria-label="Like"
-                      className={cn(
-                        "shrink-0 hover:bg-white/15",
-                        localLike ? "text-primary" : "text-white",
-                      )}
-                    >
-                      <Heart
-                        className={cn("h-7 w-7", localLike && "fill-current")}
-                      />
-                    </Button>
+                    <LikeButton
+                      trackId={currentTrack.id}
+                      size="md"
+                      tone="onDark"
+                    />
                   </div>
                   <SeekBar
                     variant="immersive"
@@ -316,20 +287,11 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
                         {currentTrack.artist.name}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={handleLikeToggle}
-                      aria-label="Like"
-                      className={cn(
-                        "ml-2 hover:bg-white/15",
-                        localLike ? "text-primary" : "text-white",
-                      )}
-                    >
-                      <Heart
-                        className={cn("h-5 w-5", localLike && "fill-current")}
-                      />
-                    </Button>
+                    <LikeButton
+                      trackId={currentTrack.id}
+                      tone="onDark"
+                      className="ml-2"
+                    />
                   </div>
 
                   <PlayerControls

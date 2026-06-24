@@ -16,7 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Music2, Search, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react"
+import { Search, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 
 export function Header() {
   const { data: session, status } = useSession()
@@ -41,16 +42,16 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-2xl lg:border-b">
       <div className="w-full px-4 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Logo */}
-        <Link 
-          href="/" 
-          className="flex items-center gap-2.5 group transition-transform active:scale-95 shrink-0"
+        <Link
+          href="/"
+          aria-label="Musicy home"
+          className="group shrink-0 transition-transform active:scale-95"
         >
-          <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <Music2 className="h-5 w-5 text-primary" />
-          </div>
-          <span className="text-xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            Musicy
-          </span>
+          <Logo
+            size="md"
+            variant="gradient"
+            className="[&_span:first-child]:transition-transform [&_span:first-child]:duration-300 group-hover:[&_span:first-child]:scale-105 group-hover:[&_span:first-child]:rotate-3"
+          />
         </Link>
 
         {/* Nav Links */}
@@ -86,16 +87,16 @@ export function Header() {
           ) : session ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 overflow-hidden ring-2 ring-transparent hover:ring-primary/30 transition-all">
-                  <Avatar className="h-9 w-9">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 ring-2 ring-transparent transition-all hover:ring-primary/40 active:scale-95">
+                  <Avatar className="h-9 w-9 overflow-hidden rounded-full">
                     <AvatarImage src={avatarSrc} alt={session.user?.name || "Profile"} />
                     <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>
                   {isAdmin && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-primary rounded-full border-2 border-background flex items-center justify-center">
-                      <Shield className="w-2 h-2 text-primary-foreground" />
+                    <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-primary to-fuchsia-500 shadow-md shadow-primary/30 ring-2 ring-background">
+                      <Shield className="h-2.5 w-2.5 text-primary-foreground" />
                     </span>
                   )}
                 </Button>

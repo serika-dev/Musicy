@@ -66,7 +66,7 @@ import {
   useUpdateUserRole,
 } from "@/hooks/useAdminData";
 import { useProfile } from "@/hooks/useProfile";
-import { formatDuration, formatFileSize } from "@/lib/utils";
+import { cn, formatDuration, formatFileSize } from "@/lib/utils";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -990,91 +990,111 @@ This is specifically an audio file upload issue.`;
     <div className="mx-auto max-w-7xl">
       <div className="space-y-8">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground">
-              Comprehensive platform management
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Crown className="w-5 h-5 text-yellow-500" />
-            <span className="text-sm font-medium">Administrator</span>
+        <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-sm sm:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-fuchsia-500 shadow-lg shadow-primary/30">
+                <Crown className="h-7 w-7 text-white" />
+              </span>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight">
+                  Admin Dashboard
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Comprehensive platform management
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
+              <Shield className="h-4 w-4" />
+              Administrator
+            </span>
           </div>
         </div>
 
         {/* Admin Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tracks">Manage Tracks</TabsTrigger>
-            <TabsTrigger value="artists">Manage Artists</TabsTrigger>
-            <TabsTrigger value="users">Manage Users</TabsTrigger>
-            <TabsTrigger value="upload">Upload Track</TabsTrigger>
-            <TabsTrigger value="lyrics">Lyrics Manager</TabsTrigger>
-            <TabsTrigger value="settings">System Settings</TabsTrigger>
-          </TabsList>
+          <div className="-mx-1 overflow-x-auto pb-1">
+            <TabsList className="inline-flex h-auto w-auto min-w-full justify-start gap-1 rounded-2xl bg-muted/60 p-1.5 backdrop-blur-sm">
+              {[
+                ["overview", "Overview"],
+                ["tracks", "Manage Tracks"],
+                ["artists", "Manage Artists"],
+                ["users", "Manage Users"],
+                ["upload", "Upload Track"],
+                ["lyrics", "Lyrics Manager"],
+                ["settings", "System Settings"],
+              ].map(([value, label]) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="whitespace-nowrap rounded-xl px-4 py-2 font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:shadow-primary/10"
+                >
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Tracks
-                  </CardTitle>
-                  <Music className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {tracksData?.total || 0}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Users
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {usersData?.total || 0}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Public Tracks
-                  </CardTitle>
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {tracksData?.tracks?.filter((t: any) => t.isPublic)
-                      .length || 0}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Admin Users
-                  </CardTitle>
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {usersData?.users?.filter((u: any) => u.role === "ADMIN")
-                      .length || 0}
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Tracks",
+                  value: tracksData?.total || 0,
+                  icon: Music,
+                  gradient: "from-violet-500 to-purple-600",
+                },
+                {
+                  label: "Total Users",
+                  value: usersData?.total || 0,
+                  icon: Users,
+                  gradient: "from-cyan-500 to-blue-600",
+                },
+                {
+                  label: "Public Tracks",
+                  value:
+                    tracksData?.tracks?.filter((t: any) => t.isPublic).length ||
+                    0,
+                  icon: Eye,
+                  gradient: "from-emerald-500 to-teal-600",
+                },
+                {
+                  label: "Admin Users",
+                  value:
+                    usersData?.users?.filter((u: any) => u.role === "ADMIN")
+                      .length || 0,
+                  icon: Shield,
+                  gradient: "from-rose-500 to-pink-600",
+                },
+              ].map((stat, i) => (
+                <Card
+                  key={stat.label}
+                  className="group animate-pop-in overflow-hidden border-border/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5"
+                  style={{ animationDelay: `${i * 70}ms` }}
+                >
+                  <CardContent className="flex items-center gap-4 p-5">
+                    <span
+                      className={cn(
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3",
+                        stat.gradient,
+                      )}
+                    >
+                      <stat.icon className="h-6 w-6" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {stat.label}
+                      </p>
+                      <p className="text-3xl font-black tracking-tight">
+                        {stat.value}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </TabsContent>
 

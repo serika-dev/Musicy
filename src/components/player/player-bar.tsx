@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronUp, Heart, Music2 } from "lucide-react";
+import { ChevronUp, Music2 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DownloadButton } from "@/components/download-button";
+import { LikeButton } from "@/components/shared/like-button";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -11,11 +12,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import {
-  useIsTrackLiked,
-  useLikeTrack,
-  useUnlikeTrack,
-} from "@/hooks/useLikedSongs";
 import { cn } from "@/lib/utils";
 import { DeviceSwitcher } from "./device-switcher";
 import { NowPlaying } from "./now-playing";
@@ -28,25 +24,9 @@ export function PlayerBar() {
   const { currentTrack } = useMusicPlayer();
   const [fullscreen, setFullscreen] = useState(false);
 
-  const { data: isLiked } = useIsTrackLiked(currentTrack?.id || "");
-  const { mutate: likeTrack } = useLikeTrack();
-  const { mutate: unlikeTrack } = useUnlikeTrack();
-  const [localLike, setLocalLike] = useState(false);
-  useEffect(() => {
-    if (isLiked !== undefined) setLocalLike(isLiked);
-  }, [isLiked]);
-
   if (!currentTrack) return null;
 
   const artwork = getTrackArtwork(currentTrack);
-
-  const handleLikeToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = !localLike;
-    setLocalLike(next);
-    if (next) likeTrack(currentTrack.id);
-    else unlikeTrack(currentTrack.id);
-  };
 
   return (
     <>
@@ -93,20 +73,10 @@ export function PlayerBar() {
                 {currentTrack.artist.name}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleLikeToggle}
-              aria-label="Like"
-              className={cn(
-                "ml-auto hidden shrink-0 sm:flex",
-                localLike
-                  ? "text-primary hover:text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Heart className={cn("h-4 w-4", localLike && "fill-current")} />
-            </Button>
+            <LikeButton
+              trackId={currentTrack.id}
+              className="ml-auto hidden sm:flex"
+            />
           </div>
 
           {/* Center controls */}
