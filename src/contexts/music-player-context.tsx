@@ -152,6 +152,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const deviceIdRef = useRef<string>("");
+  const pendingClaimRef = useRef<string | null>(null);
   const isActiveRef = useRef<boolean>(false);
   const handlingRemoteRef = useRef<boolean>(false);
   const tabIdRef = useRef<string>("");
@@ -803,6 +804,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
   const isActiveDevice = activeDeviceId === deviceId && !!deviceId;
   isActiveRef.current = isActiveDevice;
+  // Once an active device is resolved (by us or another device), the in-flight
+  // claim guard is cleared so future hand-offs can claim again.
+  if (activeDeviceId) pendingClaimRef.current = null;
   // Only leader tab plays audio (prevents multiple tabs playing simultaneously)
   const shouldPlayAudio = isActiveDevice && isLeader;
 
@@ -1061,8 +1065,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
   const ensureActiveDeviceIfNone = useCallback(() => {
     if (activeDeviceId) return activeDeviceId;
-    // No active device yet — claim this tab
+    // A claim is already in flight (set synchronously) — don't publish twice.
+    // This prevents the double-claim race where rapid actions each fired their
+    // own claim before `activeDeviceId` state had updated.
+    if (pendingClaimRef.current) return pendingClaimRef.current;
     if (deviceId) {
+      pendingClaimRef.current = deviceId;
       syncPublish({ type: "claim", payload: { deviceName } });
       setActiveDeviceId(deviceId);
     }

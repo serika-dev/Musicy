@@ -3,22 +3,26 @@
 
 export type SyncEvent =
   | {
-      type: "state"
-      fromDeviceId: string
+      type: "state";
+      fromDeviceId: string;
       payload: {
-        trackId: string | null
-        isPlaying: boolean
-        currentTime: number
-        duration: number
-        queue: Array<{ id: string; title: string; artistName?: string }>
-        currentIndex: number
-        activeDeviceId: string
-      }
+        trackId: string | null;
+        // Full track object so controller devices can render now-playing
+        // without an extra fetch. Typed loosely here to avoid importing the
+        // client Track type into this server-shared module.
+        currentTrack: unknown | null;
+        isPlaying: boolean;
+        currentTime: number;
+        duration: number;
+        queue: unknown[];
+        currentIndex: number;
+        activeDeviceId: string;
+      };
     }
   | {
-      type: "command"
-      fromDeviceId: string
-      targetDeviceId?: string
+      type: "command";
+      fromDeviceId: string;
+      targetDeviceId?: string;
       payload:
         | { action: "play" }
         | { action: "pause" }
@@ -27,59 +31,64 @@ export type SyncEvent =
         | { action: "previous" }
         | { action: "seek"; seconds: number }
         | { action: "setVolume"; volume: number }
-        | { action: "playTrack"; trackId: string }
+        | { action: "playTrack"; trackId: string };
     }
   | {
-      type: "claim"
-      fromDeviceId: string
-      payload: { deviceName: string }
+      type: "claim";
+      fromDeviceId: string;
+      payload: { deviceName: string };
     }
   | {
-      type: "device-list"
+      type: "device-list";
       payload: {
         devices: Array<{
-          id: string
-          name: string
-          isActive: boolean
-          lastSeenAt: string
-        }>
-      }
+          id: string;
+          name: string;
+          isActive: boolean;
+          lastSeenAt: string;
+        }>;
+      };
     }
   | {
-      type: "disconnect"
-      fromDeviceId: string
+      type: "disconnect";
+      fromDeviceId: string;
     }
+  | {
+      type: "autoplay-blocked" | "autoplay-resolved";
+      fromDeviceId: string;
+      payload: { deviceName: string };
+    };
 
-type Subscriber = (event: SyncEvent) => void
+type Subscriber = (event: SyncEvent) => void;
 
 // userId -> set of subscribers
-const subscribers = new Map<string, Set<Subscriber>>()
+const subscribers = new Map<string, Set<Subscriber>>();
 
 export function subscribe(userId: string, fn: Subscriber): () => void {
-  let set = subscribers.get(userId)
+  let set = subscribers.get(userId);
   if (!set) {
-    set = new Set()
-    subscribers.set(userId, set)
+    set = new Set();
+    subscribers.set(userId, set);
   }
-  set.add(fn)
+  set.add(fn);
   return () => {
-    set!.delete(fn)
-    if (set!.size === 0) subscribers.delete(userId)
-  }
+    set!.delete(fn);
+    if (set!.size === 0) subscribers.delete(userId);
+  };
 }
 
 export function publish(userId: string, event: SyncEvent): void {
-  const set = subscribers.get(userId)
-  if (!set) return
+  const set = subscribers.get(userId);
+  if (!set) return;
   for (const fn of set) {
     try {
-      fn(event)
+      fn(event);
     } catch (err) {
-      console.error("sync-bus subscriber error:", err)
+      console.error("sync-bus subscriber error:", err);
     }
   }
 }
 
 export function subscriberCount(userId: string): number {
-  return subscribers.get(userId)?.size ?? 0
+  return subscribers.get(userId)?.size ?? 0;
 }

@@ -1,49 +1,90 @@
-"use client"
+"use client";
 
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { Button } from "@/components/ui/button"
-import { ImageUpload } from "@/components/image-upload"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { useProfile, useUpdateProfile, useChangePassword } from "@/hooks/useProfile"
-import { User, Music, Heart, Users, Calendar, Crown, Mail, Edit, Shield, ListMusic, Check, X } from "lucide-react"
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Calendar,
+  Check,
+  Crown,
+  Edit,
+  Heart,
+  ListMusic,
+  Mail,
+  Shield,
+  User,
+  Users,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { ImageUpload } from "@/components/image-upload";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  useChangePassword,
+  useProfile,
+  useUpdateProfile,
+} from "@/hooks/useProfile";
 
 const profileSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters"),
-  displayName: z.string().min(1, "Display name is required").max(50, "Display name must be less than 50 characters"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30, "Username must be less than 30 characters"),
+  displayName: z
+    .string()
+    .min(1, "Display name is required")
+    .max(50, "Display name must be less than 50 characters"),
   avatarUrl: z.string().optional(),
   bannerUrl: z.string().optional(),
-})
+});
 
-const passwordSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(6, "New password must be at least 6 characters"),
-  confirmPassword: z.string().min(1, "Please confirm your new password"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-})
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z
+      .string()
+      .min(6, "New password must be at least 6 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
-type ProfileFormValues = z.infer<typeof profileSchema>
-type PasswordFormValues = z.infer<typeof passwordSchema>
+type ProfileFormValues = z.infer<typeof profileSchema>;
+type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export default function ProfilePage() {
-  const { data: session, status, update: updateSession } = useSession()
-  const router = useRouter()
-  const [isEditing, setIsEditing] = useState(false)
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-  
-  const { data: profile, isLoading, error } = useProfile()
-  const updateProfileMutation = useUpdateProfile()
-  const changePasswordMutation = useChangePassword()
+  const { data: session, status, update: updateSession } = useSession();
+  const router = useRouter();
+  const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const { data: profile, isLoading, error } = useProfile();
+  const updateProfileMutation = useUpdateProfile();
+  const changePasswordMutation = useChangePassword();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -53,7 +94,7 @@ export default function ProfilePage() {
       avatarUrl: "",
       bannerUrl: "",
     },
-  })
+  });
 
   const passwordForm = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -62,13 +103,13 @@ export default function ProfilePage() {
       newPassword: "",
       confirmPassword: "",
     },
-  })
+  });
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/login")
+      router.push("/login");
     }
-  }, [status, router])
+  }, [status, router]);
 
   useEffect(() => {
     if (profile) {
@@ -77,69 +118,75 @@ export default function ProfilePage() {
         displayName: profile.displayName || "",
         avatarUrl: profile.avatarUrl || "",
         bannerUrl: profile.bannerUrl || "",
-      })
+      });
     }
-  }, [profile, form])
+  }, [profile, form]);
 
   const onSubmit = async (data: ProfileFormValues) => {
     try {
-      await updateProfileMutation.mutateAsync(data)
-      await updateSession()
-      setIsEditing(false)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
+      await updateProfileMutation.mutateAsync(data);
+      await updateSession();
+      setIsEditing(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
-      console.error("Failed to update profile:", error)
+      console.error("Failed to update profile:", error);
     }
-  }
+  };
 
   const onPasswordSubmit = async (data: PasswordFormValues) => {
     try {
       await changePasswordMutation.mutateAsync({
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
-      })
-      setIsChangingPassword(false)
-      passwordForm.reset()
+      });
+      setIsChangingPassword(false);
+      passwordForm.reset();
     } catch (error) {
-      console.error("Error changing password:", error)
+      console.error("Error changing password:", error);
     }
-  }
+  };
 
   const userInitials = profile?.displayName
-    ? profile.displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : profile?.email?.[0]?.toUpperCase() || "?"
+    ? profile.displayName
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : profile?.email?.[0]?.toUpperCase() || "?";
 
-  const isAdmin = profile?.role === "ADMIN"
+  const isAdmin = profile?.role === "ADMIN";
   const memberSince = profile?.createdAt
-    ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : ""
+    ? new Date(profile.createdAt).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : "";
 
   if (status === "loading" || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="p-8 text-center">
-            <p className="text-destructive">Failed to load profile</p>
-            <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+      <EmptyState
+        icon={<User />}
+        title="Failed to load profile"
+        description="Something went wrong while loading your profile."
+        action={
+          <Button onClick={() => window.location.reload()}>Try again</Button>
+        }
+      />
+    );
   }
 
   if (!session || !profile) {
-    return null
+    return null;
   }
 
   return (
@@ -149,10 +196,10 @@ export default function ProfilePage() {
         {/* Banner */}
         <div className="relative h-56 md:h-72 rounded-none md:rounded-2xl overflow-hidden bg-gradient-to-br from-primary/30 via-primary/10 to-background border-b md:border border-border/50 shadow-sm">
           {profile.bannerUrl ? (
-            <img 
-              src={profile.bannerUrl} 
-              alt="Profile Banner" 
-              className="w-full h-full object-cover" 
+            <img
+              src={profile.bannerUrl}
+              alt="Profile Banner"
+              className="w-full h-full object-cover"
             />
           ) : (
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
@@ -163,7 +210,10 @@ export default function ProfilePage() {
         {/* Avatar + Name overlay */}
         <div className="absolute -bottom-16 left-6 md:left-10 flex items-end gap-6">
           <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-2xl">
-            <AvatarImage src={profile.avatarUrl || ""} alt={profile.displayName || "Profile"} />
+            <AvatarImage
+              src={profile.avatarUrl || ""}
+              alt={profile.displayName || "Profile"}
+            />
             <AvatarFallback className="bg-primary/20 text-primary text-4xl md:text-5xl font-bold">
               {userInitials}
             </AvatarFallback>
@@ -183,7 +233,9 @@ export default function ProfilePage() {
                 <Crown className="w-6 h-6 text-yellow-500 drop-shadow-sm" />
               )}
             </div>
-            <p className="text-muted-foreground text-base md:text-lg font-medium mt-1 opacity-90">@{profile.username || "unknown"}</p>
+            <p className="text-muted-foreground text-base md:text-lg font-medium mt-1 opacity-90">
+              @{profile.username || "unknown"}
+            </p>
           </div>
         </div>
 
@@ -216,19 +268,34 @@ export default function ProfilePage() {
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { icon: ListMusic, label: "Playlists", value: profile._count.playlists },
-          { icon: Heart, label: "Liked Songs", value: profile._count.likedTracks },
+          {
+            icon: ListMusic,
+            label: "Playlists",
+            value: profile._count.playlists,
+          },
+          {
+            icon: Heart,
+            label: "Liked Songs",
+            value: profile._count.likedTracks,
+          },
           { icon: Users, label: "Followers", value: profile._count.followers },
           { icon: Users, label: "Following", value: profile._count.following },
         ].map((stat) => (
-          <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur-sm">
+          <Card
+            key={stat.label}
+            className="border-border/50 bg-card/50 backdrop-blur-sm"
+          >
             <CardContent className="p-4 flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10">
                 <stat.icon className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <div className="text-lg font-bold leading-tight">{stat.value}</div>
-                <div className="text-xs text-muted-foreground">{stat.label}</div>
+                <div className="text-lg font-bold leading-tight">
+                  {stat.value}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {stat.label}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -242,25 +309,38 @@ export default function ProfilePage() {
             <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-lg">Edit Profile</CardTitle>
-                <CardDescription>Update your profile information</CardDescription>
+                <CardDescription>
+                  Update your profile information
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-5"
+                  >
                     <div className="space-y-3">
-                      <FormLabel className="text-sm font-medium">Profile Banner</FormLabel>
+                      <FormLabel className="text-sm font-medium">
+                        Profile Banner
+                      </FormLabel>
                       <ImageUpload
-                        currentImage={form.watch('bannerUrl')}
-                        onImageChange={(url: string) => form.setValue('bannerUrl', url)}
+                        currentImage={form.watch("bannerUrl")}
+                        onImageChange={(url: string) =>
+                          form.setValue("bannerUrl", url)
+                        }
                         type="banner"
                         size="banner"
                       />
                     </div>
                     <div className="flex flex-col items-center justify-center space-y-3 pt-2">
-                      <FormLabel className="text-sm font-medium self-start w-full">Profile Avatar</FormLabel>
+                      <FormLabel className="text-sm font-medium self-start w-full">
+                        Profile Avatar
+                      </FormLabel>
                       <ImageUpload
-                        currentImage={form.watch('avatarUrl')}
-                        onImageChange={(url: string) => form.setValue('avatarUrl', url)}
+                        currentImage={form.watch("avatarUrl")}
+                        onImageChange={(url: string) =>
+                          form.setValue("avatarUrl", url)
+                        }
                         type="profile"
                         size="lg"
                       />
@@ -272,9 +352,15 @@ export default function ProfilePage() {
                         <FormItem>
                           <FormLabel>Display Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Your display name" {...field} className="bg-secondary/50 border-border/50" />
+                            <Input
+                              placeholder="Your display name"
+                              {...field}
+                              className="bg-secondary/50 border-border/50"
+                            />
                           </FormControl>
-                          <FormDescription>This is your public display name.</FormDescription>
+                          <FormDescription>
+                            This is your public display name.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -286,21 +372,35 @@ export default function ProfilePage() {
                         <FormItem>
                           <FormLabel>Username</FormLabel>
                           <FormControl>
-                            <Input placeholder="your_username" {...field} className="bg-secondary/50 border-border/50" />
+                            <Input
+                              placeholder="your_username"
+                              {...field}
+                              className="bg-secondary/50 border-border/50"
+                            />
                           </FormControl>
-                          <FormDescription>Your unique username for your profile URL.</FormDescription>
+                          <FormDescription>
+                            Your unique username for your profile URL.
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                     <div className="flex gap-3 pt-2">
-                      <Button type="submit" disabled={updateProfileMutation.isPending}>
-                        {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+                      <Button
+                        type="submit"
+                        disabled={updateProfileMutation.isPending}
+                      >
+                        {updateProfileMutation.isPending
+                          ? "Saving..."
+                          : "Save Changes"}
                       </Button>
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => { setIsEditing(false); form.reset() }}
+                        onClick={() => {
+                          setIsEditing(false);
+                          form.reset();
+                        }}
                       >
                         <X className="w-4 h-4 mr-1" />
                         Cancel
@@ -308,7 +408,8 @@ export default function ProfilePage() {
                     </div>
                     {updateProfileMutation.isError && (
                       <p className="text-sm text-destructive">
-                        {updateProfileMutation.error?.message || "Failed to update profile"}
+                        {updateProfileMutation.error?.message ||
+                          "Failed to update profile"}
                       </p>
                     )}
                   </form>
@@ -326,13 +427,17 @@ export default function ProfilePage() {
                     <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
                       <div className="text-xs text-muted-foreground">Email</div>
-                      <div className="text-sm font-medium truncate">{profile.email}</div>
+                      <div className="text-sm font-medium truncate">
+                        {profile.email}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
                     <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
-                      <div className="text-xs text-muted-foreground">Member since</div>
+                      <div className="text-xs text-muted-foreground">
+                        Member since
+                      </div>
                       <div className="text-sm font-medium">{memberSince}</div>
                     </div>
                   </div>
@@ -340,14 +445,20 @@ export default function ProfilePage() {
                     <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
                       <div className="text-xs text-muted-foreground">Role</div>
-                      <div className="text-sm font-medium">{isAdmin ? "Administrator" : "User"}</div>
+                      <div className="text-sm font-medium">
+                        {isAdmin ? "Administrator" : "User"}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
                     <User className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
-                      <div className="text-xs text-muted-foreground">Username</div>
-                      <div className="text-sm font-medium">@{profile.username || "—"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Username
+                      </div>
+                      <div className="text-sm font-medium">
+                        @{profile.username || "—"}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -363,11 +474,13 @@ export default function ProfilePage() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">Account</span>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  profile.isPremium 
-                    ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20" 
-                    : "bg-muted text-muted-foreground"
-                }`}>
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    profile.isPremium
+                      ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
                   {profile.isPremium ? "Premium" : "Free"}
                 </span>
               </div>
@@ -388,15 +501,25 @@ export default function ProfilePage() {
             <CardContent>
               {isChangingPassword ? (
                 <Form {...passwordForm}>
-                  <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-3">
+                  <form
+                    onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
+                    className="space-y-3"
+                  >
                     <FormField
                       control={passwordForm.control}
                       name="currentPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Current Password</FormLabel>
+                          <FormLabel className="text-xs">
+                            Current Password
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} type="password" placeholder="Current password" className="h-9 bg-secondary/50 border-border/50 text-sm" />
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="Current password"
+                              className="h-9 bg-secondary/50 border-border/50 text-sm"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -407,9 +530,16 @@ export default function ProfilePage() {
                       name="newPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">New Password</FormLabel>
+                          <FormLabel className="text-xs">
+                            New Password
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} type="password" placeholder="New password" className="h-9 bg-secondary/50 border-border/50 text-sm" />
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="New password"
+                              className="h-9 bg-secondary/50 border-border/50 text-sm"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -420,29 +550,51 @@ export default function ProfilePage() {
                       name="confirmPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Confirm Password</FormLabel>
+                          <FormLabel className="text-xs">
+                            Confirm Password
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} type="password" placeholder="Confirm password" className="h-9 bg-secondary/50 border-border/50 text-sm" />
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="Confirm password"
+                              className="h-9 bg-secondary/50 border-border/50 text-sm"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                     <div className="flex gap-2 pt-1">
-                      <Button type="submit" size="sm" disabled={changePasswordMutation.isPending}>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={changePasswordMutation.isPending}
+                      >
                         {changePasswordMutation.isPending ? "..." : "Update"}
                       </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => { setIsChangingPassword(false); passwordForm.reset() }}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setIsChangingPassword(false);
+                          passwordForm.reset();
+                        }}
+                      >
                         Cancel
                       </Button>
                     </div>
                     {changePasswordMutation.isError && (
                       <p className="text-xs text-destructive">
-                        {changePasswordMutation.error?.message || "Failed to change password"}
+                        {changePasswordMutation.error?.message ||
+                          "Failed to change password"}
                       </p>
                     )}
                     {changePasswordMutation.isSuccess && (
-                      <p className="text-xs text-green-400">Password changed successfully</p>
+                      <p className="text-xs text-green-400">
+                        Password changed successfully
+                      </p>
                     )}
                   </form>
                 </Form>
@@ -461,5 +613,5 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

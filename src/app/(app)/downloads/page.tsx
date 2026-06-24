@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/shared/empty-state";
 import { TrackListItem } from "@/components/track-list-item";
 import { Button } from "@/components/ui/button";
 import { useMusicPlayer } from "@/contexts/music-player-context";
@@ -167,7 +168,7 @@ export default function DownloadsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-20">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
       <section className="relative overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(135deg,rgba(124,58,237,0.28),rgba(16,185,129,0.16)_42%,rgba(255,255,255,0.05))] px-5 py-7 shadow-2xl sm:px-8 lg:px-10">
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -295,16 +296,11 @@ export default function DownloadsPage() {
             </div>
           ))
         ) : (
-          <div className="flex min-h-80 flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-card/20 p-10 text-center">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <Download className="h-8 w-8" />
-            </div>
-            <h3 className="text-xl font-bold">No downloads yet</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              Save tracks from the player or track menus and they will appear
-              here.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Download />}
+            title="No downloads yet"
+            description="Save tracks from the player or track menus and they will appear here."
+          />
         )}
       </div>
     </div>

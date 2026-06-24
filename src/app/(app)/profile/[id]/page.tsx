@@ -1,96 +1,104 @@
-'use client'
+"use client";
 
-import { useParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { User, Music, Calendar, Mail, Settings, Crown } from 'lucide-react'
-import Link from 'next/link'
+import { useQuery } from "@tanstack/react-query";
+import { Calendar, Crown, Mail, Music, Settings, User } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+interface UserPlaylist {
+  id: string;
+  name: string;
+  coverImageUrl?: string;
+  _count?: { tracks: number };
+}
 
 // Hook to fetch user profile by ID
 function useUserProfile(userId: string) {
   return useQuery({
-    queryKey: ['userProfile', userId],
+    queryKey: ["userProfile", userId],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}`)
+      const response = await fetch(`/api/users/${userId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch user profile')
+        throw new Error("Failed to fetch user profile");
       }
-      return response.json()
+      return response.json();
     },
     enabled: !!userId,
-  })
+  });
 }
 
 // Hook to fetch user's public playlists
 function useUserPlaylists(userId: string) {
   return useQuery({
-    queryKey: ['userPlaylists', userId],
+    queryKey: ["userPlaylists", userId],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}/playlists`)
+      const response = await fetch(`/api/users/${userId}/playlists`);
       if (!response.ok) {
-        throw new Error('Failed to fetch user playlists')
+        throw new Error("Failed to fetch user playlists");
       }
-      return response.json()
+      return response.json();
     },
     enabled: !!userId,
-  })
+  });
 }
 
 export default function UserProfilePage() {
-  const params = useParams()
-  const { data: session } = useSession()
-  const userId = params.id as string
-  
-  const { data: profile, isLoading, error } = useUserProfile(userId)
-  const { data: playlistsData, isLoading: playlistsLoading } = useUserPlaylists(userId)
+  const params = useParams();
+  const { data: session } = useSession();
+  const userId = params.id as string;
 
-  const isOwnProfile = session?.user?.id === userId
+  const { data: profile, isLoading, error } = useUserProfile(userId);
+  const { data: playlistsData, isLoading: playlistsLoading } =
+    useUserPlaylists(userId);
+
+  const isOwnProfile = session?.user?.id === userId;
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-6 py-8 max-w-4xl">
-        <div className="animate-pulse space-y-6">
-          <div className="flex items-start space-x-6">
-            <div className="w-32 h-32 bg-muted rounded-full"></div>
-            <div className="flex-1 space-y-4">
-              <div className="h-8 bg-muted rounded w-1/2"></div>
-              <div className="h-4 bg-muted rounded w-1/4"></div>
-              <div className="h-4 bg-muted rounded w-1/3"></div>
-            </div>
+      <div className="mx-auto max-w-4xl animate-pulse space-y-6">
+        <div className="flex items-start gap-6">
+          <div className="w-32 h-32 bg-muted rounded-full"></div>
+          <div className="flex-1 space-y-4">
+            <div className="h-8 bg-muted rounded w-1/2"></div>
+            <div className="h-4 bg-muted rounded w-1/4"></div>
+            <div className="h-4 bg-muted rounded w-1/3"></div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !profile) {
     return (
-      <div className="container mx-auto px-6 py-8 max-w-4xl">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <User className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">User Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              This user doesn't exist or their profile is private.
-            </p>
-            <Button onClick={() => window.history.back()}>Go Back</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+      <EmptyState
+        icon={<User />}
+        title="User not found"
+        description="This user doesn't exist or their profile is private."
+        action={<Button onClick={() => window.history.back()}>Go back</Button>}
+      />
+    );
   }
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-4xl">
+    <div className="mx-auto max-w-4xl">
       <div className="space-y-8">
         {/* Profile Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">
-            {isOwnProfile ? 'Your Profile' : `${profile.displayName || profile.username || 'User'}'s Profile`}
+            {isOwnProfile
+              ? "Your Profile"
+              : `${profile.displayName || profile.username || "User"}'s Profile`}
           </h1>
           {isOwnProfile && (
             <Button asChild variant="outline">
@@ -132,8 +140,12 @@ export default function UserProfilePage() {
                   <div className="flex-1 space-y-4">
                     <div>
                       <h2 className="text-2xl font-bold flex items-center space-x-2">
-                        <span>{profile.displayName || profile.username || 'Anonymous User'}</span>
-                        {profile.role === 'ADMIN' && (
+                        <span>
+                          {profile.displayName ||
+                            profile.username ||
+                            "Anonymous User"}
+                        </span>
+                        {profile.role === "ADMIN" && (
                           <Crown className="w-5 h-5 text-yellow-500" />
                         )}
                         {profile.isPremium && (
@@ -143,34 +155,53 @@ export default function UserProfilePage() {
                         )}
                       </h2>
                       {profile.username && profile.displayName && (
-                        <p className="text-muted-foreground">@{profile.username}</p>
+                        <p className="text-muted-foreground">
+                          @{profile.username}
+                        </p>
                       )}
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <Mail className="w-4 h-4" />
-                        <span>{isOwnProfile ? profile.email : 'Email hidden'}</span>
+                        <span>
+                          {isOwnProfile ? profile.email : "Email hidden"}
+                        </span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
-                        <span>Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
+                        <span>
+                          Joined{" "}
+                          {new Date(profile.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
 
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{profile._count?.playlists || 0}</div>
-                        <div className="text-xs text-muted-foreground">Playlists</div>
+                        <div className="text-2xl font-bold">
+                          {profile._count?.playlists || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Playlists
+                        </div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{profile._count?.likedTracks || 0}</div>
-                        <div className="text-xs text-muted-foreground">Liked Songs</div>
+                        <div className="text-2xl font-bold">
+                          {profile._count?.likedTracks || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Liked Songs
+                        </div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{profile._count?.tracks || 0}</div>
-                        <div className="text-xs text-muted-foreground">Uploads</div>
+                        <div className="text-2xl font-bold">
+                          {profile._count?.tracks || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Uploads
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -186,14 +217,19 @@ export default function UserProfilePage() {
                   <span>Public Playlists</span>
                 </CardTitle>
                 <CardDescription>
-                  {isOwnProfile ? 'Your public playlists' : `${profile.displayName || 'User'}'s public playlists`}
+                  {isOwnProfile
+                    ? "Your public playlists"
+                    : `${profile.displayName || "User"}'s public playlists`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {playlistsLoading ? (
                   <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="flex items-center space-x-4 p-3 rounded-md animate-pulse">
+                    {["a", "b", "c"].map((k) => (
+                      <div
+                        key={k}
+                        className="flex items-center space-x-4 p-3 rounded-md animate-pulse"
+                      >
                         <div className="w-12 h-12 bg-muted rounded-md"></div>
                         <div className="flex-1">
                           <div className="h-4 bg-muted rounded mb-1"></div>
@@ -202,10 +238,14 @@ export default function UserProfilePage() {
                       </div>
                     ))}
                   </div>
-                ) : playlistsData?.playlists && playlistsData.playlists.length > 0 ? (
+                ) : playlistsData?.playlists &&
+                  playlistsData.playlists.length > 0 ? (
                   <div className="space-y-3">
-                    {playlistsData.playlists.map((playlist: any) => (
-                      <Link key={playlist.id} href={`/playlists/${playlist.id}`}>
+                    {playlistsData.playlists.map((playlist: UserPlaylist) => (
+                      <Link
+                        key={playlist.id}
+                        href={`/playlists/${playlist.id}`}
+                      >
                         <div className="flex items-center space-x-4 p-3 rounded-md hover:bg-accent transition-colors cursor-pointer">
                           <div className="w-12 h-12 bg-gradient-to-br from-primary/30 to-primary/60 rounded-md flex items-center justify-center overflow-hidden">
                             {playlist.coverImageUrl ? (
@@ -230,7 +270,9 @@ export default function UserProfilePage() {
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-8">
-                    {isOwnProfile ? "You haven't created any public playlists yet." : "No public playlists available."}
+                    {isOwnProfile
+                      ? "You haven't created any public playlists yet."
+                      : "No public playlists available."}
                   </p>
                 )}
               </CardContent>
@@ -243,14 +285,19 @@ export default function UserProfilePage() {
             <Card>
               <CardContent className="p-6 text-center">
                 <div className="mb-4">
-                  {profile.role === 'ADMIN' ? (
+                  {profile.role === "ADMIN" ? (
                     <Crown className="w-12 h-12 text-yellow-500 mx-auto" />
                   ) : (
                     <User className="w-12 h-12 text-primary mx-auto" />
                   )}
                 </div>
-                <Badge variant={profile.role === 'ADMIN' ? 'destructive' : 'secondary'} className="mb-2">
-                  {profile.role === 'ADMIN' ? 'Administrator' : 'Music Lover'}
+                <Badge
+                  variant={
+                    profile.role === "ADMIN" ? "destructive" : "secondary"
+                  }
+                  className="mb-2"
+                >
+                  {profile.role === "ADMIN" ? "Administrator" : "Music Lover"}
                 </Badge>
                 {profile.isPremium && (
                   <Badge className="block mt-2 bg-gradient-to-r from-purple-500 to-pink-500">
@@ -273,7 +320,7 @@ export default function UserProfilePage() {
                   <Button variant="outline" className="w-full" asChild>
                     <Link href="/profile">Edit Profile</Link>
                   </Button>
-                  {profile.role === 'ADMIN' && (
+                  {profile.role === "ADMIN" && (
                     <Button variant="secondary" className="w-full" asChild>
                       <Link href="/admin">Admin Panel</Link>
                     </Button>
@@ -285,5 +332,5 @@ export default function UserProfilePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

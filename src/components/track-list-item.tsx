@@ -7,6 +7,7 @@ import { Play, Pause } from "lucide-react"
 import { formatDuration } from "@/lib/utils"
 import type { Track } from "@/types/track"
 import { AddToPlaylistButton } from "@/components/add-to-playlist-button"
+import { LikeButton } from "@/components/shared/like-button"
 import { ShareMenu } from "@/components/share-menu"
 import { MoreVertical, Share2, Users, Music } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -165,6 +166,14 @@ export function TrackListItem({
 
       {/* Duration & Actions */}
       <div className="flex items-center space-x-1 sm:space-x-2">
+        <div
+          className={`transition-opacity ${
+            showAddButton ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <LikeButton trackId={track.id} />
+        </div>
         {/* Add to Playlist Button */}
         <div 
           className={`transition-opacity ${

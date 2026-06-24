@@ -1,194 +1,159 @@
-"use client"
+"use client";
 
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { TrackListItem } from "@/components/track-list-item"
-import { Play, Heart, Shuffle } from "lucide-react"
-import { useLikedSongs } from "@/hooks/useLikedSongs"
-import { useMusicPlayer } from "@/contexts/music-player-context"
+import { Heart, Play, Shuffle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { EmptyState } from "@/components/shared/empty-state";
+import { TrackListSkeleton } from "@/components/shared/skeletons";
+import { TrackListItem } from "@/components/track-list-item";
+import { Button } from "@/components/ui/button";
+import { useMusicPlayer } from "@/contexts/music-player-context";
+import { useLikedSongs } from "@/hooks/useLikedSongs";
 
 export default function LikedSongsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const { data: likedSongsData, isLoading, error } = useLikedSongs(50, 0)
-  const { playTrack, isPlaying, currentTrack, isCurrentTrack } = useMusicPlayer()
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const { data: likedSongsData, isLoading, error } = useLikedSongs(50, 0);
+  const { playTrack, isPlaying, isCurrentTrack } = useMusicPlayer();
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/login")
+      router.push("/login");
     }
-  }, [status, router])
+  }, [status, router]);
 
   if (status === "loading" || isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="space-y-8">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+          <div className="h-48 w-48 shrink-0 animate-pulse rounded-2xl bg-muted sm:h-56 sm:w-56" />
+          <div className="flex-1 space-y-3">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+            <div className="h-12 w-2/3 animate-pulse rounded bg-muted" />
           </div>
-        </main>
+        </div>
+        <TrackListSkeleton count={8} />
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-6 py-8">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-destructive">Failed to load liked songs</p>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-    )
+      <EmptyState
+        icon={<Heart />}
+        title="Couldn't load liked songs"
+        description="Something went wrong. Please try again."
+      />
+    );
   }
 
   if (!session) {
-    return null
+    return null;
   }
 
-  const tracks = likedSongsData?.tracks || []
+  const tracks = likedSongsData?.tracks || [];
+
+  const handlePlay = () => {
+    if (tracks.length > 0) {
+      playTrack(tracks[0], tracks, { type: "standalone", name: "Liked Songs" });
+    }
+  };
+
+  const handleShuffle = () => {
+    if (tracks.length === 0) return;
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+    playTrack(shuffled[0], shuffled, {
+      type: "standalone",
+      name: "Liked Songs",
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-6 py-8 max-w-6xl">
-        {/* Header Section */}
-        <div className="flex items-end space-x-6 mb-8">
-          {/* Large Heart Icon */}
-          <div className="w-60 h-60 bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg flex items-center justify-center shadow-xl">
-            <Heart className="w-24 h-24 text-white fill-current" />
-          </div>
-
-          {/* Playlist Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-muted-foreground mb-2">PLAYLIST</p>
-            <h1 className="text-4xl md:text-6xl font-bold mb-4">Liked Songs</h1>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{session.user?.name || session.user?.email}</span>
-              <span>•</span>
-              <span>{tracks.length} songs</span>
-            </div>
+    <div className="space-y-8">
+      {/* Hero */}
+      <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-end sm:text-left">
+        <div className="flex h-48 w-48 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-purple-600 to-indigo-700 shadow-2xl shadow-primary/30 sm:h-56 sm:w-56">
+          <Heart className="h-20 w-20 fill-current text-white sm:h-24 sm:w-24" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Playlist
+          </p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-6xl">
+            Liked Songs
+          </h1>
+          <div className="mt-3 flex items-center justify-center gap-2 text-sm text-muted-foreground sm:justify-start">
+            <span className="font-semibold text-foreground">
+              {session.user?.name || session.user?.email}
+            </span>
+            <span>•</span>
+            <span>
+              {tracks.length} {tracks.length === 1 ? "song" : "songs"}
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* Controls */}
-        <div className="flex items-center space-x-4 mb-8">
-          <Button 
-            size="lg" 
-            className="rounded-full w-14 h-14 p-0"
-            disabled={tracks.length === 0}
-            onClick={() => {
-              if (tracks.length > 0) {
-                playTrack(tracks[0], tracks, { 
-                  type: 'standalone', 
-                  name: 'Liked Songs' 
-                })
-              }
-            }}
+      {/* Controls */}
+      {tracks.length > 0 && (
+        <div className="flex items-center gap-4">
+          <Button
+            size="icon-lg"
+            className="h-14 w-14 rounded-full shadow-lg shadow-primary/30"
+            onClick={handlePlay}
           >
-            <Play className="w-6 h-6 ml-1" />
+            <Play className="ml-1 h-6 w-6 fill-current" />
           </Button>
-
-          <Button 
-            variant="ghost" 
-            size="lg"
-            disabled={tracks.length === 0}
-          >
-            <Shuffle className="w-5 h-5" />
+          <Button variant="ghost" size="lg" onClick={handleShuffle}>
+            <Shuffle className="h-5 w-5" />
+            Shuffle
           </Button>
         </div>
+      )}
 
-        {/* Tracks List */}
+      {/* Track list */}
+      {tracks.length > 0 ? (
         <div className="space-y-1">
-          {tracks.length > 0 ? (
-            <>
-              {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-sm text-muted-foreground border-b">
-                <div className="col-span-1">#</div>
-                <div className="col-span-6">TITLE</div>
-                <div className="col-span-3 hidden md:block">ALBUM</div>
-                <div className="col-span-2 text-right">DURATION</div>
+          {tracks.map((track, index) => (
+            <div
+              key={track.id}
+              className="flex items-center gap-2 rounded-lg transition-colors hover:bg-white/5"
+            >
+              <span className="hidden w-8 shrink-0 text-center text-sm text-muted-foreground sm:block">
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <TrackListItem
+                  track={track}
+                  isPlaying={isPlaying}
+                  isCurrentTrack={isCurrentTrack(track.id)}
+                  onPlay={() =>
+                    playTrack(track, tracks, {
+                      type: "standalone",
+                      name: "Liked Songs",
+                    })
+                  }
+                  showAlbum={true}
+                  showAddButton={true}
+                  className="bg-transparent hover:bg-transparent"
+                />
               </div>
-
-              {/* Track Items */}
-              {tracks.map((track, index) => (
-                <div key={track.id} className="grid grid-cols-12 gap-4 group hover:bg-muted/50 rounded-md p-2">
-                  <div className="col-span-1 flex items-center">
-                    <span className="text-sm text-muted-foreground group-hover:hidden">
-                      {index + 1}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="hidden group-hover:flex w-8 h-8 p-0"
-                      onClick={() => playTrack(track, tracks, { 
-                        type: 'standalone', 
-                        name: 'Liked Songs' 
-                      })}
-                    >
-                      {isCurrentTrack(track.id) && isPlaying ? (
-                        <div className="w-4 h-4 flex items-center justify-center">
-                          <div className="flex space-x-0.5">
-                            <div className="w-0.5 h-4 bg-primary animate-bounce"></div>
-                            <div className="w-0.5 h-4 bg-primary animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-0.5 h-4 bg-primary animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                        </div>
-                      ) : (
-                        <Play className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                  
-                  <div className="col-span-6">
-                    <TrackListItem
-                      track={track}
-                      isPlaying={isPlaying}
-                      isCurrentTrack={isCurrentTrack(track.id)}
-                      onPlay={() => playTrack(track, tracks, { 
-                        type: 'standalone', 
-                        name: 'Liked Songs' 
-                      })}
-                      showAlbum={false}
-                      showAddButton={true}
-                    />
-                  </div>
-
-                  <div className="col-span-3 hidden md:flex items-center">
-                    <span className="text-sm text-muted-foreground truncate">
-                      {track.album?.title || 'Unknown Album'}
-                    </span>
-                  </div>
-
-                  <div className="col-span-2 flex items-center justify-end">
-                    <span className="text-sm text-muted-foreground">
-                      {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </>
-          ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Heart className="w-16 h-16 text-muted-foreground mx-auto mb-6" />
-                <h3 className="text-xl font-semibold mb-2">No liked songs yet</h3>
-                <p className="text-muted-foreground mb-6">
-                  Songs you like will appear here. Start exploring and heart your favorites!
-                </p>
-                <Button asChild>
-                  <a href="/artists">Browse Music</a>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+            </div>
+          ))}
         </div>
-      </main>
+      ) : (
+        <EmptyState
+          icon={<Heart />}
+          title="No liked songs yet"
+          description="Songs you like will appear here. Start exploring and heart your favorites!"
+          action={
+            <Button asChild className="rounded-xl">
+              <a href="/artists">Browse music</a>
+            </Button>
+          }
+        />
+      )}
     </div>
-  )
+  );
 }
