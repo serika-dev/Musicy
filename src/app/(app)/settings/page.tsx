@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +28,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { SaveButton } from "@/components/ui/save-button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import { useSettings } from "@/hooks/useSettings";
+import { useSaveState } from "@/hooks/useSaveState";
+import {
+  DEFAULT_SETTINGS,
+  type UserSettings,
+  useSettings,
+} from "@/hooks/useSettings";
 
 function SegmentedControl<T extends string>({
   value,
@@ -63,16 +69,39 @@ function SegmentedControl<T extends string>({
   );
 }
 
+/** "Active now" while it's fresh, otherwise a short relative time. */
+function formatLastSeen(iso: string): string {
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 45) return "Active now";
+  if (secs < 90) return "Active a minute ago";
+  if (secs < 3600) return `Active ${Math.round(secs / 60)} min ago`;
+  return `Active ${Math.round(secs / 3600)} h ago`;
+}
+
 function DevicesPanel() {
   const {
     deviceId,
-    deviceName,
     devices,
     activeDeviceId,
     claimPlayback,
     isLeader,
     tabCount,
   } = useMusicPlayer();
+
+  // Exactly one device plays at a time. Prefer the live active id; fall back to
+  // the server's stored flag only if nothing else claims it — otherwise a stale
+  // flag makes two rows both read "Now playing".
+  const activeId =
+    activeDeviceId || devices.find((d) => d.isActive)?.id || null;
+
+  // This device first, then whatever is playing, then most-recently-seen.
+  const ordered = [...devices].sort((a, b) => {
+    if (a.id === deviceId) return -1;
+    if (b.id === deviceId) return 1;
+    if (a.id === activeId) return -1;
+    if (b.id === activeId) return 1;
+    return new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime();
+  });
 
   return (
     <Card>
@@ -110,25 +139,28 @@ function DevicesPanel() {
             </div>
           </div>
         )}
-        {devices.length === 0 && (
-          <div className="text-sm text-muted-foreground py-6 text-center">
-            Connecting…
+        {ordered.length === 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-pulse" />
+            Looking for your devices…
           </div>
         )}
-        {devices.map((d) => {
+        {ordered.map((d) => {
           const isThis = d.id === deviceId;
-          const isActive = d.id === activeDeviceId || d.isActive;
+          const isActive = d.id === activeId;
           return (
             <div
               key={d.id}
-              className={`flex items-center justify-between p-4 border rounded-lg ${
-                isActive ? "border-primary bg-primary/5" : "border-border"
+              className={`flex items-center justify-between gap-3 p-4 border rounded-lg transition-colors ${
+                isActive ? "border-primary/60 bg-primary/5" : "border-border"
               }`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div
-                  className={`p-2 rounded-md ${
-                    isActive ? "bg-primary text-primary-foreground" : "bg-muted"
+                  className={`shrink-0 p-2 rounded-md ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {isActive ? (
@@ -138,47 +170,48 @@ function DevicesPanel() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium truncate flex items-center gap-2">
-                    {d.name}
+                  <div className="font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="truncate">{d.name}</span>
                     {isThis && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         This device
                       </span>
                     )}
                     {isActive && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-                        Now playing
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                        <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
+                        Playing
                       </span>
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Last seen {new Date(d.lastSeenAt).toLocaleTimeString()}
+                    {isActive && isThis
+                      ? "Playing here"
+                      : isThis
+                        ? "Ready to play"
+                        : formatLastSeen(d.lastSeenAt)}
                   </div>
                 </div>
               </div>
-              {isThis && !isActive && (
+              {isThis && !isActive ? (
                 <Button
                   size="sm"
+                  className="shrink-0"
                   onClick={() => {
                     claimPlayback();
-                    toast.success("Playback transferred here");
+                    toast.success("Playing here now");
                   }}
                 >
                   <Play className="w-4 h-4 mr-2" /> Play here
                 </Button>
-              )}
-              {!isThis && (
-                <div className="text-xs text-muted-foreground">
-                  Open this account on that device to control it
-                </div>
-              )}
+              ) : !isThis && !isActive ? (
+                <span className="shrink-0 text-xs text-muted-foreground text-right max-w-[9rem]">
+                  Remote control
+                </span>
+              ) : null}
             </div>
           );
         })}
-        <div className="text-xs text-muted-foreground pt-2">
-          Your device ID: <code className="font-mono">{deviceId || "…"}</code> —{" "}
-          {deviceName}
-        </div>
       </CardContent>
     </Card>
   );
@@ -214,7 +247,49 @@ function SettingRow({
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { settings, updateSettings, resetSettings, hydrated } = useSettings();
+  const {
+    settings: savedSettings,
+    updateSettingsAsync,
+    hydrated,
+    isSaving,
+  } = useSettings();
+  const save = useSaveState();
+
+  // Settings are edited as a draft and committed explicitly, so the save
+  // control has something meaningful to enable and disable against.
+  const [draft, setDraft] = useState<UserSettings>(savedSettings);
+
+  // Adopt settings whenever they change on the server — including from another
+  // device. The save status is deliberately left alone: our own save applies
+  // optimistically and lands here mid-flight, so clearing it would wipe out the
+  // progress and confirmation the user is waiting on. It self-clears instead.
+  useEffect(() => {
+    setDraft(savedSettings);
+  }, [savedSettings]);
+
+  const settings = draft;
+  const set = useCallback(
+    (patch: Partial<UserSettings>) => setDraft((d) => ({ ...d, ...patch })),
+    [],
+  );
+
+  const changedKeys = useMemo(
+    () =>
+      (Object.keys(draft) as Array<keyof UserSettings>).filter(
+        (k) => draft[k] !== savedSettings[k],
+      ),
+    [draft, savedSettings],
+  );
+  const dirty = changedKeys.length > 0;
+
+  const handleSave = () =>
+    save.run(async () => {
+      const patch = Object.fromEntries(
+        changedKeys.map((k) => [k, draft[k]]),
+      ) as Partial<UserSettings>;
+      await updateSettingsAsync(patch);
+    });
+
   const [testText, setTestText] = useState("困っちまうこれは誰かのせい");
   const [testResult, setTestResult] = useState<string>("");
   const [testing, setTesting] = useState(false);
@@ -309,19 +384,19 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>
             <p className="text-muted-foreground mt-1">
-              Customize your Musicy experience
+              Changes apply once you save them.
             </p>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              resetSettings();
-              toast.success("Settings reset to defaults");
-            }}
+            onClick={() => setDraft(DEFAULT_SETTINGS)}
+            disabled={(
+              Object.keys(DEFAULT_SETTINGS) as Array<keyof UserSettings>
+            ).every((k) => draft[k] === DEFAULT_SETTINGS[k])}
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            Reset to Defaults
+            Restore defaults
           </Button>
         </div>
 
@@ -378,9 +453,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.autoRomanizeLyrics}
-                    onCheckedChange={(v) =>
-                      updateSettings({ autoRomanizeLyrics: v })
-                    }
+                    onCheckedChange={(v) => set({ autoRomanizeLyrics: v })}
                   />
                 </SettingRow>
 
@@ -391,7 +464,7 @@ export default function SettingsPage() {
                   <Switch
                     checked={settings.showRomanizationAlongside}
                     onCheckedChange={(v) =>
-                      updateSettings({ showRomanizationAlongside: v })
+                      set({ showRomanizationAlongside: v })
                     }
                     disabled={!settings.autoRomanizeLyrics}
                   />
@@ -403,7 +476,7 @@ export default function SettingsPage() {
                 >
                   <SegmentedControl
                     value={settings.romanizeLanguage}
-                    onChange={(v) => updateSettings({ romanizeLanguage: v })}
+                    onChange={(v) => set({ romanizeLanguage: v })}
                     options={[
                       { value: "auto", label: "Auto" },
                       { value: "ja", label: "JP" },
@@ -474,7 +547,7 @@ export default function SettingsPage() {
                 >
                   <SegmentedControl
                     value={settings.audioQuality}
-                    onChange={(v) => updateSettings({ audioQuality: v })}
+                    onChange={(v) => set({ audioQuality: v })}
                     options={[
                       { value: "auto", label: "Auto" },
                       { value: "low", label: "Low" },
@@ -491,9 +564,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.normalizeVolume}
-                    onCheckedChange={(v) =>
-                      updateSettings({ normalizeVolume: v })
-                    }
+                    onCheckedChange={(v) => set({ normalizeVolume: v })}
                   />
                 </SettingRow>
 
@@ -513,9 +584,7 @@ export default function SettingsPage() {
                   </div>
                   <Slider
                     value={[settings.defaultVolume * 100]}
-                    onValueChange={(v) =>
-                      updateSettings({ defaultVolume: v[0] / 100 })
-                    }
+                    onValueChange={(v) => set({ defaultVolume: v[0] / 100 })}
                     max={100}
                     step={5}
                   />
@@ -537,9 +606,7 @@ export default function SettingsPage() {
                   </div>
                   <Slider
                     value={[settings.crossfadeSeconds]}
-                    onValueChange={(v) =>
-                      updateSettings({ crossfadeSeconds: v[0] })
-                    }
+                    onValueChange={(v) => set({ crossfadeSeconds: v[0] })}
                     max={12}
                     step={1}
                   />
@@ -562,9 +629,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.autoplayRecommendations}
-                    onCheckedChange={(v) =>
-                      updateSettings({ autoplayRecommendations: v })
-                    }
+                    onCheckedChange={(v) => set({ autoplayRecommendations: v })}
                   />
                 </SettingRow>
 
@@ -574,9 +639,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.gaplessPlayback}
-                    onCheckedChange={(v) =>
-                      updateSettings({ gaplessPlayback: v })
-                    }
+                    onCheckedChange={(v) => set({ gaplessPlayback: v })}
                   />
                 </SettingRow>
               </CardContent>
@@ -602,7 +665,7 @@ export default function SettingsPage() {
                 >
                   <SegmentedControl
                     value={settings.theme}
-                    onChange={(v) => updateSettings({ theme: v })}
+                    onChange={(v) => set({ theme: v })}
                     options={[
                       { value: "dark", label: "Dark" },
                       { value: "light", label: "Light" },
@@ -617,9 +680,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.reducedMotion}
-                    onCheckedChange={(v) =>
-                      updateSettings({ reducedMotion: v })
-                    }
+                    onCheckedChange={(v) => set({ reducedMotion: v })}
                   />
                 </SettingRow>
 
@@ -629,7 +690,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.compactMode}
-                    onCheckedChange={(v) => updateSettings({ compactMode: v })}
+                    onCheckedChange={(v) => set({ compactMode: v })}
                   />
                 </SettingRow>
               </CardContent>
@@ -652,9 +713,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.privateSession}
-                    onCheckedChange={(v) =>
-                      updateSettings({ privateSession: v })
-                    }
+                    onCheckedChange={(v) => set({ privateSession: v })}
                   />
                 </SettingRow>
 
@@ -664,9 +723,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.allowScrobbling}
-                    onCheckedChange={(v) =>
-                      updateSettings({ allowScrobbling: v })
-                    }
+                    onCheckedChange={(v) => set({ allowScrobbling: v })}
                   />
                 </SettingRow>
 
@@ -737,7 +794,7 @@ export default function SettingsPage() {
                           return;
                         }
                       }
-                      updateSettings({ showNowPlayingNotifications: v });
+                      set({ showNowPlayingNotifications: v });
                     }}
                   />
                 </SettingRow>
@@ -748,9 +805,7 @@ export default function SettingsPage() {
                 >
                   <Switch
                     checked={settings.notifyOnNewReleases}
-                    onCheckedChange={(v) =>
-                      updateSettings({ notifyOnNewReleases: v })
-                    }
+                    onCheckedChange={(v) => set({ notifyOnNewReleases: v })}
                   />
                 </SettingRow>
               </CardContent>
@@ -758,11 +813,42 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Saved indicator */}
-        <div className="flex items-center justify-center text-xs text-muted-foreground pt-4">
-          <Check className="w-3 h-3 mr-1.5 text-green-500" />
-          Changes are saved automatically
-        </div>
+        {/* Save bar — only appears when there's something to act on, so it
+            isn't sitting in the way the rest of the time. */}
+        {(dirty || save.status !== "idle" || isSaving) && (
+          <div className="sticky bottom-0 z-30 -mx-4 px-4 pb-2 pt-3 bg-gradient-to-t from-background via-background to-transparent animate-in slide-in-from-bottom-3 fade-in duration-300">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/90 backdrop-blur-xl px-4 py-3 shadow-lg">
+              <p
+                className="text-xs text-muted-foreground min-w-0"
+                role="status"
+              >
+                {save.status === "error"
+                  ? save.error
+                  : save.status === "saved"
+                    ? "Your settings are up to date."
+                    : `${changedKeys.length} unsaved ${changedKeys.length === 1 ? "change" : "changes"}`}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDraft(savedSettings)}
+                  disabled={!dirty}
+                >
+                  Discard
+                </Button>
+                <SaveButton
+                  // The request being in flight is the authoritative signal for
+                  // showing progress; the local state machine owns the rest.
+                  status={isSaving ? "saving" : save.status}
+                  dirty={dirty}
+                  onClick={handleSave}
+                  size="sm"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

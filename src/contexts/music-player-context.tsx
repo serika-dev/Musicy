@@ -80,6 +80,8 @@ interface MusicPlayerContextType {
   isLeader: boolean;
   tabCount: number;
   shouldPlayAudio: boolean;
+  /** Whether the live sync stream to the server is currently open. */
+  syncConnected: boolean;
 
   // Autoplay protection
   isAutoplayBlocked: boolean;
@@ -792,6 +794,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     deviceName,
     devices,
     publish: syncPublish,
+    connected: syncConnected,
     isLeader,
     tabId,
     tabCount,
@@ -1281,6 +1284,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     isLeader,
     tabCount,
     shouldPlayAudio,
+    syncConnected,
     toggleRepeat,
     toggleShuffle,
     setQueue,
