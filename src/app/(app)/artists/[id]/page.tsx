@@ -129,7 +129,9 @@ export default function ArtistPage() {
   return (
     <div className="relative flex flex-col space-y-6">
       {/* Immersive Header Background */}
-      <div className="relative h-[40vh] lg:h-[45vh] w-full overflow-hidden rounded-3xl shadow-xl border border-white/5">
+      {/* Grows with its content instead of clipping: a tall minimum, but a
+          long title just makes the hero taller. */}
+      <div className="relative flex items-end w-full min-h-[clamp(17rem,40vh,25rem)] overflow-hidden rounded-3xl shadow-xl border border-white/5">
         <div className="absolute inset-0 bg-neutral-900" />
         {artist.imageUrl ? (
           <div className="absolute inset-0">
@@ -145,7 +147,7 @@ export default function ArtistPage() {
         )}
 
         {/* Content Overlay */}
-        <div className="absolute inset-x-0 bottom-0 p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
+        <div className="relative w-full p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
           <div className="w-48 h-48 lg:w-64 lg:h-64 rounded-full overflow-hidden shadow-2xl border-4 border-background/20 mb-6 lg:mb-0 relative group">
             <ArtistImage
               artistId={artist.id}
@@ -168,7 +170,7 @@ export default function ArtistPage() {
                   </Badge>
                 )}
               </div>
-              <h1 className="text-5xl lg:text-8xl font-black tracking-tight drop-shadow-xl">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] drop-shadow-xl line-clamp-2 break-words">
                 {artist.name}
               </h1>
             </div>

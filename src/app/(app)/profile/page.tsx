@@ -40,11 +40,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { SaveButton } from "@/components/ui/save-button";
 import {
   useChangePassword,
   useProfile,
   useUpdateProfile,
 } from "@/hooks/useProfile";
+import { useSaveState } from "@/hooks/useSaveState";
 
 const profileSchema = z.object({
   username: z
@@ -80,7 +82,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const profileSave = useSaveState();
 
   const { data: profile, isLoading, error } = useProfile();
   const updateProfileMutation = useUpdateProfile();
@@ -123,15 +125,12 @@ export default function ProfilePage() {
   }, [profile, form]);
 
   const onSubmit = async (data: ProfileFormValues) => {
-    try {
+    await profileSave.run(async () => {
       await updateProfileMutation.mutateAsync(data);
       await updateSession();
-      setIsEditing(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-    }
+      // Reset the baseline so the form is clean again and the button settles.
+      form.reset(data);
+    });
   };
 
   const onPasswordSubmit = async (data: PasswordFormValues) => {
@@ -257,14 +256,6 @@ export default function ProfilePage() {
       {/* Spacer for avatar overflow */}
       <div className="h-12 md:h-16" />
 
-      {/* Success toast */}
-      {saveSuccess && (
-        <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-4 py-3">
-          <Check className="w-4 h-4" />
-          Profile updated successfully
-        </div>
-      )}
-
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
@@ -385,14 +376,26 @@ export default function ProfilePage() {
                         </FormItem>
                       )}
                     />
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <SaveButton
+                        status={
+                          updateProfileMutation.isPending
+                            ? "saving"
+                            : profileSave.status
+                        }
+                        dirty={form.formState.isDirty}
+                      />
                       <Button
-                        type="submit"
-                        disabled={updateProfileMutation.isPending}
+                        type="button"
+                        variant="ghost"
+                        disabled={!form.formState.isDirty}
+                        onClick={() => {
+                          form.reset();
+                          profileSave.reset();
+                        }}
                       >
-                        {updateProfileMutation.isPending
-                          ? "Saving..."
-                          : "Save Changes"}
+                        <X className="w-4 h-4 mr-1" />
+                        Discard
                       </Button>
                       <Button
                         type="button"
@@ -400,10 +403,10 @@ export default function ProfilePage() {
                         onClick={() => {
                           setIsEditing(false);
                           form.reset();
+                          profileSave.reset();
                         }}
                       >
-                        <X className="w-4 h-4 mr-1" />
-                        Cancel
+                        Close
                       </Button>
                     </div>
                     {updateProfileMutation.isError && (

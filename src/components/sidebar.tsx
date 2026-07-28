@@ -55,7 +55,7 @@ export function Sidebar({ className }: SidebarProps) {
         <nav className="space-y-0.5">
           <Button
             variant={isActive("/") ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 text-sm"
+            className="w-full justify-start h-9 text-sm min-w-0 overflow-hidden"
             asChild
           >
             <Link href="/">
@@ -65,7 +65,7 @@ export function Sidebar({ className }: SidebarProps) {
           </Button>
           <Button
             variant={isActive("/search") ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 text-sm"
+            className="w-full justify-start h-9 text-sm min-w-0 overflow-hidden"
             asChild
           >
             <Link href="/search">
@@ -76,7 +76,7 @@ export function Sidebar({ className }: SidebarProps) {
           {profile?.role === 'ADMIN' && (
             <Button
               variant={isActive("/admin") ? "secondary" : "ghost"}
-              className="w-full justify-start h-9 text-sm"
+              className="w-full justify-start h-9 text-sm min-w-0 overflow-hidden"
               asChild
             >
               <Link href="/admin">
@@ -111,32 +111,32 @@ export function Sidebar({ className }: SidebarProps) {
             {/* Liked Songs */}
             <Button
               variant={isActive("/liked-songs") ? "secondary" : "ghost"}
-              className="w-full justify-start h-auto py-2"
+              className="w-full justify-start h-auto py-2 min-w-0 overflow-hidden"
               asChild
             >
               <Link href="/liked-songs">
                 <div className="w-8 h-8 mr-2 bg-gradient-to-br from-primary/80 to-primary rounded flex items-center justify-center flex-shrink-0">
                   <Heart className="h-3.5 w-3.5 text-white" />
                 </div>
-                <div className="flex flex-col items-start text-left min-w-0">
-                  <span className="text-sm">Liked Songs</span>
-                  <span className="text-[11px] text-muted-foreground">Playlist</span>
+                <div className="flex flex-col items-start text-left min-w-0 flex-1">
+                  <span className="text-sm truncate w-full">Liked Songs</span>
+                  <span className="text-[11px] text-muted-foreground truncate w-full">Playlist</span>
                 </div>
               </Link>
             </Button>
 
             <Button
               variant={isActive("/downloads") ? "secondary" : "ghost"}
-              className="w-full justify-start h-auto py-2"
+              className="w-full justify-start h-auto py-2 min-w-0 overflow-hidden"
               asChild
             >
               <Link href="/downloads">
                 <div className="w-8 h-8 mr-2 bg-gradient-to-br from-emerald-500/80 to-cyan-500 rounded flex items-center justify-center flex-shrink-0">
                   <Download className="h-3.5 w-3.5 text-white" />
                 </div>
-                <div className="flex flex-col items-start text-left min-w-0">
-                  <span className="text-sm">Downloads</span>
-                  <span className="text-[11px] text-muted-foreground">Offline library</span>
+                <div className="flex flex-col items-start text-left min-w-0 flex-1">
+                  <span className="text-sm truncate w-full">Downloads</span>
+                  <span className="text-[11px] text-muted-foreground truncate w-full">Offline library</span>
                 </div>
               </Link>
             </Button>
@@ -150,7 +150,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <Button 
                     key={mix.id} 
                     variant={isActive(`/daily-mixes/${mix.id}`) ? "secondary" : "ghost"}
-                    className="w-full justify-start h-auto py-1.5"
+                    className="w-full justify-start h-auto py-1.5 min-w-0 overflow-hidden"
                     asChild
                   >
                     <Link href={`/daily-mixes/${mix.id}`}>
@@ -165,7 +165,7 @@ export function Sidebar({ className }: SidebarProps) {
                       </div>
                       <div className="flex flex-col items-start text-left min-w-0 flex-1">
                         <span className="text-sm truncate w-full">{mix.name}</span>
-                        <span className="text-[11px] text-muted-foreground">{mix.tracks?.length || 0} songs</span>
+                        <span className="text-[11px] text-muted-foreground truncate w-full">{mix.tracks?.length || 0} songs</span>
                       </div>
                     </Link>
                   </Button>
@@ -181,7 +181,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <Button
                     key={playlist.id}
                     variant={isActive(`/playlists/${playlist.id}`) ? "secondary" : "ghost"}
-                    className="w-full justify-start h-auto py-1.5"
+                    className="w-full justify-start h-auto py-1.5 min-w-0 overflow-hidden"
                     asChild
                   >
                     <Link href={`/playlists/${playlist.id}`}>
@@ -194,7 +194,7 @@ export function Sidebar({ className }: SidebarProps) {
                       </div>
                       <div className="flex flex-col items-start text-left min-w-0 flex-1">
                         <span className="text-sm truncate w-full">{playlist.name}</span>
-                        <span className="text-[11px] text-muted-foreground">Playlist · {playlist._count.tracks} songs</span>
+                        <span className="text-[11px] text-muted-foreground truncate w-full">Playlist · {playlist._count.tracks} songs</span>
                       </div>
                     </Link>
                   </Button>
@@ -210,7 +210,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <Button
                     key={artist.id}
                     variant={isActive(`/artists/${artist.id}`) ? "secondary" : "ghost"}
-                    className="w-full justify-start h-auto py-1.5"
+                    className="w-full justify-start h-auto py-1.5 min-w-0 overflow-hidden"
                     asChild
                   >
                     <Link href={`/artists/${artist.id}`}>
@@ -228,7 +228,7 @@ export function Sidebar({ className }: SidebarProps) {
                           {artist.name}
                           {artist.verified && <span className="ml-1 text-primary text-xs">✓</span>}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">Artist · {artist._count.tracks} tracks</span>
+                        <span className="text-[11px] text-muted-foreground truncate w-full">Artist · {artist._count.tracks} tracks</span>
                       </div>
                     </Link>
                   </Button>

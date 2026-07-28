@@ -36,19 +36,31 @@ export function MobileNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-background/80 backdrop-blur-xl border-t border-border/40 px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3">
-      <div className="flex items-center justify-around max-w-md mx-auto">
+    <nav
+      aria-label="Primary"
+      data-mobile-nav=""
+      className="fixed bottom-0 left-0 right-0 z-40 lg:hidden h-[var(--mobile-nav-h)] bg-background/80 backdrop-blur-xl border-t border-border/40 px-3 pb-[var(--safe-bottom)]"
+    >
+      <div className="flex h-full items-center justify-around max-w-md mx-auto">
         {navItems.map((item) => (
           <Link
             key={item.label}
             href={item.href}
+            aria-current={item.active ? "page" : undefined}
             className={cn(
-              "flex flex-col items-center gap-1 transition-all active:scale-90",
+              "control-pop relative flex flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1",
               item.active ? "text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <item.icon className={cn("h-6 w-6", item.active && "fill-current")} />
+            <item.icon className={cn("h-[1.375rem] w-[1.375rem]", item.active && "fill-current")} />
             <span className="text-[10px] font-bold uppercase tracking-wider">{item.label}</span>
+            {/* The active marker is a rail, not a colour change alone. */}
+            <span
+              className={cn(
+                "absolute -top-px h-0.5 w-8 rounded-full bg-primary transition-opacity",
+                item.active ? "opacity-100" : "opacity-0"
+              )}
+            />
           </Link>
         ))}
       </div>

@@ -76,43 +76,125 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
   useEffect(() => {
     if (status !== "authenticated" || !deviceId) return;
 
-    const url = `/api/sync/stream?deviceId=${encodeURIComponent(deviceId)}&name=${encodeURIComponent(deviceName.current)}`;
-    const es = new EventSource(url);
-    eventSourceRef.current = es;
+    let disposed = false;
+    let attempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
 
-    es.addEventListener("ready", () => setConnected(true));
-    es.addEventListener("device-list", (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        setDevices(data.payload.devices);
-      } catch {
-        // ignore
+    const clearTimers = () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (watchdog) clearTimeout(watchdog);
+      reconnectTimer = null;
+      watchdog = null;
+    };
+
+    /**
+     * The server pings every 20s. If nothing arrives for well over that, the
+     * connection is a zombie — a suspended laptop or a proxy that dropped the
+     * stream without an error — so tear it down and dial again.
+     */
+    const armWatchdog = () => {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        if (!disposed) connect(true);
+      }, 50_000);
+    };
+
+    const scheduleReconnect = () => {
+      if (disposed || reconnectTimer) return;
+      // Exponential backoff with jitter, capped at 15s.
+      const delay = Math.min(1000 * 2 ** attempt, 15_000);
+      const jitter = delay * 0.25 * Math.random();
+      attempt += 1;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay + jitter);
+    };
+
+    function connect(force = false) {
+      if (disposed) return;
+      if (eventSourceRef.current) {
+        if (!force && eventSourceRef.current.readyState !== EventSource.CLOSED)
+          return;
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
-    });
+      clearTimers();
 
-    const forward = (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        onEventRef.current?.(data);
-      } catch {
-        // ignore
+      const url = `/api/sync/stream?deviceId=${encodeURIComponent(deviceId)}&name=${encodeURIComponent(deviceName.current)}`;
+      const es = new EventSource(url);
+      eventSourceRef.current = es;
+
+      // Any traffic at all — including the keep-alive — proves we're live.
+      const touch = () => {
+        if (disposed) return;
+        attempt = 0;
+        setConnected(true);
+        armWatchdog();
+      };
+
+      es.onopen = touch;
+      es.addEventListener("ready", touch);
+      es.addEventListener("device-list", (e: MessageEvent) => {
+        touch();
+        try {
+          setDevices(JSON.parse(e.data).payload.devices);
+        } catch {
+          // A malformed frame shouldn't drop the connection.
+        }
+      });
+
+      const forward = (e: MessageEvent) => {
+        touch();
+        try {
+          onEventRef.current?.(JSON.parse(e.data));
+        } catch {
+          // ignore
+        }
+      };
+      es.addEventListener("state", forward);
+      es.addEventListener("command", forward);
+      es.addEventListener("claim", forward);
+      es.addEventListener("disconnect", forward);
+      // Autoplay-protection events were published by the context but never
+      // listened for here, so `remoteBlockedDevices` never populated.
+      es.addEventListener("autoplay-blocked", forward);
+      es.addEventListener("autoplay-resolved", forward);
+
+      es.onerror = () => {
+        if (disposed) return;
+        setConnected(false);
+        es.close();
+        eventSourceRef.current = null;
+        scheduleReconnect();
+      };
+    }
+
+    connect();
+
+    // Coming back from a background tab or a dead network should reconnect
+    // immediately rather than waiting out the backoff.
+    const revive = () => {
+      if (disposed || document.visibilityState !== "visible") return;
+      if (
+        !eventSourceRef.current ||
+        eventSourceRef.current.readyState === EventSource.CLOSED
+      ) {
+        attempt = 0;
+        clearTimers();
+        connect();
       }
     };
-    es.addEventListener("state", forward);
-    es.addEventListener("command", forward);
-    es.addEventListener("claim", forward);
-    es.addEventListener("disconnect", forward);
-    // Autoplay-protection events were published by the context but never
-    // listened for here, so `remoteBlockedDevices` never populated.
-    es.addEventListener("autoplay-blocked", forward);
-    es.addEventListener("autoplay-resolved", forward);
-
-    es.onerror = () => {
-      setConnected(false);
-    };
+    document.addEventListener("visibilitychange", revive);
+    window.addEventListener("online", revive);
 
     return () => {
-      es.close();
+      disposed = true;
+      clearTimers();
+      document.removeEventListener("visibilitychange", revive);
+      window.removeEventListener("online", revive);
+      eventSourceRef.current?.close();
       eventSourceRef.current = null;
       setConnected(false);
     };
@@ -130,22 +212,27 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
       // All tabs receive state via SSE (server distributes to all connections)
       if (!isLeader && event.type === "state") return;
 
-      try {
-        const response = await fetch("/api/sync/publish", {
+      const body = JSON.stringify({ fromDeviceId: deviceId, ...event });
+      const send = () =>
+        fetch("/api/sync/publish", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fromDeviceId: deviceId,
-            ...event,
-          }),
+          body,
           keepalive: true,
-        }).catch(() => null); // Silently catch network errors/aborts
+        }).catch(() => null);
 
-        if (response && !response.ok) {
-          console.warn("sync publish returned non-ok status:", response.status);
-        }
-      } catch (err) {
-        // Silently catch errors to avoid UI crashes on network instability
+      let response = await send();
+
+      // State frames are superseded by the next tick, so a dropped one is
+      // harmless. Commands are one-shot instructions — a lost "pause" leaves
+      // the other device playing, so those get one retry.
+      if (event.type !== "state" && (!response || !response.ok)) {
+        await new Promise((r) => setTimeout(r, 400));
+        response = await send();
+      }
+
+      if (response && !response.ok) {
+        console.warn("sync publish returned non-ok status:", response.status);
       }
     },
     [deviceId, isLeader],

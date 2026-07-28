@@ -221,7 +221,9 @@ export default function PlaylistPage() {
   return (
     <div className="relative flex flex-col space-y-6">
       {/* Immersive Playlist Header */}
-      <div className="relative h-[40vh] lg:h-[45vh] w-full overflow-hidden rounded-3xl shadow-xl border border-white/5">
+      {/* Grows with its content instead of clipping: a tall minimum, but a
+          long title just makes the hero taller. */}
+      <div className="relative flex items-end w-full min-h-[clamp(17rem,40vh,25rem)] overflow-hidden rounded-3xl shadow-xl border border-white/5">
         <div className="absolute inset-0 bg-neutral-900" />
         {playlist.coverImageUrl ? (
           <div className="absolute inset-0">
@@ -237,7 +239,7 @@ export default function PlaylistPage() {
         )}
 
         {/* Content Overlay */}
-        <div className="absolute inset-x-0 bottom-0 p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
+        <div className="relative w-full p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
           <div className="group relative mb-6 h-48 w-48 overflow-hidden rounded-3xl border-4 border-background/20 shadow-2xl lg:mb-0 lg:h-64 lg:w-64">
             {playlist.coverImageUrl ? (
               <img
@@ -275,7 +277,7 @@ export default function PlaylistPage() {
               >
                 Playlist
               </Badge>
-              <h1 className="text-4xl lg:text-7xl font-black tracking-tight drop-shadow-2xl truncate">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] drop-shadow-2xl line-clamp-2 break-words">
                 {playlist.name}
               </h1>
             </div>

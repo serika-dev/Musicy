@@ -27,9 +27,11 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       <div className="flex flex-1 overflow-hidden relative">
         {/* Desktop sidebar */}
+        {/* overflow-hidden is a hard stop: nothing in the sidebar may bleed
+            into the content column, whatever a child's CSS tries to do. */}
         {showSidebar && (
-          <div className="hidden lg:flex w-64 flex-shrink-0 p-2 pr-0">
-            <Sidebar className={`h-full ${currentTrack ? 'pb-24' : 'pb-4'}`} />
+          <div className="hidden lg:flex w-64 flex-shrink-0 min-w-0 overflow-hidden p-2 pr-0">
+            <Sidebar className={`h-full min-w-0 ${currentTrack ? 'pb-24' : 'pb-4'}`} />
           </div>
         )}
 

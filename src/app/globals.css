@@ -26,6 +26,8 @@
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
   --ring: 262 83% 58%;
+  --success: 142 71% 40%;
+  --success-foreground: 0 0% 100%;
   --chart-1: 12 76% 61%;
   --chart-2: 173 58% 39%;
   --chart-3: 197 37% 24%;
@@ -66,6 +68,8 @@
   --border: 240 5% 16%;
   --input: 240 5% 17%;
   --ring: 263 85% 64%;
+  --success: 142 64% 45%;
+  --success-foreground: 144 80% 6%;
   --chart-1: 220 70% 50%;
   --chart-2: 160 60% 45%;
   --chart-3: 30 80% 55%;
@@ -105,6 +109,8 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
@@ -519,4 +525,50 @@ body[data-scroll-locked] {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================================================
+   HERO
+
+   Sized by aspect ratio and clamped, never by a fixed pixel height — so the art
+   scales with the viewport and the copy inside always has room. Content is a
+   grid row rather than an absolute overlay, which is what let tall titles
+   overflow the card and get clipped.
+   ============================================================================ */
+
+.hero {
+  position: relative;
+  display: grid;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--radius-2xl, 1.5rem);
+  min-height: clamp(19rem, 42vw, 27rem);
+  max-height: min(72dvh, 34rem);
+}
+
+.hero > * {
+  grid-area: 1 / 1;
+}
+
+.hero-copy {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: clamp(1rem, 2.2vw, 1.75rem);
+  padding: clamp(1.25rem, 3.5vw, 3.5rem);
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .hero-copy {
+    justify-content: center;
+    max-width: 46rem;
+  }
+}
+
+/* Display size for hero titles, fluid between phone and desktop. */
+.hero-title {
+  font-size: clamp(2.25rem, 1.5rem + 3.3vw, 4.5rem);
+  line-height: 1.02;
 }

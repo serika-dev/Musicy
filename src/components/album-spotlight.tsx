@@ -27,52 +27,61 @@ export function AlbumSpotlight({ album: initialAlbum }: AlbumSpotlightProps) {
   }
 
   return (
-    <div className="relative w-full h-[320px] md:h-[420px] overflow-hidden rounded-3xl group shadow-2xl">
+    <section className="hero group shadow-2xl">
       {/* Dynamic Background */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-[2000ms] group-hover:scale-110"
+      <div
+        className="bg-cover bg-center transition-transform duration-[2000ms] group-hover:scale-105"
         style={{ backgroundImage: `url(${album.coverImageUrl})` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent md:bg-gradient-to-r md:from-background md:via-background/40 md:to-transparent" />
-      
+      <div className="bg-gradient-to-t from-background via-background/70 to-transparent md:bg-gradient-to-r md:from-background md:via-background/50 md:to-transparent" />
+
       {/* Content */}
-      <div className="absolute inset-0 flex flex-col justify-end md:justify-center p-8 md:p-16 space-y-6">
+      <div className="hero-copy">
         <div className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-700">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-lg">
               Featured {album.albumType}
             </span>
             {tracks.length > 0 && (
-              <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">
+              <span className="text-[10px] font-bold text-foreground/70 uppercase tracking-widest">
                 {tracks.length} tracks
               </span>
             )}
           </div>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tighter max-w-3xl line-clamp-2 drop-shadow-2xl">
+          <h1
+            className="hero-title font-black tracking-tighter line-clamp-2 drop-shadow-2xl"
+          >
             {album.title}
           </h1>
-          <p className="text-xl md:text-2xl font-bold text-white/80 drop-shadow-lg">
+          <p
+            className="text-xl md:text-2xl font-bold text-foreground/80 drop-shadow-lg truncate"
+          >
             {album.artist.name}
           </p>
         </div>
 
-        <div className="flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-          <Button 
-            size="lg" 
-            className="rounded-full px-10 h-14 text-lg font-black shadow-2xl active:scale-95 transition-all hover:scale-105 bg-primary hover:bg-primary/90" 
+        <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+          <Button
+            size="lg"
+            className="rounded-full px-8 h-12 sm:h-14 sm:px-10 text-base sm:text-lg font-black shadow-2xl hover:scale-[1.03]"
             onClick={handlePlay}
             disabled={tracks.length === 0}
           >
-            <Play className="mr-3 h-6 w-6 fill-current" />
-            Listen Now
+            <Play className="mr-2 !h-5 !w-5 sm:!h-6 sm:!w-6 fill-current" />
+            Listen now
           </Button>
-          <Button size="lg" variant="secondary" className="rounded-full h-14 w-14 p-0 bg-white/10 hover:bg-white/20 backdrop-blur-xl border-white/10 text-white hover:scale-105 transition-all" asChild title="View Album">
-            <Link href={`/albums/${album.id}`}>
-              <Info className="h-7 w-7" />
+          <Button
+            size="lg"
+            variant="secondary"
+            className="rounded-full h-12 w-12 sm:h-14 sm:w-14 p-0 bg-white/10 hover:bg-white/20 backdrop-blur-xl border-white/10 text-white hover:scale-105"
+            asChild
+          >
+            <Link href={`/albums/${album.id}`} aria-label={`View ${album.title}`}>
+              <Info className="!h-6 !w-6" />
             </Link>
           </Button>
         </div>
       </div>
-    </div>
+    </section>
   )
 }

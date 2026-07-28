@@ -70,6 +70,12 @@ export function useSettings() {
     [mutation]
   )
 
+  /** Awaitable variant, for callers that report save progress in the UI. */
+  const updateSettingsAsync = useCallback(
+    (patch: Partial<UserSettings>) => mutation.mutateAsync(patch),
+    [mutation]
+  )
+
   const resetSettings = useCallback(() => {
     mutation.mutate(DEFAULT_SETTINGS)
   }, [mutation])
@@ -77,7 +83,9 @@ export function useSettings() {
   return {
     settings,
     updateSettings,
+    updateSettingsAsync,
     resetSettings,
+    isSaving: mutation.isPending,
     hydrated: query.isSuccess || !enabled,
     isLoading: query.isLoading,
   }
