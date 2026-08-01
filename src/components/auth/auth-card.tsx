@@ -121,19 +121,13 @@ export function AuthCard({ initialMode }: { initialMode: Mode }) {
       <div className="pointer-events-none absolute left-1/2 top-1/3 -z-10 h-72 w-72 -translate-x-1/2 rounded-full bg-fuchsia-500/10 blur-[120px]" />
 
       <div className="w-full max-w-md space-y-6">
-        {/* Distinct glass logo for auth */}
         <div className="flex flex-col items-center gap-4 text-center">
           <Link
             href="/"
             aria-label="Musicy home"
-            className="animate-float transition-transform hover:scale-105 active:scale-95"
+            className="animate-float transition-opacity hover:opacity-90 active:scale-95"
           >
-            <Logo
-              size="lg"
-              variant="glass"
-              showWordmark={false}
-              idSuffix="auth"
-            />
+            <Logo size="lg" className="items-center text-center" />
           </Link>
           <div className="space-y-1">
             <h1 className="text-3xl font-black tracking-tight">

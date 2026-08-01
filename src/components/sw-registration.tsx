@@ -8,47 +8,21 @@ export function ServiceWorkerRegistration() {
       return;
     }
 
-    let refreshing = false;
-
-    const handleControllerChange = () => {
-      if (refreshing) {
-        return;
-      }
-
-      refreshing = true;
-      window.location.reload();
-    };
-
-    const registerServiceWorker = () => {
-      navigator.serviceWorker
-        .register("/sw.js", { updateViaCache: "none" })
-        .then((registration) => {
-          registration.update().catch(() => {});
-          console.log("SW registered: ", registration);
-        })
-        .catch((registrationError) => {
-          console.log("SW registration failed: ", registrationError);
+    // In development mode, aggressively unregister all SWs and purge cache storage
+    if (process.env.NODE_ENV === "development") {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister();
+        }
+      });
+      if ("caches" in window) {
+        caches.keys().then((names) => {
+          for (const name of names) {
+            caches.delete(name);
+          }
         });
-    };
-
-    navigator.serviceWorker.addEventListener(
-      "controllerchange",
-      handleControllerChange,
-    );
-
-    if (document.readyState === "complete") {
-      registerServiceWorker();
-    } else {
-      window.addEventListener("load", registerServiceWorker);
+      }
     }
-
-    return () => {
-      navigator.serviceWorker.removeEventListener(
-        "controllerchange",
-        handleControllerChange,
-      );
-      window.removeEventListener("load", registerServiceWorker);
-    };
   }, []);
 
   return null;

@@ -158,9 +158,9 @@ export default function AlbumPage() {
         <div className="min-w-0 flex-1 space-y-4">
           <div className="space-y-2">
             <Badge variant="secondary">{albumTypeLabel(album.albumType)}</Badge>
-            <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
+            <p className="text-4xl font-black tracking-tight sm:text-6xl" aria-hidden="true">
               {album.title}
-            </h1>
+            </p>
             {album.description && (
               <p className="text-muted-foreground">{album.description}</p>
             )}

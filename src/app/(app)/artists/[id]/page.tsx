@@ -170,9 +170,9 @@ export default function ArtistPage() {
                   </Badge>
                 )}
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] drop-shadow-xl line-clamp-2 break-words">
+              <p className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] drop-shadow-xl line-clamp-2 break-words" aria-hidden="true">
                 {artist.name}
-              </h1>
+              </p>
             </div>
 
             <div className="flex items-center gap-6 text-sm font-bold text-foreground/80">

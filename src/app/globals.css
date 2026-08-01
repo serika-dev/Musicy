@@ -133,6 +133,31 @@
 }
 
 /* ============================================================================
+   LAYOUT CHROME (player bar + mobile nav clearance)
+   ============================================================================ */
+
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Matches mobile-nav height + player float offset (4.25rem) */
+  --mobile-nav-h: 4.25rem;
+  /* Seek strip + control row + surface padding */
+  --player-bar-h: 5.75rem;
+  /* Desktop float gap (md:bottom-4) */
+  --player-float-gap: 1rem;
+  /* Extra breathing room past the chrome so last rows aren't flush */
+  --content-end-gap: 1.5rem;
+  /* Total bottom inset when the mini player is visible */
+  --content-pad-player-mobile: calc(
+    var(--mobile-nav-h) + var(--safe-bottom) + var(--player-bar-h) + var(--content-end-gap)
+  );
+  --content-pad-player-desktop: calc(
+    var(--player-float-gap) + var(--player-bar-h) + var(--content-end-gap)
+  );
+  /* Mobile nav alone (no player) */
+  --content-pad-nav-mobile: calc(var(--mobile-nav-h) + var(--safe-bottom) + var(--content-end-gap));
+}
+
+/* ============================================================================
    BASE STYLES
    ============================================================================ */
 

@@ -28,12 +28,16 @@ export function AlbumSpotlight({ album: initialAlbum }: AlbumSpotlightProps) {
 
   return (
     <section className="hero group shadow-2xl">
-      {/* Dynamic Background */}
+      {/* Dynamic Background — keep at z-0 so scale transform never covers the darken layer */}
       <div
-        className="bg-cover bg-center transition-transform duration-[2000ms] group-hover:scale-105"
+        className="z-0 bg-cover bg-center transition-transform duration-[2000ms] group-hover:scale-105"
         style={{ backgroundImage: `url(${album.coverImageUrl})` }}
       />
-      <div className="bg-gradient-to-t from-background via-background/70 to-transparent md:bg-gradient-to-r md:from-background md:via-background/50 md:to-transparent" />
+      {/* Darken overlay stays on hover; only lightens slightly */}
+      <div
+        className="z-[1] bg-gradient-to-t from-background via-background/70 to-transparent transition-opacity duration-500 group-hover:opacity-85 md:bg-gradient-to-r md:from-background md:via-background/50 md:to-transparent"
+        aria-hidden
+      />
 
       {/* Content */}
       <div className="hero-copy">

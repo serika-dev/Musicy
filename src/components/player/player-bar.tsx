@@ -33,8 +33,8 @@ export function PlayerBar() {
       <div
         className={cn(
           // Float above the mobile bottom-nav on phones; pinned card on desktop.
-          "fixed left-2 right-2 z-40 bottom-[calc(4.25rem+env(safe-area-inset-bottom))]",
-          "md:bottom-4 md:left-4 md:right-4",
+          "fixed left-2 right-2 z-40 bottom-[calc(var(--mobile-nav-h)+var(--safe-bottom))]",
+          "md:bottom-[var(--player-float-gap)] md:left-4 md:right-4",
           "surface rounded-2xl shadow-2xl",
         )}
       >

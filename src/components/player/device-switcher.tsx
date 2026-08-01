@@ -114,56 +114,98 @@ export function DeviceSwitcher({ variant = "bar" }: DeviceSwitcherProps) {
         </div>
 
         <div className="max-h-56 space-y-1 overflow-y-auto p-2">
-          {devices.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No other devices found
-            </p>
-          )}
-          {devices.map((d) => {
-            const isThis = d.id === deviceId;
-            const isActive = d.id === activeDeviceId || d.isActive;
-            const Icon = deviceIcon(d.name);
-            return (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => {
-                  if (isThis && !isActive) claimPlayback();
-                  else if (!isThis && !isActive) transferPlayback(d.id);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-muted cursor-pointer",
-                )}
-              >
-                <div
+          {(() => {
+            // Client-side guard: drop ancient entries and collapse same-name ghosts
+            const STALE_MS = 90_000;
+            const now = Date.now();
+            const fresh = devices.filter((d) => {
+              if (d.id === deviceId) return true;
+              if (d.id === activeDeviceId || d.isActive) return true;
+              const seen = Date.parse(d.lastSeenAt);
+              return Number.isFinite(seen) && now - seen < STALE_MS;
+            });
+
+            const byName = new Map<string, (typeof devices)[number]>();
+            for (const d of fresh) {
+              const key = d.name.trim().toLowerCase() || d.id;
+              const prev = byName.get(key);
+              if (!prev) {
+                byName.set(key, d);
+                continue;
+              }
+              // Prefer this device, then active, then newest
+              const rank = (x: typeof d) =>
+                (x.id === deviceId ? 8 : 0) +
+                (x.id === activeDeviceId || x.isActive ? 4 : 0) +
+                Date.parse(x.lastSeenAt || "0");
+              if (rank(d) >= rank(prev)) byName.set(key, d);
+            }
+
+            // Ensure current device always appears even if list is empty
+            const list = Array.from(byName.values());
+            if (deviceId && !list.some((d) => d.id === deviceId)) {
+              list.unshift({
+                id: deviceId,
+                name: deviceName || "This device",
+                isActive: activeDeviceId === deviceId,
+                lastSeenAt: new Date().toISOString(),
+              });
+            }
+
+            if (list.length === 0) {
+              return (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No devices found
+                </p>
+              );
+            }
+
+            return list.map((d) => {
+              const isThis = d.id === deviceId;
+              const isActive = d.id === activeDeviceId || d.isActive;
+              const Icon = deviceIcon(d.name);
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => {
+                    if (isThis && !isActive) claimPlayback();
+                    else if (!isThis) transferPlayback(d.id);
+                    setOpen(false);
+                  }}
                   className={cn(
-                    "rounded-md p-1.5",
-                    isActive ? "bg-primary/15" : "bg-muted",
+                    "flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "hover:bg-muted cursor-pointer",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {d.name}
-                    {isThis && (
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                        This device
-                      </span>
+                  <div
+                    className={cn(
+                      "rounded-md p-1.5",
+                      isActive ? "bg-primary/15" : "bg-muted",
                     )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isActive ? "Playing now" : "Available"}
-                  </p>
-                </div>
-                {isActive && <Check className="h-4 w-4 shrink-0" />}
-              </button>
-            );
-          })}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {d.name}
+                      {isThis && (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          This device
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {isActive ? "Playing now" : "Available"}
+                    </p>
+                  </div>
+                  {isActive && <Check className="h-4 w-4 shrink-0" />}
+                </button>
+              );
+            });
+          })()}
         </div>
       </PopoverContent>
     </Popover>

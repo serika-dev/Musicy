@@ -64,6 +64,12 @@ type Subscriber = (event: SyncEvent) => void;
 // userId -> set of subscribers
 const subscribers = new Map<string, Set<Subscriber>>();
 
+/**
+ * Live SSE connections per user.
+ * deviceId -> open stream count (tabs on same device share an id, so count > 1).
+ */
+const liveDevices = new Map<string, Map<string, number>>();
+
 export function subscribe(userId: string, fn: Subscriber): () => void {
   let set = subscribers.get(userId);
   if (!set) {
@@ -91,4 +97,36 @@ export function publish(userId: string, event: SyncEvent): void {
 
 export function subscriberCount(userId: string): number {
   return subscribers.get(userId)?.size ?? 0;
+}
+
+/** Register an open SSE stream for a device. */
+export function registerLiveDevice(userId: string, deviceId: string): void {
+  let map = liveDevices.get(userId);
+  if (!map) {
+    map = new Map();
+    liveDevices.set(userId, map);
+  }
+  map.set(deviceId, (map.get(deviceId) || 0) + 1);
+}
+
+/** Unregister when an SSE stream closes. */
+export function unregisterLiveDevice(userId: string, deviceId: string): void {
+  const map = liveDevices.get(userId);
+  if (!map) return;
+  const next = (map.get(deviceId) || 1) - 1;
+  if (next <= 0) map.delete(deviceId);
+  else map.set(deviceId, next);
+  if (map.size === 0) liveDevices.delete(userId);
+}
+
+/** Device IDs with at least one open SSE stream for this user. */
+export function getLiveDeviceIds(userId: string): string[] {
+  const map = liveDevices.get(userId);
+  if (!map) return [];
+  return Array.from(map.keys());
+}
+
+export function isDeviceLive(userId: string, deviceId: string): boolean {
+  const map = liveDevices.get(userId);
+  return !!map && (map.get(deviceId) || 0) > 0;
 }

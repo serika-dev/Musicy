@@ -1,49 +1,76 @@
-import { prisma } from '@/lib/db'
-import { Metadata } from 'next'
+import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
+import { prisma } from "@/lib/db";
+import {
+  absoluteUrl,
+  buildEntityMetadata,
+  musicRecordingJsonLd,
+} from "@/lib/seo";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
   const track = await prisma.track.findUnique({
     where: { id },
-    include: { artist: true, album: true }
-  })
+    include: { artist: true, album: true },
+  });
 
-  if (!track) return {}
+  if (!track) return {};
 
-  const title = `${track.title} by ${track.artist.name}`
-  const image = track.album?.coverImageUrl || ""
+  const title = `${track.title} by ${track.artist.name} — Listen on Serika Music`;
+  const description = `Listen to ${track.title} by ${track.artist.name}${
+    track.album?.title ? ` from ${track.album.title}` : ""
+  } on Serika Music. High-fidelity lossless streaming.`;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
-
-  return {
+  return buildEntityMetadata({
+    path: `/tracks/${id}`,
     title,
-    description: `Listen to ${track.title} by ${track.artist.name} on Musicy. High-fidelity lossless streaming.`,
-    openGraph: {
-      title,
-      description: `Listen to ${track.title} on Musicy.`,
-      images: [image],
-      type: 'music.song',
-    },
-    twitter: {
-      card: 'player',
-      title,
-      description: `Listen to ${track.title} on Musicy.`,
-      images: [image],
-    },
-    alternates: {
-      types: {
-        'application/json+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(`${appUrl}/tracks/${id}`)}`,
-        'text/xml+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(`${appUrl}/tracks/${id}`)}&format=xml`,
-      }
-    },
-    other: {
-      'twitter:player': `${appUrl}/embed/tracks/${id}`,
-      'twitter:player:width': '456',
-      'twitter:player:height': '152',
-    }
-  }
+    description,
+    imageUrl: track.coverImageUrl || track.album?.coverImageUrl,
+    imageAlt: `${track.title} by ${track.artist.name}`,
+    ogType: "music.song",
+    twitterPlayer: true,
+    embedType: "tracks",
+    embedId: id,
+  });
 }
 
-export default function TrackLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+export default async function TrackLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const track = await prisma.track.findUnique({
+    where: { id },
+    include: { artist: true, album: true },
+  });
+
+  if (!track) return <>{children}</>;
+
+  const url = absoluteUrl(`/tracks/${id}`);
+
+  return (
+    <>
+      <JsonLd
+        data={musicRecordingJsonLd({
+          name: track.title,
+          url,
+          image: track.coverImageUrl || track.album?.coverImageUrl,
+          byArtist: track.artist.name,
+          durationSeconds: track.duration,
+          inAlbum: track.album?.title,
+        })}
+      />
+      <h1 className="sr-only">
+        {track.title} by {track.artist.name}
+      </h1>
+      {children}
+    </>
+  );
 }

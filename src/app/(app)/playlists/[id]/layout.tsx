@@ -1,49 +1,84 @@
-import { prisma } from '@/lib/db'
-import { Metadata } from 'next'
+import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
+import { prisma } from "@/lib/db";
+import {
+  absoluteUrl,
+  buildEntityMetadata,
+  musicPlaylistJsonLd,
+} from "@/lib/seo";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
   const playlist = await prisma.playlist.findUnique({
     where: { id },
-    include: { owner: true }
-  })
+    include: { owner: true, _count: { select: { tracks: true } } },
+  });
 
-  if (!playlist) return {}
+  if (!playlist) return {};
 
-  const title = `${playlist.name} by ${playlist.owner.displayName || playlist.owner.username}`
-  const image = playlist.coverImageUrl || ""
+  const ownerName =
+    playlist.owner.displayName || playlist.owner.username || "a Serika Music user";
+  const title = `${playlist.name} by ${ownerName} — Playlist on Serika Music`;
+  const description =
+    playlist.description?.trim() ||
+    `Listen to the playlist “${playlist.name}” by ${ownerName} on Serika Music.${
+      playlist._count.tracks ? ` ${playlist._count.tracks} tracks.` : ""
+    } Curated high-fidelity audio.`;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
-
-  return {
+  return buildEntityMetadata({
+    path: `/playlists/${id}`,
     title,
-    description: `Listen to ${playlist.name} on Musicy. Curated high-fidelity audio.`,
-    openGraph: {
-      title,
-      description: `Listen to ${playlist.name} on Musicy.`,
-      images: [image],
-      type: 'music.playlist',
-    },
-    twitter: {
-      card: 'player',
-      title,
-      description: `Listen to ${playlist.name} on Musicy.`,
-      images: [image],
-    },
-    alternates: {
-      types: {
-        'application/json+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(`${appUrl}/playlists/${id}`)}`,
-        'text/xml+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(`${appUrl}/playlists/${id}`)}&format=xml`,
-      }
-    },
-    other: {
-      'twitter:player': `${appUrl}/embed/playlists/${id}`,
-      'twitter:player:width': '456',
-      'twitter:player:height': '152',
-    }
-  }
+    description:
+      description.length > 160
+        ? `${description.slice(0, 157).trim()}…`
+        : description,
+    imageUrl: playlist.coverImageUrl,
+    imageAlt: `${playlist.name} playlist on Serika Music`,
+    ogType: "music.playlist",
+    twitterPlayer: true,
+    embedType: "playlists",
+    embedId: id,
+  });
 }
 
-export default function PlaylistLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+export default async function PlaylistLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const playlist = await prisma.playlist.findUnique({
+    where: { id },
+    include: { owner: true },
+  });
+
+  if (!playlist) return <>{children}</>;
+
+  const ownerName =
+    playlist.owner.displayName || playlist.owner.username || "Musicy User";
+  const url = absoluteUrl(`/playlists/${id}`);
+
+  return (
+    <>
+      <JsonLd
+        data={musicPlaylistJsonLd({
+          name: playlist.name,
+          url,
+          image: playlist.coverImageUrl,
+          description: playlist.description || undefined,
+          authorName: ownerName,
+        })}
+      />
+      <h1 className="sr-only">
+        {playlist.name} by {ownerName}
+      </h1>
+      {children}
+    </>
+  );
 }

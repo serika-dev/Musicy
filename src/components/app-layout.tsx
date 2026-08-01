@@ -4,6 +4,7 @@ import { PlayerBar } from "@/components/player/player-bar"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
+import { SiteFooter } from "@/components/site-footer"
 import { useMusicPlayer } from "@/contexts/music-player-context"
 import { useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
@@ -36,14 +37,27 @@ export function AppLayout({ children }: AppLayoutProps) {
         )}
 
         {/* Main content. Bottom padding accounts for the mobile nav + the
-            floating player bar (which sits above the nav on phones). */}
-        <main className={cn(
-          "flex-1 overflow-auto",
-          currentTrack ? 'pb-44 lg:pb-28' : 'pb-24 lg:pb-0',
-          showSidebar ? 'lg:pl-2' : ''
-        )}>
-          <div className="w-full h-full px-4 lg:px-8 py-6 mb-8">
-            {children}
+            floating player bar (which sits above the nav on phones).
+            Use min-h-0 so flex doesn't block scrolling, and CSS vars so
+            the last rows stay clear of the player chrome. */}
+        <main
+          className={cn(
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
+            currentTrack
+              ? "pb-[var(--content-pad-player-mobile)] lg:pb-[var(--content-pad-player-desktop)]"
+              : "pb-[var(--content-pad-nav-mobile)] lg:pb-6",
+            showSidebar ? "lg:pl-2" : "",
+          )}
+          style={{
+            scrollPaddingBottom: currentTrack
+              ? "var(--content-pad-player-mobile)"
+              : "var(--content-pad-nav-mobile)",
+          }}
+        >
+          <div className="flex min-h-full w-full flex-col">
+            <div className="flex-1 px-4 py-6 lg:px-8">{children}</div>
+            {/* Footer is full-bleed; own padding lives inside SiteFooter */}
+            {!isAuthPage && <SiteFooter />}
           </div>
         </main>
       </div>

@@ -113,7 +113,7 @@ export default function TrackPage() {
             <Badge variant="outline" className="mb-2">
               Track
             </Badge>
-            <h1 className="text-4xl font-bold mb-2">{track.title}</h1>
+            <p className="text-4xl font-bold mb-2" aria-hidden="true">{track.title}</p>
             <div className="flex items-center space-x-2 text-lg">
               <Link
                 href={`/artists/${track.artist.id}`}

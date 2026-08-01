@@ -41,17 +41,13 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-2xl lg:border-b">
       <div className="w-full px-4 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Logo */}
+        {/* Wordmark */}
         <Link
           href="/"
           aria-label="Musicy home"
-          className="group shrink-0 transition-transform active:scale-95"
+          className="group shrink-0 transition-opacity active:scale-95 hover:opacity-90"
         >
-          <Logo
-            size="md"
-            variant="gradient"
-            className="[&_span:first-child]:transition-transform [&_span:first-child]:duration-300 group-hover:[&_span:first-child]:scale-105 group-hover:[&_span:first-child]:rotate-3"
-          />
+          <Logo size="md" />
         </Link>
 
         {/* Nav Links */}
