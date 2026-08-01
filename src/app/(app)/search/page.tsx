@@ -179,8 +179,10 @@ function SearchPageContent() {
   return (
     <div className="space-y-8">
       {/* Search bar */}
-      <div className="sticky top-16 z-30 -mx-4 bg-background/80 px-4 py-4 backdrop-blur-xl lg:static lg:mx-0 lg:bg-transparent lg:p-0">
-        <h1 className="mb-4 text-3xl font-black lg:hidden">Search</h1>
+      <div className="sticky top-16 z-30 -mx-4 -mt-6 bg-background/80 px-4 py-3 backdrop-blur-xl lg:static lg:mx-0 lg:mt-0 lg:bg-transparent lg:p-0">
+        <div className="mb-3 flex items-center gap-3 lg:hidden">
+          <h1 className="text-2xl font-black">Search</h1>
+        </div>
         <form onSubmit={handleSearch} className="relative w-full lg:max-w-2xl">
           <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input

@@ -46,6 +46,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
             filePath: true,
             format: true,
             trackNumber: true,
+            playCount: true,
             artist: {
               select: {
                 id: true,

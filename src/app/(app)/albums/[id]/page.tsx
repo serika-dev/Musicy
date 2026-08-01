@@ -46,6 +46,7 @@ interface Album {
     filePath: string;
     format: string;
     trackNumber?: number;
+    playCount?: number;
     artist: {
       id: string;
       name: string;
@@ -115,8 +116,8 @@ export default function AlbumPage() {
   }
 
   const handlePlayAll = () => {
-    if (album.tracks && album.tracks.length > 0) {
-      playTrack(album.tracks[0], album.tracks, {
+    if (allTracks.length > 0) {
+      playTrack(allTracks[0], allTracks, {
         type: "album",
         id: album.id,
         name: album.title,
@@ -131,9 +132,13 @@ export default function AlbumPage() {
     isPlaying &&
     !!currentTrack &&
     album.tracks?.some((t) => t.id === currentTrack.id);
-  const sortedTracks = [...(album.tracks || [])].sort(
+  const allTracks = [...(album.tracks || [])].sort(
     (a, b) => (a.trackNumber || 0) - (b.trackNumber || 0),
   );
+  const hasDescription = !!album.description?.trim();
+  const sortedTracks = hasDescription
+    ? allTracks
+    : [...allTracks].sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 10);
 
   return (
     <div className="space-y-10">
@@ -238,6 +243,11 @@ export default function AlbumPage() {
 
       {/* Tracks */}
       <section className="space-y-1">
+        {!hasDescription && sortedTracks.length > 0 && (
+          <p className="text-xs text-muted-foreground font-medium pb-2">
+            Top {sortedTracks.length} tracks
+          </p>
+        )}
         {sortedTracks.length > 0 ? (
           sortedTracks.map((track, index) => (
             <div key={track.id} className="flex items-center gap-2">
@@ -250,7 +260,7 @@ export default function AlbumPage() {
                   isCurrentTrack={isCurrentTrack(track.id)}
                   isPlaying={isCurrentTrack(track.id) && isPlaying}
                   onPlay={() =>
-                    playTrack(track, album.tracks, {
+                    playTrack(track, allTracks, {
                       type: "album",
                       id: album.id,
                       name: album.title,

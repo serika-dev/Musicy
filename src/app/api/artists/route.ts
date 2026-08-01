@@ -22,7 +22,13 @@ export async function GET(request: NextRequest) {
     const whereClause: any = {}
 
     if (search) {
-      whereClause.name = { contains: search, mode: 'insensitive' }
+      // altNames is a String[] which doesn't support mode:insensitive in Prisma
+      const queryVariants = [search, search.charAt(0).toUpperCase() + search.slice(1), search.toUpperCase(), search.toLowerCase()]
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { altNames: { hasSome: queryVariants } },
+      ]
     }
 
     const [artists, total] = await Promise.all([
@@ -31,6 +37,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           name: true,
+          altNames: true,
           bio: true,
           imageUrl: true,
           verified: true,

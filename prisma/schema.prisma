@@ -106,6 +106,7 @@ model VerificationToken {
 model Artist {
   id          String   @id @default(cuid())
   name        String   @unique
+  altNames    String[] // Romanized/alternate names for search (e.g. "Hoshimachi Suisei" for 星街すいせい)
   bio         String?
   imageUrl    String?
   bannerUrl   String?

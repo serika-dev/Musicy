@@ -354,6 +354,7 @@ export default function AdminPage() {
   const [editingArtist, setEditingArtist] = useState<any>(null);
   const [editArtistForm, setEditArtistForm] = useState({
     name: "",
+    altNames: "",
     bio: "",
     website: "",
     verified: false,
@@ -909,6 +910,7 @@ export default function AdminPage() {
     setEditingArtist(artist);
     setEditArtistForm({
       name: artist.name || "",
+      altNames: Array.isArray(artist.altNames) ? artist.altNames.join(", ") : "",
       bio: artist.bio || "",
       website: artist.website || "",
       verified: artist.verified || false,
@@ -925,7 +927,12 @@ export default function AdminPage() {
       const response = await fetch(`/api/admin/artists/${editingArtist.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editArtistForm),
+        body: JSON.stringify({
+          ...editArtistForm,
+          altNames: editArtistForm.altNames
+            ? editArtistForm.altNames.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : [],
+        }),
       });
 
       if (response.ok) {
@@ -2473,6 +2480,17 @@ export default function AdminPage() {
                 onChange={(e) => setEditArtistForm({ ...editArtistForm, name: e.target.value })}
                 className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-zinc-200">Alternate / Romanized Names</Label>
+              <Input
+                value={editArtistForm.altNames}
+                onChange={(e) => setEditArtistForm({ ...editArtistForm, altNames: e.target.value })}
+                placeholder="e.g. Hoshimachi Suisei, Suisei (comma-separated)"
+                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+              />
+              <p className="text-[10px] text-zinc-500">Comma-separated names users can search by (romanized, English, etc.)</p>
             </div>
 
             <div className="space-y-1.5">

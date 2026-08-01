@@ -29,15 +29,25 @@ export async function GET(req: NextRequest) {
   }
 
   if (type.includes("artist")) {
+    // altNames is a String[] which doesn't support mode:insensitive in Prisma
+    // Generate case variants for hasSome search
+    const queryVariants = [query, query.charAt(0).toUpperCase() + query.slice(1), query.toUpperCase(), query.toLowerCase()]
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+    const artistWhere = {
+      OR: [
+        { name: { contains: query, mode: "insensitive" as const } },
+        { altNames: { hasSome: queryVariants } },
+      ]
+    }
     results.artists = {
       items: await prisma.artist.findMany({
-        where: { name: { contains: query, mode: "insensitive" } },
+        where: artistWhere,
         take: limit,
         skip: offset,
       }),
       limit,
       offset,
-      total: await prisma.artist.count({ where: { name: { contains: query, mode: "insensitive" } } })
+      total: await prisma.artist.count({ where: artistWhere })
     }
   }
 

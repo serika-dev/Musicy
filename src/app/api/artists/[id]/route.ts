@@ -22,6 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       select: {
         id: true,
         name: true,
+        altNames: true,
         bio: true,
         imageUrl: true,
         website: true,
