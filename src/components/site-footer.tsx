@@ -24,37 +24,16 @@ const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: "Company",
     links: [
-      { label: "About Us", href: "/about" },
-      { label: "Careers", href: "/careers", badge: "Hiring" },
-      { label: "Press & News", href: "/press" },
+      { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },
     ],
   },
   {
-    title: "Communities",
+    title: "Platform",
     links: [
-      { label: "For Artists", href: "/artists" },
+      { label: "For Artists", href: "/join-artist" },
       { label: "Developers", href: "/developers" },
-      { label: "Advertising", href: "/advertising" },
-      { label: "Investors", href: "/investors" },
-    ],
-  },
-  {
-    title: "Useful Links",
-    links: [
-      { label: "Support & Help", href: "/support" },
-      { label: "Web Player", href: "/" },
-      { label: "Free Mobile App", href: "/download" },
-      { label: "Audio Quality (FLAC)", href: "/hifi" },
-    ],
-  },
-  {
-    title: "Plans & Pricing",
-    links: [
-      { label: "Premium Individual", href: "/premium" },
-      { label: "Premium Duo", href: "/premium#duo" },
-      { label: "Premium Family", href: "/premium#family" },
-      { label: "Student Discount", href: "/premium#student" },
+      { label: "Support", href: "/support" },
     ],
   },
 ];
@@ -101,14 +80,14 @@ export function SiteFooter({ className }: SiteFooterProps) {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-2 gap-8 py-12 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-8 py-12 md:grid-cols-3 lg:grid-cols-3">
           {/* Brand Column */}
           <div className="col-span-2 space-y-4 lg:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
               <Logo size="md" />
             </Link>
             <p className="text-xs leading-relaxed text-zinc-400 max-w-xs">
-              Next-generation lossless music streaming platform with spatial audio, live lyrics, and artist monetization.
+              Lossless music streaming with live lyrics and artist monetization.
             </p>
             <div className="flex items-center gap-2 pt-2">
               <Button
@@ -173,18 +152,10 @@ export function SiteFooter({ className }: SiteFooterProps) {
             <Link href="/terms" className="hover:text-zinc-300 transition-colors">
               Terms of Service
             </Link>
-            <span>•</span>
-            <Link href="/cookies" className="hover:text-zinc-300 transition-colors">
-              Cookie Preferences
-            </Link>
-            <span>•</span>
-            <Link href="/security" className="hover:text-zinc-300 transition-colors">
-              Security
-            </Link>
           </div>
 
           <div className="flex items-center gap-4">
-            <p>© {year} Serika Ecosystem. All rights reserved.</p>
+            <p>© {year} Serika. All rights reserved.</p>
             <Button
               variant="ghost"
               size="icon"

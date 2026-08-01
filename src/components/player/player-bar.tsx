@@ -42,14 +42,14 @@ export function PlayerBar() {
           <SeekBar />
         </div>
 
-        <div className="flex h-16 items-center gap-3 px-3 md:px-4">
+        <div className="flex h-14 items-center gap-2 px-3 md:h-16 md:gap-3 md:px-4">
           {/* Track info */}
-          <div className="flex min-w-0 flex-1 items-center gap-3 md:max-w-xs">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3 md:max-w-xs">
             <button
               type="button"
               onClick={() => setFullscreen(true)}
               aria-label="Open full screen player"
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-muted transition-transform hover:scale-105"
+              className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted transition-transform hover:scale-105 md:h-11 md:w-11"
             >
               {artwork ? (
                 <Image
@@ -80,10 +80,10 @@ export function PlayerBar() {
           </div>
 
           {/* Center controls */}
-          <PlayerControls className="flex-1" />
+          <PlayerControls className="flex shrink-0 justify-center md:flex-1" />
 
           {/* Right cluster */}
-          <div className="flex flex-1 items-center justify-end gap-1">
+          <div className="flex shrink-0 items-center justify-end gap-1 md:flex-1">
             <div className="hidden lg:block">
               <DeviceSwitcher />
             </div>

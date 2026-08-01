@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
-  ChevronRight,
   ExternalLink,
   Heart,
   Music,
@@ -15,7 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ArtistImage } from "@/components/artist-image";
 import { ShareMenu } from "@/components/share-menu";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -24,10 +23,10 @@ import { TrackListItem } from "@/components/track-list-item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import { type Artist, useArtist } from "@/hooks/useArtists";
+import { useArtist } from "@/hooks/useArtists";
 import { cn } from "@/lib/utils";
 
-export default function ArtistPage() {
+export default function CollabPage() {
   const params = useParams();
   const artistId = params.id as string;
 
@@ -35,78 +34,32 @@ export default function ArtistPage() {
   const { data: artist, isLoading, error } = useArtist(artistId);
   const { playTrack, isCurrentTrack, isPlaying, currentTrack } =
     useMusicPlayer();
-  const router = useRouter();
 
-  // Optimistic follow/unfollow
-  const followMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/artists/${artistId}/follow`, {
-        method: "POST",
+  // Follow/unfollow all member artists at once
+  const [isFollowingAll, setIsFollowingAll] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
+  const handleFollowAll = async () => {
+    if (!artist?.collaborationArtists?.length) return;
+    setIsFollowLoading(true);
+    try {
+      const method = isFollowingAll ? "DELETE" : "POST";
+      await Promise.all(
+        artist.collaborationArtists.map((member) =>
+          fetch(`/api/artists/${member.id}/follow`, { method })
+        )
+      );
+      setIsFollowingAll(!isFollowingAll);
+      // Invalidate member artist queries
+      artist.collaborationArtists.forEach((member) => {
+        queryClient.invalidateQueries({ queryKey: ["artist", member.id] });
       });
-      if (!res.ok) throw new Error("Failed to follow");
-      return res.json();
-    },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ["artist", artistId] });
-      const prev = queryClient.getQueryData(["artist", artistId]) as
-        | Artist
-        | undefined;
-      if (prev) {
-        queryClient.setQueryData(["artist", artistId], {
-          ...prev,
-          _count: { ...prev._count, followers: prev._count.followers + 1 },
-          isFollowing: true,
-        });
-      }
-      return { prev };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(["artist", artistId], ctx.prev);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["artist", artistId] });
-    },
-  });
-
-  const unfollowMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/artists/${artistId}/follow`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to unfollow");
-      return res.json();
-    },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ["artist", artistId] });
-      const prev = queryClient.getQueryData(["artist", artistId]) as
-        | Artist
-        | undefined;
-      if (prev) {
-        queryClient.setQueryData(["artist", artistId], {
-          ...prev,
-          _count: {
-            ...prev._count,
-            followers: Math.max(0, prev._count.followers - 1),
-          },
-          isFollowing: false,
-        });
-      }
-      return { prev };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(["artist", artistId], ctx.prev);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["artist", artistId] });
-    },
-  });
-
-  // Redirect collaboration artists to /collabs/[id]
-  useEffect(() => {
-    if (artist?.isCollab) {
-      router.replace(`/collabs/${artist.id}`);
+    } catch (e) {
+      console.error("Failed to toggle follow:", e);
+    } finally {
+      setIsFollowLoading(false);
     }
-  }, [artist?.isCollab, artist?.id, router]);
+  };
 
   if (isLoading) {
     return (
@@ -121,18 +74,10 @@ export default function ArtistPage() {
     return (
       <EmptyState
         icon={<Music />}
-        title="Artist not found"
-        description="This artist doesn't exist or is not available."
+        title="Collaboration not found"
+        description="This collaboration doesn't exist or is not available."
         action={<Button onClick={() => window.history.back()}>Go back</Button>}
       />
-    );
-  }
-
-  if (artist.isCollab) {
-    return (
-      <div className="space-y-8">
-        <div className="h-[40vh] w-full animate-pulse rounded-3xl bg-muted lg:h-[45vh]" />
-      </div>
     );
   }
 
@@ -152,9 +97,7 @@ export default function ArtistPage() {
 
   return (
     <div className="relative flex flex-col space-y-6">
-      {/* Immersive Header Background */}
-      {/* Grows with its content instead of clipping: a tall minimum, but a
-          long title just makes the hero taller. */}
+      {/* Header */}
       <div className="relative flex items-end w-full min-h-[clamp(17rem,40vh,25rem)] overflow-hidden rounded-3xl shadow-xl border border-white/5">
         <div className="absolute inset-0 bg-neutral-900" />
         {artist.imageUrl ? (
@@ -170,7 +113,6 @@ export default function ArtistPage() {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-background" />
         )}
 
-        {/* Content Overlay */}
         <div className="relative w-full p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
           <div className="w-48 h-48 lg:w-64 lg:h-64 rounded-full overflow-hidden shadow-2xl border-4 border-background/20 mb-6 lg:mb-0 relative group">
             <ArtistImage
@@ -178,13 +120,19 @@ export default function ArtistPage() {
               artistImageUrl={artist.imageUrl}
               artistName={artist.name}
               className="w-full h-full object-cover"
-              fallbackClassName="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-orange-600"
+              fallbackClassName="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/40 to-primary/10"
             />
           </div>
 
           <div className="space-y-4 lg:pb-4 flex-1">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
+                <Badge
+                  variant="secondary"
+                  className="bg-primary/20 text-primary border-none font-black text-[10px] py-0 px-2 uppercase"
+                >
+                  Collaboration
+                </Badge>
                 {artist.verified && (
                   <Badge
                     variant="secondary"
@@ -194,7 +142,7 @@ export default function ArtistPage() {
                   </Badge>
                 )}
               </div>
-              <p className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] drop-shadow-xl line-clamp-2 break-words" aria-hidden="true">
+              <p className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight leading-[1.05] drop-shadow-xl line-clamp-2 break-words">
                 {artist.name}
               </p>
             </div>
@@ -212,7 +160,6 @@ export default function ArtistPage() {
           </div>
         </div>
 
-        {/* Back Button (Mobile) */}
         <Button
           variant="ghost"
           size="icon"
@@ -223,19 +170,17 @@ export default function ArtistPage() {
         </Button>
       </div>
 
-      {/* Action Bar - Sticky on Mobile */}
+      {/* Action Bar */}
       <div className="sticky top-16 z-30 -mx-4 border-b border-white/5 bg-background/80 px-4 backdrop-blur-xl lg:static lg:mx-0 lg:border-none lg:bg-transparent lg:px-0">
         <div className="flex items-center justify-between py-4">
           <div className="flex items-center gap-4 lg:gap-6">
             <Button
               size="lg"
               onClick={handlePlayAll}
-              disabled={!artist.tracks || artist.tracks.length === 0}
+              disabled={topTracks.length === 0}
               className="rounded-full w-14 h-14 lg:w-auto lg:h-14 lg:px-8 group shadow-2xl"
             >
-              {currentTrack &&
-              artist.tracks?.some((t) => t.id === currentTrack.id) &&
-              isPlaying ? (
+              {currentTrack && topTracks.some((t) => t.id === currentTrack.id) && isPlaying ? (
                 <Pause className="h-6 w-6 lg:mr-2 fill-current" />
               ) : (
                 <Play className="h-6 w-6 lg:mr-2 fill-current" />
@@ -248,25 +193,16 @@ export default function ArtistPage() {
               size="icon"
               className={cn(
                 "w-12 h-12 lg:w-auto lg:h-12 lg:px-6 rounded-full border-white/10 transition-all",
-                artist.isFollowing
+                isFollowingAll
                   ? "bg-primary/10 border-primary/20 text-primary"
                   : "hover:bg-white/5",
               )}
-              onClick={() =>
-                artist.isFollowing
-                  ? unfollowMutation.mutate()
-                  : followMutation.mutate()
-              }
-              disabled={followMutation.isPending || unfollowMutation.isPending}
+              onClick={handleFollowAll}
+              disabled={isFollowLoading || !artist.collaborationArtists?.length}
             >
-              <Heart
-                className={cn(
-                  "h-5 w-5 lg:mr-2",
-                  artist.isFollowing && "fill-current",
-                )}
-              />
+              <Heart className={cn("h-5 w-5 lg:mr-2", isFollowingAll && "fill-current")} />
               <span className="hidden lg:inline font-bold">
-                {artist.isFollowing ? "Following" : "Follow"}
+                {isFollowingAll ? "Following All" : "Follow All"}
               </span>
             </Button>
           </div>
@@ -274,43 +210,69 @@ export default function ArtistPage() {
           <div className="flex items-center gap-2">
             <ShareMenu
               title={artist.name}
-              url={`/artists/${artist.id}`}
+              url={`/collabs/${artist.id}`}
               id={artist.id}
               type="artist"
               trigger={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-12 h-12 rounded-full"
-                >
+                <Button variant="ghost" size="icon" className="w-12 h-12 rounded-full">
                   <Share className="h-5 w-5" />
                 </Button>
               }
             />
-            {artist.website && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-12 h-12 rounded-full lg:hidden"
-                asChild
-              >
-                <a
-                  href={artist.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="h-5 w-5" />
-                </a>
-              </Button>
-            )}
           </div>
         </div>
       </div>
 
       <div className="py-4">
         <div className="grid grid-cols-1 gap-12 xl:grid-cols-3">
-          {/* Popular Tracks + Bio */}
+          {/* Tracks + Bio */}
           <div className="xl:col-span-2 space-y-6">
+            {/* Member Artists */}
+            {artist.collaborationArtists && artist.collaborationArtists.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-primary" />
+                  <h2 className="text-2xl font-black tracking-tight">Member Artists</h2>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {artist.collaborationArtists.map((member) => (
+                    <Link
+                      key={member.id}
+                      href={`/artists/${member.id}`}
+                      className="group flex items-center gap-3 p-3 pr-5 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 hover:border-primary/20 transition-all"
+                    >
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                        {member.imageUrl ? (
+                          <img
+                            src={member.imageUrl}
+                            alt={member.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/30 to-primary/10">
+                            <User className="h-5 w-5 text-primary/60" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm group-hover:text-primary transition-colors">
+                          {member.name}
+                        </span>
+                        {member.verified && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-primary/20 text-primary border-none font-black text-[8px] py-0 px-1.5 uppercase"
+                          >
+                            Verified
+                          </Badge>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Popular Tracks - Top 5 */}
             {topTracks.length > 0 && (
               <div className="space-y-4">
@@ -322,7 +284,6 @@ export default function ArtistPage() {
                       className="flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
                     >
                       Show all {artist._count.tracks}
-                      <ChevronRight className="h-3 w-3" />
                     </Link>
                   )}
                 </div>
@@ -356,81 +317,7 @@ export default function ArtistPage() {
               </div>
             )}
 
-            {/* Appears On - Featured Tracks (Top 5) */}
-            {artist.featuredInTracks && artist.featuredInTracks.length > 0 && (
-              <div className="mt-8 space-y-4">
-                <h2 className="text-2xl font-black tracking-tight px-1">Appears On</h2>
-                <div className="space-y-1">
-                  {artist.featuredInTracks.slice(0, 5).map((track, index) => (
-                    <div
-                      key={track.id}
-                      className="flex items-center group/item hover:bg-white/5 rounded-xl transition-colors pr-2"
-                    >
-                      <div className="w-10 text-center text-xs font-bold text-muted-foreground group-hover/item:text-foreground transition-colors shrink-0">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <TrackListItem
-                          track={track}
-                          isCurrentTrack={isCurrentTrack(track.id)}
-                          isPlaying={isCurrentTrack(track.id) && isPlaying}
-                          onPlay={() =>
-                            playTrack(track, artist.featuredInTracks!, {
-                              type: "standalone",
-                              name: `${artist.name} - Appears On`,
-                            })
-                          }
-                          showAddButton={true}
-                          className="bg-transparent hover:bg-transparent border-none"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Collaborations */}
-            {artist.collaborations && artist.collaborations.length > 0 && (
-              <div className="mt-8 space-y-4">
-                <h2 className="text-2xl font-black tracking-tight px-1">Collaborations</h2>
-                <div className="flex flex-wrap gap-3">
-                  {artist.collaborations.map((collab) => (
-                    <Link
-                      key={collab.id}
-                      href={`/collabs/${collab.id}`}
-                      className="group flex items-center gap-3 p-3 pr-5 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 hover:border-primary/20 transition-all"
-                    >
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted flex-shrink-0">
-                        {collab.imageUrl ? (
-                          <img
-                            src={collab.imageUrl}
-                            alt={collab.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/30 to-primary/10">
-                            <User className="h-5 w-5 text-primary/60" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm group-hover:text-primary transition-colors">
-                          {collab.name}
-                        </span>
-                        {collab.bio && (
-                          <span className="text-[11px] text-muted-foreground/70 font-medium line-clamp-1 max-w-[200px]">
-                            {collab.bio}
-                          </span>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Bio Section - Clean */}
+            {/* Bio */}
             {artist.bio && (
               <div className="mt-8 p-6 lg:p-8 bg-card/20 rounded-2xl border border-white/5">
                 <h3 className="text-lg font-black tracking-tight mb-3">About {artist.name}</h3>
@@ -441,7 +328,7 @@ export default function ArtistPage() {
             )}
           </div>
 
-          {/* Albums & Side Content */}
+          {/* Albums */}
           <div className="space-y-12">
             <section className="space-y-6">
               <div className="flex items-center justify-between px-1">
@@ -452,17 +339,12 @@ export default function ArtistPage() {
                     className="flex items-center gap-1 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
                   >
                     Show all {artist._count.albums}
-                    <ChevronRight className="h-3 w-3" />
                   </Link>
                 )}
               </div>
               <div className="grid grid-cols-1 gap-4">
                 {topAlbums.map((album) => (
-                  <Link
-                    key={album.id}
-                    href={`/albums/${album.id}`}
-                    className="group"
-                  >
+                  <Link key={album.id} href={`/albums/${album.id}`} className="group">
                     <div className="flex items-center gap-4 p-3 rounded-2xl bg-card/20 border border-white/5 group-hover:bg-card/40 transition-all">
                       <div className="w-16 h-16 lg:w-20 lg:h-20 bg-muted rounded-xl flex-shrink-0 relative overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
                         {album.coverImageUrl ? (

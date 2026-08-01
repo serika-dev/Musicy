@@ -94,11 +94,16 @@ export async function POST(request: NextRequest) {
     // Create or find album if provided
     let album = null
     if (albumTitle) {
+      // Search by title only (case-insensitive), NOT artistId
+      // This prevents albums from being split when tracks have different artists
       album = await prisma.album.findFirst({
         where: {
-          title: albumTitle,
-          artistId: artist.id
-        }
+          title: {
+            equals: albumTitle.trim(),
+            mode: 'insensitive'
+          },
+        },
+        orderBy: { createdAt: 'asc' }, // Use the oldest album if duplicates exist
       })
 
       if (!album) {

@@ -122,7 +122,7 @@ export default function UserProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start space-x-6">
+                <div className="flex flex-col items-center space-y-4 sm:flex-row sm:items-start sm:space-x-6">
                   {/* Profile Picture */}
                   <div className="w-32 h-32 bg-gradient-to-br from-primary/30 to-primary/60 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {profile.avatarUrl ? (

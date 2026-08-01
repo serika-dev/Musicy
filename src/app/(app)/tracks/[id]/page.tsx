@@ -156,14 +156,14 @@ export default function TrackPage() {
           </div>
 
           {/* Technical Info */}
-          <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
             <Badge variant="secondary">{track.format}</Badge>
             {track.bitRate && <span>{track.bitRate} kbps</span>}
             {track.sampleRate && <span>{track.sampleRate} Hz</span>}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button
               size="lg"
               onClick={handlePlay}
@@ -179,9 +179,9 @@ export default function TrackPage() {
               </span>
             </Button>
 
-            <Button variant="outline" size="lg">
-              <Heart className="h-5 w-5 mr-2" />
-              Like
+            <Button variant="outline" size="lg" className="px-4 sm:px-8">
+              <Heart className="h-5 w-5 sm:mr-2" />
+              <span className="hidden sm:inline">Like</span>
             </Button>
 
             <ShareMenu
@@ -190,9 +190,9 @@ export default function TrackPage() {
               id={track.id}
               type="track"
               trigger={
-                <Button variant="outline" size="lg">
-                  <Share className="h-5 w-5 mr-2" />
-                  Share
+                <Button variant="outline" size="lg" className="px-4 sm:px-8">
+                  <Share className="h-5 w-5 sm:mr-2" />
+                  <span className="hidden sm:inline">Share</span>
                 </Button>
               }
             />

@@ -76,6 +76,18 @@ export function Header() {
           </form>
         </div>
 
+        {/* Mobile search icon */}
+        <Button
+          variant="ghost"
+          size="icon"
+          asChild
+          className="md:hidden shrink-0"
+        >
+          <Link href="/search" aria-label="Search">
+            <Search className="h-5 w-5" />
+          </Link>
+        </Button>
+
         {/* Right Controls */}
         <div className="flex items-center gap-3 shrink-0">
           {status === "loading" ? (

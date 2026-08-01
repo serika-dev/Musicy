@@ -300,6 +300,8 @@ export default function AdminPage() {
   const [searchUsers, setSearchUsers] = useState("");
   const [searchTracks, setSearchTracks] = useState("");
   const [searchArtists, setSearchArtists] = useState("");
+  const [artistFilter, setArtistFilter] = useState<'all' | 'collab' | 'solo'>('all');
+  const [searchCollabs, setSearchCollabs] = useState("");
   const [searchAlbums, setSearchAlbums] = useState("");
 
   // Pagination states (25 per page)
@@ -307,6 +309,7 @@ export default function AdminPage() {
   const [tracksPage, setTracksPage] = useState(1);
   const [artistsPage, setArtistsPage] = useState(1);
   const [albumsPage, setAlbumsPage] = useState(1);
+  const [collabsPage, setCollabsPage] = useState(1);
 
   // Lyrics modal & editing state
   const [selectedTrackForLyrics, setSelectedTrackForLyrics] = useState<any>(null);
@@ -359,6 +362,116 @@ export default function AdminPage() {
   });
   const [isUpdatingArtist, setIsUpdatingArtist] = useState(false);
 
+  // Collab editing state
+  const [editingCollab, setEditingCollab] = useState<any>(null);
+  const [collabForm, setCollabForm] = useState({
+    bio: "",
+    website: "",
+    verified: false,
+    imageUrl: "",
+    bannerUrl: "",
+  });
+  const [collabMembers, setCollabMembers] = useState<any[]>([]);
+  const [collabSearch, setCollabSearch] = useState("");
+  const [collabTracks, setCollabTracks] = useState<any[]>([]);
+  const [collabAlbums, setCollabAlbums] = useState<any[]>([]);
+  const [isUpdatingCollab, setIsUpdatingCollab] = useState(false);
+  const [syncFeatured, setSyncFeatured] = useState(true);
+
+  // ===== Collab handlers =====
+  const handleEditCollabClick = async (collab: any) => {
+    setEditingCollab(collab);
+    setCollabForm({
+      bio: collab.bio || "",
+      website: collab.website || "",
+      verified: collab.verified || false,
+      imageUrl: collab.imageUrl || "",
+      bannerUrl: collab.bannerUrl || "",
+    });
+    setCollabMembers([]);
+    setCollabTracks([]);
+    setCollabAlbums([]);
+    setCollabSearch("");
+    setSyncFeatured(true);
+
+    // Fetch full collab details
+    try {
+      const res = await fetch(`/api/admin/collabs/${collab.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCollabMembers(data.members || []);
+        setCollabTracks(data.tracks || []);
+        setCollabAlbums(data.albums || []);
+        setCollabForm({
+          bio: data.bio || "",
+          website: data.website || "",
+          verified: data.verified || false,
+          imageUrl: data.imageUrl || "",
+          bannerUrl: data.bannerUrl || "",
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching collab details:", e);
+    }
+  };
+
+  const addCollabMember = (artist: any) => {
+    if (collabMembers.find(m => m.id === artist.id)) return;
+    setCollabMembers([...collabMembers, artist]);
+    setCollabSearch("");
+  };
+
+  const removeCollabMember = (memberId: string) => {
+    setCollabMembers(collabMembers.filter(m => m.id !== memberId));
+  };
+
+  const collabPreviewName = collabMembers.length > 0
+    ? collabMembers.map(m => m.name).join(' & ')
+    : '';
+
+  const filteredAvailableArtists = availableArtists
+    .filter(a => !collabMembers.find(m => m.id === a.id))
+    .filter(a => !a.name?.includes(' & '))
+    .filter(a => collabSearch ? a.name.toLowerCase().includes(collabSearch.toLowerCase()) : true)
+    .slice(0, 10);
+
+  const handleUpdateCollab = async () => {
+    if (!editingCollab) return;
+    if (collabMembers.length < 2) {
+      toast.error("A collaboration needs at least 2 artists");
+      return;
+    }
+
+    setIsUpdatingCollab(true);
+    try {
+      const response = await fetch(`/api/admin/collabs/${editingCollab.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...collabForm,
+          memberIds: collabMembers.map(m => m.id),
+          syncFeatured,
+        }),
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        toast.success(`Collaboration "${updated.name}" updated successfully!`);
+        setEditingCollab(null);
+        refetchArtists();
+        refetchCollabs();
+      } else {
+        const error = await response.json();
+        toast.error(`Failed to update collaboration: ${error.message}`);
+      }
+    } catch (error) {
+      console.error("Error updating collab:", error);
+      toast.error("Failed to update collaboration: Network error");
+    } finally {
+      setIsUpdatingCollab(false);
+    }
+  };
+
   // Track editing state
   const [editingTrack, setEditingTrack] = useState<any>(null);
   const [editTrackForm, setEditTrackForm] = useState({
@@ -380,6 +493,11 @@ export default function AdminPage() {
     isPublic: true,
   });
   const [isUpdatingAlbum, setIsUpdatingAlbum] = useState(false);
+
+  // Album merge state
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [mergeDuplicates, setMergeDuplicates] = useState<any[]>([]);
+  const [isMerging, setIsMerging] = useState(false);
 
   // Upload form data
   const [uploadFormData, setUploadFormData] = useState({
@@ -423,6 +541,13 @@ export default function AdminPage() {
     searchArtists,
     ITEMS_PER_PAGE,
     (artistsPage - 1) * ITEMS_PER_PAGE,
+    artistFilter,
+  );
+  const { data: collabsData, refetch: refetchCollabs } = useAdminArtists(
+    searchCollabs,
+    ITEMS_PER_PAGE,
+    (collabsPage - 1) * ITEMS_PER_PAGE,
+    'collab',
   );
   const { data: albumsData, refetch: refetchAlbums } = useAdminAlbums(
     searchAlbums,
@@ -925,6 +1050,79 @@ export default function AdminPage() {
     }
   };
 
+  // ===== Album merge handlers =====
+  const handleScanDuplicateAlbums = async () => {
+    setIsMerging(true);
+    try {
+      const res = await fetch('/api/admin/albums/merge');
+      if (res.ok) {
+        const data = await res.json();
+        setMergeDuplicates(data.duplicates || []);
+        setShowMergeDialog(true);
+        if (data.duplicates.length === 0) {
+          toast.success("No duplicate albums found!");
+        } else {
+          toast.info(`Found ${data.totalDuplicateTitles} album title(s) with duplicates (${data.totalAlbumsToMerge} albums to merge)`);
+        }
+      } else {
+        toast.error("Failed to scan for duplicates");
+      }
+    } catch (e) {
+      toast.error("Failed to scan for duplicates");
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const handleMergeAlbum = async (albumTitle: string) => {
+    setIsMerging(true);
+    try {
+      const res = await fetch('/api/admin/albums/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumTitle }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        // Remove from list
+        setMergeDuplicates(prev => prev.filter(g => g.title.toLowerCase() !== albumTitle.toLowerCase()));
+        refetchAlbums();
+      } else {
+        const err = await res.json();
+        toast.error(`Failed to merge: ${err.message}`);
+      }
+    } catch (e) {
+      toast.error("Failed to merge albums");
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const handleMergeAllDuplicates = async () => {
+    setIsMerging(true);
+    let merged = 0;
+    for (const dup of mergeDuplicates) {
+      try {
+        const res = await fetch('/api/admin/albums/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ albumTitle: dup.title }),
+        });
+        if (res.ok) {
+          merged++;
+        }
+      } catch (e) {
+        console.error(`Failed to merge ${dup.title}:`, e);
+      }
+    }
+    toast.success(`Merged ${merged} album group(s) successfully!`);
+    setMergeDuplicates([]);
+    setShowMergeDialog(false);
+    refetchAlbums();
+    setIsMerging(false);
+  };
+
   // Lyrics search & update handlers
   const handleSearchLyrics = async (track: any) => {
     try {
@@ -1065,6 +1263,7 @@ export default function AdminPage() {
               { value: "users", label: "Users", icon: Users, badge: usersData?.total },
               { value: "tracks", label: "Tracks", icon: Music, badge: tracksData?.total },
               { value: "artists", label: "Artists", icon: UserIcon, badge: artistsData?.total },
+              { value: "collabs", label: "Collabs", icon: Users, badge: collabsData?.total },
               { value: "albums", label: "Albums", icon: AlbumIcon, badge: albumsData?.total },
               { value: "upload", label: "Upload", icon: Upload },
               { value: "settings", label: "Settings", icon: Settings },
@@ -1244,6 +1443,7 @@ export default function AdminPage() {
 
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-zinc-950">
                   <TableRow className="border-zinc-800 hover:bg-transparent">
@@ -1317,6 +1517,7 @@ export default function AdminPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
               <PaginationControls
                 currentPage={usersPage}
                 totalItems={usersData?.total || 0}
@@ -1345,6 +1546,7 @@ export default function AdminPage() {
 
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-zinc-950">
                   <TableRow className="border-zinc-800 hover:bg-transparent">
@@ -1424,6 +1626,7 @@ export default function AdminPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
               <PaginationControls
                 currentPage={tracksPage}
                 totalItems={tracksData?.total || 0}
@@ -1445,6 +1648,32 @@ export default function AdminPage() {
               }}
               placeholder="Search artists by name..."
             />
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+              <Button
+                variant={artistFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setArtistFilter('all'); setArtistsPage(1); }}
+                className="h-10 px-3 text-xs font-bold"
+              >
+                All
+              </Button>
+              <Button
+                variant={artistFilter === 'solo' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setArtistFilter('solo'); setArtistsPage(1); }}
+                className="h-10 px-3 text-xs font-bold"
+              >
+                Solo
+              </Button>
+              <Button
+                variant={artistFilter === 'collab' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setArtistFilter('collab'); setArtistsPage(1); }}
+                className="h-10 px-3 text-xs font-bold"
+              >
+                Collabs
+              </Button>
+            </div>
             <Button variant="outline" size="sm" onClick={() => refetchArtists()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh List
             </Button>
@@ -1452,6 +1681,7 @@ export default function AdminPage() {
 
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-zinc-950">
                   <TableRow className="border-zinc-800 hover:bg-transparent">
@@ -1478,6 +1708,9 @@ export default function AdminPage() {
                             <div className="font-bold text-sm text-white flex items-center gap-1.5">
                               {artist.name}
                               {artist.verified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                              {artist.name?.includes(' & ') && (
+                                <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1505,6 +1738,13 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {artist.name?.includes(' & ') && (
+                            <Button variant="outline" size="sm" asChild className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                              <a href={`/collabs/${artist.id}`} target="_blank" rel="noreferrer">
+                                <ExternalLink className="w-3.5 h-3.5" /> View
+                              </a>
+                            </Button>
+                          )}
                           <Button variant="outline" size="sm" onClick={() => handleEditArtistClick(artist)} className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
                             <Edit className="w-3.5 h-3.5" /> Edit Profile
                           </Button>
@@ -1517,11 +1757,108 @@ export default function AdminPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
               <PaginationControls
                 currentPage={artistsPage}
                 totalItems={artistsData?.total || 0}
                 itemsPerPage={ITEMS_PER_PAGE}
                 onPageChange={setArtistsPage}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 🤝 COLLABORATIONS MANAGEMENT TAB */}
+        <TabsContent value="collabs" className="space-y-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <AdminSearchInput
+              value={searchCollabs}
+              onChange={(val) => {
+                setSearchCollabs(val);
+                setCollabsPage(1);
+              }}
+              placeholder="Search collaborations..."
+            />
+            <Button variant="outline" size="sm" onClick={() => refetchCollabs()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh List
+            </Button>
+          </div>
+
+          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-zinc-950">
+                  <TableRow className="border-zinc-800 hover:bg-transparent">
+                    <TableHead className="font-bold text-zinc-200">Collaboration</TableHead>
+                    <TableHead className="font-bold text-zinc-200">Status</TableHead>
+                    <TableHead className="font-bold text-zinc-200">Tracks</TableHead>
+                    <TableHead className="font-bold text-zinc-200">Albums</TableHead>
+                    <TableHead className="font-bold text-zinc-200">Bio</TableHead>
+                    <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {collabsData?.artists?.map((collab: any) => (
+                    <TableRow key={collab.id} className="border-zinc-800/80 hover:bg-zinc-800/50 transition-colors">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border border-zinc-700 shrink-0 shadow-sm">
+                            <AvatarImage src={collab.imageUrl} alt={collab.name} />
+                            <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-bold text-xs">
+                              {collab.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                              {collab.name}
+                              {collab.verified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {collab.verified ? (
+                          <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 gap-1 text-[10px] font-bold">
+                            <CheckCircle2 className="w-3 h-3 text-blue-400" /> VERIFIED
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] font-semibold">Standard</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-zinc-200">{collab._count?.tracks || 0} tracks</TableCell>
+                      <TableCell className="text-xs font-bold text-zinc-200">{collab._count?.albums || 0} albums</TableCell>
+                      <TableCell>
+                        <div className="text-xs text-zinc-400 font-medium truncate max-w-[200px]">
+                          {collab.bio || "No bio set"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="outline" size="sm" asChild className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                            <a href={`/collabs/${collab.id}`} target="_blank" rel="noreferrer">
+                              <ExternalLink className="w-3.5 h-3.5" /> View
+                            </a>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleEditCollabClick(collab)} className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                            <Edit className="w-3.5 h-3.5" /> Edit
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteArtist(collab.id, collab.name)} className="h-8 text-xs font-bold">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              </div>
+              <PaginationControls
+                currentPage={collabsPage}
+                totalItems={collabsData?.total || 0}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCollabsPage}
               />
             </CardContent>
           </Card>
@@ -1538,13 +1875,19 @@ export default function AdminPage() {
               }}
               placeholder="Search albums..."
             />
-            <Button variant="outline" size="sm" onClick={() => refetchAlbums()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh List
-            </Button>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <Button variant="outline" size="sm" onClick={handleScanDuplicateAlbums} disabled={isMerging} className="border-amber-600/40 bg-amber-950/30 hover:bg-amber-900/30 text-amber-300 font-semibold gap-2 h-10 px-4">
+                <Disc className={cn("h-3.5 w-3.5", isMerging && "animate-spin")} /> Merge Duplicates
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => refetchAlbums()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 h-10 px-4">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh List
+              </Button>
+            </div>
           </div>
 
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-zinc-950">
                   <TableRow className="border-zinc-800 hover:bg-transparent">
@@ -1608,6 +1951,7 @@ export default function AdminPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
               <PaginationControls
                 currentPage={albumsPage}
                 totalItems={albumsData?.total || 0}
@@ -1632,7 +1976,7 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-6 pt-4">
               {/* Mode Selector */}
-              <div className="flex items-center gap-6 p-4 rounded-xl bg-zinc-950 border border-zinc-800">
+              <div className="flex flex-col gap-4 p-4 rounded-xl bg-zinc-950 border border-zinc-800 sm:flex-row sm:items-center sm:gap-6">
                 <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setAutoExtractMode(true)}>
                   <input type="radio" checked={autoExtractMode} onChange={() => setAutoExtractMode(true)} className="accent-purple-500 h-4 w-4" />
                   <Label className="cursor-pointer font-bold text-white text-sm">Automatic Metadata Extraction (Recommended)</Label>
@@ -1892,7 +2236,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center w-full sm:w-auto">
                       {setting.type === "switch" ? (
                         <Switch
                           checked={isEnabled}
@@ -1914,13 +2258,13 @@ export default function AdminPage() {
                           ))}
                         </select>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
                           <Input
                             value={currentVal}
                             onChange={(e) =>
                               setSystemSettings((prev) => ({ ...prev, [setting.key]: e.target.value }))
                             }
-                            className="w-48 h-9 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
+                            className="flex-1 sm:w-48 h-9 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
                           />
                           <Button
                             size="sm"
@@ -1969,7 +2313,7 @@ export default function AdminPage() {
                     .map((customKey) => (
                       <div
                         key={customKey}
-                        className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800"
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 gap-3"
                       >
                         <div className="space-y-0.5">
                           <Label className="text-white font-bold text-xs">{customKey}</Label>
@@ -1977,7 +2321,7 @@ export default function AdminPage() {
                             {systemSettings[customKey]}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
                           <Input
                             value={systemSettings[customKey] || ""}
                             onChange={(e) =>
@@ -1986,7 +2330,7 @@ export default function AdminPage() {
                                 [customKey]: e.target.value,
                               }))
                             }
-                            className="w-48 h-8 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
+                            className="flex-1 sm:w-48 h-8 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
                           />
                           <Button
                             size="sm"
@@ -2009,7 +2353,7 @@ export default function AdminPage() {
 
       {/* ✏️ USER EDITOR DIALOG */}
       <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white max-w-lg shadow-2xl">
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-zinc-800 pb-3">
             <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
               <UserIcon className="w-5 h-5 text-purple-400" />
@@ -2095,11 +2439,11 @@ export default function AdminPage() {
 
       {/* 🎤 ARTIST EDITOR DIALOG */}
       <Dialog open={!!editingArtist} onOpenChange={(open) => !open && setEditingArtist(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white max-w-lg shadow-2xl">
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-zinc-800 pb-3">
             <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
               <UserIcon className="w-5 h-5 text-purple-400" />
-              Edit Artist Profile
+              {editingArtist?.name?.includes(' & ') ? 'Edit Collaboration' : 'Edit Artist Profile'}
             </DialogTitle>
           </DialogHeader>
 
@@ -2176,7 +2520,225 @@ export default function AdminPage() {
           <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
             <Button variant="outline" onClick={() => setEditingArtist(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
             <Button onClick={handleUpdateArtist} disabled={isUpdatingArtist} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
-              Save Artist
+              {editingArtist?.name?.includes(' & ') ? 'Save Collaboration' : 'Save Artist'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🤝 COLLAB EDITOR DIALOG */}
+      <Dialog open={!!editingCollab} onOpenChange={(open) => !open && setEditingCollab(null)}>
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[95vw] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="border-b border-zinc-800 pb-3">
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-400" />
+              Edit Collaboration
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-3">
+            {/* Preview name */}
+            <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/20">
+              <Label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Collaboration Name (auto-generated)</Label>
+              <p className="text-lg font-black text-white mt-1">
+                {collabPreviewName || "Add at least 2 members..."}
+              </p>
+            </div>
+
+            {/* Member artists management */}
+            <div className="space-y-3">
+              <Label className="text-xs font-bold text-zinc-200">Member Artists *</Label>
+
+              {/* Current members */}
+              {collabMembers.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {collabMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700"
+                    >
+                      <Avatar className="h-6 w-6 border border-zinc-600">
+                        <AvatarImage src={member.imageUrl} alt={member.name} />
+                        <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
+                          {member.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs font-bold text-white">{member.name}</span>
+                      {member.verified && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 hover:bg-red-500/20 hover:text-red-400"
+                        onClick={() => removeCollabMember(member.id)}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Search to add members */}
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <Input
+                    value={collabSearch}
+                    onChange={(e) => setCollabSearch(e.target.value)}
+                    placeholder="Search artists to add as members..."
+                    className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium pl-9"
+                  />
+                </div>
+                {collabSearch && filteredAvailableArtists.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-lg bg-zinc-800 border border-zinc-700 shadow-2xl max-h-48 overflow-y-auto">
+                    {filteredAvailableArtists.map((artist) => (
+                      <button
+                        key={artist.id}
+                        onClick={() => addCollabMember(artist)}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-purple-600/20 transition-colors text-left"
+                      >
+                        <Avatar className="h-6 w-6 border border-zinc-600">
+                          <AvatarImage src={artist.imageUrl} alt={artist.name} />
+                          <AvatarFallback className="bg-zinc-700 text-white text-[10px] font-bold">
+                            {artist.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-bold text-white">{artist.name}</span>
+                        {artist.verified && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
+                        <Plus className="w-3.5 h-3.5 text-purple-400 ml-auto" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {collabSearch && filteredAvailableArtists.length === 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-lg bg-zinc-800 border border-zinc-700 shadow-2xl p-3 text-center">
+                    <p className="text-xs text-zinc-400">No solo artists found. Try a different search.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Sync featured checkbox */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-bold text-white">Sync Featured Artists</Label>
+                <p className="text-xs text-zinc-400 font-medium">Update all collab tracks/albums to feature the member artists</p>
+              </div>
+              <Switch
+                checked={syncFeatured}
+                onCheckedChange={setSyncFeatured}
+              />
+            </div>
+
+            {/* Avatar + Banner */}
+            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+              <Avatar className="h-14 w-14 border-2 border-purple-500/40 shadow-lg shrink-0">
+                <AvatarImage src={collabForm.imageUrl} alt="Collab" />
+                <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-bold text-lg">
+                  {(collabPreviewName?.charAt(0) || "C").toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <ImageUrlOrUploadField
+                  label="Avatar Image"
+                  value={collabForm.imageUrl}
+                  onChange={(url) => setCollabForm({ ...collabForm, imageUrl: url })}
+                  type="profile"
+                  placeholder="https://example.com/collab.jpg"
+                />
+              </div>
+            </div>
+
+            <ImageUrlOrUploadField
+              label="Banner Image"
+              value={collabForm.bannerUrl}
+              onChange={(url) => setCollabForm({ ...collabForm, bannerUrl: url })}
+              type="banner"
+              placeholder="https://example.com/banner.jpg"
+            />
+
+            {/* Bio */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-zinc-200">Collaboration Bio</Label>
+              <Textarea
+                value={collabForm.bio}
+                onChange={(e) => setCollabForm({ ...collabForm, bio: e.target.value })}
+                rows={3}
+                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                placeholder="Describe this collaboration..."
+              />
+            </div>
+
+            {/* Website */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-zinc-200">Website Link</Label>
+              <Input
+                value={collabForm.website}
+                onChange={(e) => setCollabForm({ ...collabForm, website: e.target.value })}
+                placeholder="https://..."
+                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+              />
+            </div>
+
+            {/* Verified */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-bold text-white">Verified Badge</Label>
+                <p className="text-xs text-zinc-400 font-medium">Show official blue badge on platform</p>
+              </div>
+              <Switch
+                checked={collabForm.verified}
+                onCheckedChange={(val) => setCollabForm({ ...collabForm, verified: val })}
+              />
+            </div>
+
+            {/* Tracks & Albums summary */}
+            {(collabTracks.length > 0 || collabAlbums.length > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Music className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-bold text-white">Tracks ({collabTracks.length})</span>
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {collabTracks.slice(0, 8).map((track) => (
+                      <div key={track.id} className="text-[10px] text-zinc-400 font-medium truncate">
+                        {track.title} {track.playCount > 0 && `• ${track.playCount} plays`}
+                      </div>
+                    ))}
+                    {collabTracks.length > 8 && (
+                      <div className="text-[10px] text-zinc-500">+{collabTracks.length - 8} more...</div>
+                    )}
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlbumIcon className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-bold text-white">Albums ({collabAlbums.length})</span>
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {collabAlbums.slice(0, 8).map((album) => (
+                      <div key={album.id} className="text-[10px] text-zinc-400 font-medium truncate">
+                        {album.title} • {album.albumType}
+                      </div>
+                    ))}
+                    {collabAlbums.length > 8 && (
+                      <div className="text-[10px] text-zinc-500">+{collabAlbums.length - 8} more...</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
+            <Button variant="outline" onClick={() => setEditingCollab(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
+            <Button
+              onClick={handleUpdateCollab}
+              disabled={isUpdatingCollab || collabMembers.length < 2}
+              className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg disabled:opacity-50"
+            >
+              {isUpdatingCollab ? "Saving..." : "Save Collaboration"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2184,7 +2746,7 @@ export default function AdminPage() {
 
       {/* 🎵 TRACK EDITOR DIALOG */}
       <Dialog open={!!editingTrack} onOpenChange={(open) => !open && setEditingTrack(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white max-w-lg shadow-2xl">
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-zinc-800 pb-3">
             <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
               <Music className="w-5 h-5 text-purple-400" />
@@ -2243,7 +2805,7 @@ export default function AdminPage() {
 
       {/* 💿 ALBUM EDITOR DIALOG */}
       <Dialog open={!!editingAlbum} onOpenChange={(open) => !open && setEditingAlbum(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white max-w-lg shadow-2xl">
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-zinc-800 pb-3">
             <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
               <AlbumIcon className="w-5 h-5 text-purple-400" />
@@ -2305,9 +2867,97 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* 💿 ALBUM MERGE DIALOG */}
+      <Dialog open={showMergeDialog} onOpenChange={setShowMergeDialog}>
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[95vw] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="border-b border-zinc-800 pb-3">
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
+              <Disc className="w-5 h-5 text-amber-400" />
+              Merge Duplicate Albums
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            {mergeDuplicates.length === 0 ? (
+              <div className="text-center py-8">
+                <Check className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                <p className="text-sm font-bold text-white">No duplicate albums found!</p>
+                <p className="text-xs text-zinc-400 mt-1">All albums have unique titles.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-950/30 border border-amber-500/20">
+                  <div>
+                    <p className="text-sm font-bold text-amber-300">
+                      {mergeDuplicates.length} album title(s) with duplicates
+                    </p>
+                    <p className="text-xs text-amber-400/70 mt-0.5">
+                      Merging moves all tracks to the oldest album and deletes duplicates.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleMergeAllDuplicates}
+                    disabled={isMerging}
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-bold shrink-0"
+                  >
+                    {isMerging ? "Merging..." : "Merge All"}
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {mergeDuplicates.map((group, gi) => (
+                    <div key={gi} className="rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden">
+                      <div className="flex items-center justify-between p-3 border-b border-zinc-800">
+                        <div>
+                          <p className="text-sm font-bold text-white">{group.title}</p>
+                          <p className="text-[10px] text-zinc-500">{group.albums.length} copies found</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleMergeAlbum(group.title)}
+                          disabled={isMerging}
+                          className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs h-8"
+                        >
+                          Merge
+                        </Button>
+                      </div>
+                      <div className="divide-y divide-zinc-800/50">
+                        {group.albums.map((album: any, ai: number) => (
+                          <div key={album.id} className="flex items-center gap-3 px-3 py-2">
+                            <div className="w-8 h-8 rounded bg-zinc-800 overflow-hidden shrink-0">
+                              {album.coverImageUrl && (
+                                <img src={album.coverImageUrl} alt="" className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-white truncate">{album.artist.name}</p>
+                              <p className="text-[10px] text-zinc-500">{album.tracks} tracks</p>
+                            </div>
+                            {ai === 0 && (
+                              <Badge className="bg-green-500/20 text-green-300 border-green-500/40 text-[8px] font-bold uppercase">Keep</Badge>
+                            )}
+                            {ai > 0 && (
+                              <Badge className="bg-red-500/20 text-red-300 border-red-500/40 text-[8px] font-bold uppercase">Delete</Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
+            <Button variant="outline" onClick={() => setShowMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 📜 LYRICS EDITOR DIALOG */}
       <Dialog open={!!selectedTrackForLyrics} onOpenChange={(open) => !open && setSelectedTrackForLyrics(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white max-w-2xl shadow-2xl">
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-zinc-800 pb-3">
             <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-400" />

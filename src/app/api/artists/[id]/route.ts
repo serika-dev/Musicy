@@ -66,7 +66,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
             { playCount: 'desc' },
             { createdAt: 'desc' },
           ],
-          take: 20, // Top 20 tracks
+          take: 5, // Top 5 tracks for profile preview
         },
         albums: {
           where: { isPublic: true },
@@ -76,6 +76,66 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
             coverImageUrl: true,
             releaseDate: true,
             albumType: true,
+            _count: {
+              select: {
+                tracks: { where: { isPublic: true } },
+              },
+            },
+          },
+          orderBy: {
+            releaseDate: 'desc',
+          },
+        },
+        // Tracks where this artist is featured (e.g. collaborative tracks)
+        featuredInTracks: {
+          where: { isPublic: true },
+          select: {
+            id: true,
+            title: true,
+            duration: true,
+            coverImageUrl: true,
+            genre: true,
+            format: true,
+            filePath: true,
+            bitRate: true,
+            sampleRate: true,
+            playCount: true,
+            artist: {
+              select: {
+                id: true,
+                name: true,
+                verified: true,
+              },
+            },
+            album: {
+              select: {
+                id: true,
+                title: true,
+                coverImageUrl: true,
+              },
+            },
+          },
+          orderBy: [
+            { playCount: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 5, // Top 5 featured tracks for profile preview
+        },
+        // Albums where this artist is featured
+        featuredInAlbums: {
+          where: { isPublic: true },
+          select: {
+            id: true,
+            title: true,
+            coverImageUrl: true,
+            releaseDate: true,
+            albumType: true,
+            artist: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
             _count: {
               select: {
                 tracks: { where: { isPublic: true } },
@@ -96,6 +156,37 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       )
     }
 
+    const isCollab = artist.name.includes(' & ')
+
+    // For collaborative artists, find the individual artists
+    let collaborationArtists: { id: string; name: string; imageUrl: string | null; verified: boolean }[] = []
+    if (isCollab) {
+      const individualNames = artist.name.split(' & ').map(n => n.trim()).filter(Boolean)
+      for (const name of individualNames) {
+        const found = await prisma.artist.findFirst({
+          where: { name: { equals: name, mode: 'insensitive' } },
+          select: { id: true, name: true, imageUrl: true, verified: true },
+        })
+        if (found) collaborationArtists.push(found)
+      }
+    }
+
+    // For individual artists, find collaborations (collab artists whose name includes this artist's name)
+    let collaborations: { id: string; name: string; imageUrl: string | null; bio: string | null }[] = []
+    if (!isCollab) {
+      const collabArtists = await prisma.artist.findMany({
+        where: {
+          name: { contains: ' & ' },
+          OR: [
+            { name: { startsWith: `${artist.name} & `, mode: 'insensitive' } },
+            { name: { contains: ` & ${artist.name}`, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true, name: true, imageUrl: true, bio: true },
+      })
+      collaborations = collabArtists
+    }
+
     // Attach follow state
     let isFollowing = false
     if (session?.user?.id) {
@@ -114,12 +205,23 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const isAuthorized = session || apiKeyUser;
     
     // Mask file paths for unauthorized access
+    const maskTracks = (tracks: any[]) =>
+      tracks.map((track: any) => ({
+        ...track,
+        filePath: isAuthorized ? track.filePath : undefined,
+      }))
+
+    // Limit albums to top 5 for profile preview
+    const limitedAlbums = (artist as any).albums?.slice(0, 5) || []
+
     const returnedArtist = {
       ...artist,
-      tracks: (artist as any).tracks.map((track: any) => ({
-        ...track,
-        filePath: isAuthorized ? track.filePath : undefined
-      }))
+      tracks: maskTracks((artist as any).tracks),
+      albums: limitedAlbums,
+      featuredInTracks: maskTracks((artist as any).featuredInTracks || []),
+      collaborationArtists,
+      collaborations,
+      isCollab,
     }
 
     return NextResponse.json({ ...returnedArtist, isFollowing })

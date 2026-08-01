@@ -1,6 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { Track } from '@/types/track'
 
+export interface CollaborationArtist {
+  id: string
+  name: string
+  imageUrl?: string
+  verified: boolean
+}
+
+export interface Collaboration {
+  id: string
+  name: string
+  imageUrl?: string
+  bio?: string
+}
+
 export interface Artist {
   id: string
   name: string
@@ -12,6 +26,11 @@ export interface Artist {
   createdAt: string
   tracks?: Track[]
   albums?: Album[]
+  featuredInTracks?: Track[]
+  featuredInAlbums?: Album[]
+  collaborationArtists?: CollaborationArtist[]
+  collaborations?: Collaboration[]
+  isCollab?: boolean
   isFollowing?: boolean
   _count: {
     tracks: number

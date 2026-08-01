@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number(searchParams.get('limit')) || 50, 100)
     const offset = Math.max(Number(searchParams.get('offset')) || 0, 0)
     const search = searchParams.get('search')
+    const filter = searchParams.get('filter')
 
     let whereClause: any = {}
 
@@ -32,6 +33,18 @@ export async function GET(request: NextRequest) {
       whereClause.name = {
         contains: search,
         mode: 'insensitive',
+      }
+    }
+
+    if (filter === 'collab') {
+      whereClause.name = {
+        ...whereClause.name,
+        contains: ' & ',
+        mode: 'insensitive',
+      }
+    } else if (filter === 'solo') {
+      whereClause.NOT = {
+        name: { contains: ' & ', mode: 'insensitive' }
       }
     }
 

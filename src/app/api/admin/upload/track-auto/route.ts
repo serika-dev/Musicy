@@ -226,6 +226,8 @@ export async function POST(request: NextRequest) {
 
     if (finalData.albumTitle) {
       // Improved lookup: Case-insensitive and trimmed to avoid duplicates like "Album " vs "Album"
+      // Search by title only, NOT artistId - this prevents albums from being split
+      // when individual tracks have different primary artists (e.g. collab tracks)
       const normalizedTitle = finalData.albumTitle.trim();
       
       album = await prisma.album.findFirst({
@@ -234,8 +236,8 @@ export async function POST(request: NextRequest) {
             equals: normalizedTitle,
             mode: 'insensitive'
           },
-          artistId: albumArtist.id
-        }
+        },
+        orderBy: { createdAt: 'asc' }, // Use the oldest album if duplicates exist
       })
 
       if (!album) {

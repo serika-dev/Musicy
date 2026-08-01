@@ -128,9 +128,9 @@ export function useAdminTracks(search?: string, limit = 50, offset = 0) {
   })
 }
 
-export function useAdminArtists(search?: string, limit = 50, offset = 0) {
+export function useAdminArtists(search?: string, limit = 50, offset = 0, filter?: 'all' | 'collab' | 'solo') {
   return useQuery({
-    queryKey: ['admin', 'artists', { search, limit, offset }],
+    queryKey: ['admin', 'artists', { search, limit, offset, filter }],
     queryFn: async () => {
       const params = new URLSearchParams({
         limit: limit.toString(),
@@ -139,6 +139,10 @@ export function useAdminArtists(search?: string, limit = 50, offset = 0) {
       
       if (search) {
         params.append('search', search)
+      }
+      
+      if (filter && filter !== 'all') {
+        params.append('filter', filter)
       }
       
       const response = await fetch(`/api/admin/artists?${params}`)

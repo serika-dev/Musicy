@@ -380,7 +380,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>
             <p className="text-muted-foreground mt-1">
@@ -403,32 +403,32 @@ export default function SettingsPage() {
         <Tabs defaultValue="lyrics" className="w-full">
           <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
             <TabsTrigger value="lyrics">
-              <Languages className="w-4 h-4 mr-1.5" />
-              Lyrics
+              <Languages className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Lyrics</span>
             </TabsTrigger>
             <TabsTrigger value="audio">
-              <Music className="w-4 h-4 mr-1.5" />
-              Audio
+              <Music className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Audio</span>
             </TabsTrigger>
             <TabsTrigger value="playback">
-              <Play className="w-4 h-4 mr-1.5" />
-              Playback
+              <Play className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Playback</span>
             </TabsTrigger>
             <TabsTrigger value="devices">
-              <Radio className="w-4 h-4 mr-1.5" />
-              Devices
+              <Radio className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Devices</span>
             </TabsTrigger>
             <TabsTrigger value="appearance">
-              <Palette className="w-4 h-4 mr-1.5" />
-              Appearance
+              <Palette className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Appearance</span>
             </TabsTrigger>
             <TabsTrigger value="privacy">
-              <Shield className="w-4 h-4 mr-1.5" />
-              Privacy
+              <Shield className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Privacy</span>
             </TabsTrigger>
             <TabsTrigger value="notifications">
-              <Bell className="w-4 h-4 mr-1.5" />
-              Notifications
+              <Bell className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Notifications</span>
             </TabsTrigger>
           </TabsList>
 
