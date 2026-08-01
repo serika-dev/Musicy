@@ -1,19 +1,20 @@
-"use client"
+"use client";
 
-import { useState, useRef } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Upload, X, Camera, Music, Image as ImageIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useRef, useState } from "react";
+import { Camera, Image as ImageIcon, Music, Upload, X } from "lucide-react";
+import { ImageCropModal } from "@/components/image-crop-modal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ImageUploadProps {
-  currentImage?: string | null
-  onImageChange: (imageUrl: string) => void
-  type: 'profile' | 'playlist' | 'banner'
-  entityId?: string
-  className?: string
-  size?: 'sm' | 'md' | 'lg' | 'banner'
-  disabled?: boolean
+  currentImage?: string | null;
+  onImageChange: (imageUrl: string) => void;
+  type: "profile" | "playlist" | "banner";
+  entityId?: string;
+  className?: string;
+  size?: "sm" | "md" | "lg" | "banner";
+  disabled?: boolean;
 }
 
 export function ImageUpload({
@@ -22,101 +23,108 @@ export function ImageUpload({
   type,
   entityId,
   className,
-  size = 'md',
-  disabled = false
+  size = "md",
+  disabled = false,
 }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(currentImage || null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(currentImage || null);
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sizeClasses = {
-    sm: 'w-16 h-16',
-    md: 'w-32 h-32',
-    lg: 'w-48 h-48',
-    banner: 'w-full h-56 md:h-72'
-  }
+    sm: "w-16 h-16",
+    md: "w-32 h-32",
+    lg: "w-48 h-48",
+    banner: "w-full h-56 md:h-72",
+  };
 
   const handleFileSelect = () => {
-    if (disabled) return
-    fileInputRef.current?.click()
-  }
+    if (disabled) return;
+    fileInputRef.current?.click();
+  };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file')
-      return
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file");
+      return;
     }
 
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB')
-      return
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size must be less than 10MB");
+      return;
     }
 
-    setIsUploading(true)
+    // Read selected file for crop preview
+    const reader = new FileReader();
+    reader.onload = () => {
+      setRawImageSrc(reader.result as string);
+      setShowCropModal(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob, croppedDataUrl: string) => {
+    setIsUploading(true);
+    setPreviewUrl(croppedDataUrl);
 
     try {
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = () => {
-        setPreviewUrl(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      const croppedFile = new File([croppedBlob], "cropped_image.jpg", {
+        type: "image/jpeg",
+      });
 
-      // Upload file
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('type', type)
+      const formData = new FormData();
+      formData.append("file", croppedFile);
+      formData.append("type", type);
       if (entityId) {
-        formData.append('entityId', entityId)
+        formData.append("entityId", entityId);
       }
 
-      const response = await fetch('/api/upload/image', {
-        method: 'POST',
+      const response = await fetch("/api/upload/image", {
+        method: "POST",
         body: formData,
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Upload failed')
+        const error = await response.json();
+        throw new Error(error.message || "Upload failed");
       }
 
-      const result = await response.json()
-      onImageChange(result.url)
-      setPreviewUrl(result.url)
-
+      const result = await response.json();
+      onImageChange(result.url);
+      setPreviewUrl(result.url);
     } catch (error) {
-      console.error('Upload error:', error)
-      alert('Failed to upload image. Please try again.')
-      setPreviewUrl(currentImage || null)
+      console.error("Upload error:", error);
+      alert("Failed to upload cropped image. Please try again.");
+      setPreviewUrl(currentImage || null);
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   const handleRemoveImage = () => {
-    if (disabled) return
-    setPreviewUrl(null)
-    onImageChange('')
+    if (disabled) return;
+    setPreviewUrl(null);
+    onImageChange("");
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
-  const isCircular = type === 'profile'
-  const isBanner = type === 'banner'
+  const isCircular = type === "profile";
+  const isBanner = type === "banner";
+  const aspectRatio = type === "banner" ? 3 / 1 : 1;
 
   return (
-    <div className={cn('flex flex-col items-center space-y-4', className, isBanner && 'w-full')}>
+    <div className={cn("flex flex-col items-center space-y-4", className, isBanner && "w-full")}>
       <Card className={cn(
-        'relative overflow-hidden cursor-pointer hover:opacity-80 transition-opacity',
+        "relative overflow-hidden cursor-pointer hover:opacity-80 transition-opacity",
         sizeClasses[size],
-        isCircular ? 'rounded-full' : (isBanner ? 'rounded-xl' : 'rounded-lg'),
-        disabled && 'opacity-50 cursor-not-allowed'
+        isCircular ? "rounded-full" : (isBanner ? "rounded-xl" : "rounded-lg"),
+        disabled && "opacity-50 cursor-not-allowed"
       )}>
         <CardContent className="p-0 h-full w-full">
           {previewUrl ? (
@@ -125,8 +133,8 @@ export function ImageUpload({
                 src={previewUrl}
                 alt={`${type} image`}
                 className={cn(
-                  'w-full h-full object-cover',
-                  isCircular ? 'rounded-full' : (isBanner ? 'rounded-xl' : 'rounded-lg')
+                  "w-full h-full object-cover",
+                  isCircular ? "rounded-full" : (isBanner ? "rounded-xl" : "rounded-lg")
                 )}
               />
               {!disabled && (
@@ -157,26 +165,26 @@ export function ImageUpload({
           ) : (
             <div
               className={cn(
-                'w-full h-full bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/30',
-                isCircular ? 'rounded-full' : (isBanner ? 'rounded-xl' : 'rounded-lg'),
-                !disabled && 'hover:border-muted-foreground/50 hover:bg-muted/80'
+                "w-full h-full bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/30",
+                isCircular ? "rounded-full" : (isBanner ? "rounded-xl" : "rounded-lg"),
+                !disabled && "hover:border-muted-foreground/50 hover:bg-muted/80"
               )}
               onClick={handleFileSelect}
             >
               {isUploading ? (
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
               ) : (
                 <div className="flex flex-col items-center space-y-2 text-muted-foreground">
-                  {type === 'profile' ? (
+                  {type === "profile" ? (
                     <Camera className="w-8 h-8" />
-                  ) : type === 'banner' ? (
+                  ) : type === "banner" ? (
                     <ImageIcon className="w-8 h-8" />
                   ) : (
                     <Music className="w-8 h-8" />
                   )}
-                  {size !== 'sm' && (
+                  {size !== "sm" && (
                     <span className="text-xs text-center">
-                      Upload {type === 'profile' ? 'Photo' : type === 'banner' ? 'Banner' : 'Cover'}
+                      Upload {type === "profile" ? "Photo" : type === "banner" ? "Banner" : "Cover"}
                     </span>
                   )}
                 </div>
@@ -187,7 +195,7 @@ export function ImageUpload({
       </Card>
 
       {/* Upload button for smaller sizes */}
-      {size === 'sm' && !previewUrl && !disabled && (
+      {size === "sm" && !previewUrl && !disabled && (
         <Button
           type="button"
           size="sm"
@@ -210,13 +218,16 @@ export function ImageUpload({
         disabled={disabled || isUploading}
       />
 
-      {/* Upload instructions */}
-      {size === 'lg' && (
-        <div className="text-center text-sm text-muted-foreground max-w-xs">
-          <p>JPG, PNG, GIF up to 5MB</p>
-          <p>Recommended: {type === 'profile' ? '400x400px' : '640x640px'}</p>
-        </div>
-      )}
+      {/* Image Crop Modal */}
+      <ImageCropModal
+        open={showCropModal}
+        onClose={() => setShowCropModal(false)}
+        imageSrc={rawImageSrc}
+        aspectRatio={aspectRatio}
+        isCircular={isCircular}
+        title={`Crop ${type === "profile" ? "Avatar" : type === "banner" ? "Banner" : "Cover"} Image`}
+        onCropComplete={handleCropComplete}
+      />
     </div>
-  )
+  );
 }

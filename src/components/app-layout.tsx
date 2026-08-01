@@ -19,7 +19,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
 
-  const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register")
+  const isAuthPage = Boolean(pathname?.startsWith("/login") || pathname?.startsWith("/register"))
+  const isAdminPage = Boolean(pathname?.startsWith("/admin"))
   const showSidebar = session && !isAuthPage
 
   return (
@@ -57,7 +58,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex min-h-full w-full flex-col">
             <div className="flex-1 px-4 py-6 lg:px-8">{children}</div>
             {/* Footer is full-bleed; own padding lives inside SiteFooter */}
-            {!isAuthPage && <SiteFooter />}
+            {!isAuthPage && !isAdminPage && <SiteFooter />}
           </div>
         </main>
       </div>

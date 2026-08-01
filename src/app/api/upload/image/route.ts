@@ -25,17 +25,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Only image files are allowed' }, { status: 400 })
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ message: 'File size must be less than 5MB' }, { status: 400 })
+    // Validate file size (max 15MB)
+    if (file.size > 15 * 1024 * 1024) {
+      return NextResponse.json({ message: 'File size must be less than 15MB' }, { status: 400 })
     }
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
     // Generate unique R2 key
-    const fileExtension = file.name.split('.').pop()
-    const filename = `${entityId || session.user.id}_${Date.now()}.${fileExtension}`
+    const fileExtension = file.name ? file.name.split('.').pop() : 'jpg'
+    const filename = `${entityId || session.user.id}_${Date.now()}.${fileExtension || 'jpg'}`
     const r2Key = `${type}/${filename}` // 'profiles/...' or 'playlists/...'
 
     // Upload to R2

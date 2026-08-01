@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -101,7 +102,12 @@ interface SiteFooterProps {
 }
 
 export function SiteFooter({ className }: SiteFooterProps) {
+  const pathname = usePathname();
   const year = new Date().getFullYear();
+
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   const scrollToTop = () => {
     const main = document.querySelector("main");
@@ -114,7 +120,7 @@ export function SiteFooter({ className }: SiteFooterProps) {
 
   return (
     <footer
-      className={`relative w-full overflow-hidden border-t border-white/5 bg-black/40 mt-16 pt-16 pb-48 lg:pb-56 ${
+      className={`relative w-full overflow-hidden border-t border-white/5 bg-black/40 mt-12 pt-12 pb-4 lg:pb-6 ${
         className ?? ""
       }`}
     >

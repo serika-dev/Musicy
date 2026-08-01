@@ -229,28 +229,61 @@ export function useUpdateUserRole() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: 'ADMIN' | 'USER' }) => {
+    mutationFn: async ({ userId, role, isPremium, displayName, username, avatarUrl }: { 
+      userId: string; 
+      role?: 'ADMIN' | 'USER'; 
+      isPremium?: boolean;
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
+    }) => {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role, isPremium, displayName, username, avatarUrl }),
       })
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.message || 'Failed to update user role')
+        throw new Error(error.message || 'Failed to update user')
       }
 
       return response.json()
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
-      toast.success(`User role updated to ${data.role}`)
+      toast.success(`User updated successfully`)
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update user role: ${error.message}`)
+      toast.error(`Failed to update user: ${error.message}`)
+    },
+  })
+}
+
+export function useDeleteAlbum() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (albumId: string) => {
+      const response = await fetch(`/api/admin/albums/${albumId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to delete album')
+      }
+
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'albums'] })
+      toast.success('Album deleted successfully')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete album: ${error.message}`)
     },
   })
 }

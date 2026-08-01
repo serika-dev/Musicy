@@ -15,7 +15,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin
     const adminUser = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true }
@@ -26,31 +25,23 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const { id } = await params
-    const { role, isPremium, displayName, username, avatarUrl } = await request.json()
+    const { title, description, coverImageUrl, genre, isPublic, albumType } = await request.json()
 
-    const updatedUser = await prisma.user.update({
+    const updatedAlbum = await prisma.album.update({
       where: { id },
       data: {
-        ...(role && { role }),
-        ...(typeof isPremium === 'boolean' && { isPremium }),
-        ...(displayName !== undefined && { displayName: displayName || null }),
-        ...(username !== undefined && { username: username || null }),
-        ...(avatarUrl !== undefined && { avatarUrl: avatarUrl || null }),
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        displayName: true,
-        avatarUrl: true,
-        role: true,
-        isPremium: true,
+        ...(title && { title: title.trim() }),
+        ...(description !== undefined && { description: description || null }),
+        ...(coverImageUrl !== undefined && { coverImageUrl: coverImageUrl || null }),
+        ...(genre !== undefined && { genre: genre || null }),
+        ...(typeof isPublic === 'boolean' && { isPublic }),
+        ...(albumType && { albumType }),
       },
     })
 
-    return NextResponse.json(updatedUser)
+    return NextResponse.json(updatedAlbum)
   } catch (error) {
-    console.error('Error updating user:', error)
+    console.error('Error updating album:', error)
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
   }
 }
@@ -63,7 +54,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin
     const adminUser = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true }
@@ -75,29 +65,22 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     const { id } = await params
 
-    // Prevent admin from deleting themselves
-    if (id === session.user.id) {
-      return NextResponse.json({ message: 'Cannot delete your own account' }, { status: 400 })
-    }
-
-    // Check if user exists
-    const userToDelete = await prisma.user.findUnique({
+    const album = await prisma.album.findUnique({
       where: { id },
-      select: { id: true, role: true, email: true }
+      select: { id: true, title: true }
     })
 
-    if (!userToDelete) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 })
+    if (!album) {
+      return NextResponse.json({ message: 'Album not found' }, { status: 404 })
     }
 
-    // Delete user (cascade will handle related records)
-    await prisma.user.delete({
+    await prisma.album.delete({
       where: { id },
     })
 
-    return NextResponse.json({ message: 'User deleted successfully' })
+    return NextResponse.json({ message: 'Album deleted successfully' })
   } catch (error) {
-    console.error('Error deleting user:', error)
+    console.error('Error deleting album:', error)
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
   }
 }
