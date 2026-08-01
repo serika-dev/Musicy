@@ -4,6 +4,7 @@ import { Providers } from "@/components/providers/session-provider";
 import { Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { getSystemSetting } from "@/lib/settings";
 import "@/app/globals.css";
 
 const geistSans = Geist({
@@ -21,11 +22,31 @@ export const metadata: Metadata = {
   description: "Build the future of lossless music integration with Musicy APIs.",
 };
 
-export default function DevelopersLayout({
+export default async function DevelopersLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const isApiAccessEnabled = (await getSystemSetting("PUBLIC_API_ACCESS", "true")) === "true";
+
+  if (!isApiAccessEnabled) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-8 rounded-2xl space-y-4 shadow-2xl">
+          <div className="w-14 h-14 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl flex items-center justify-center mx-auto">
+            <span className="text-xl font-bold">403</span>
+          </div>
+          <h1 className="text-xl font-extrabold">Public API Access Disabled</h1>
+          <p className="text-xs text-zinc-400 font-medium">
+            Developer API access and OAuth application endpoints are currently disabled by the system administrator.
+          </p>
+          <a href="/" className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg">
+            Return to App
+          </a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white min-h-screen selection:bg-primary/30`}>
       <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/50 backdrop-blur-xl">

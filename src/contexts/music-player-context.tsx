@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { AutoplayWarning } from "@/components/autoplay-warning";
 import { WebScrobblerMetadata } from "@/components/web-scrobbler-metadata";
@@ -111,6 +112,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
+  const { data: session } = useSession();
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -937,6 +939,34 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       } else {
         setPlaybackContext({ type: "standalone" });
       }
+
+      // Check system settings for Anonymous Playback and Email Verification
+      fetch("/api/settings/public")
+        .then((res) => res.json())
+        .then((data) => {
+          const sys = data.settings || {};
+          const allowAnon = sys.ALLOW_ANONYMOUS_PLAYBACK !== "false" && sys.allow_anonymous_playback !== "false";
+          const reqEmail = sys.REQUIRE_EMAIL_VERIFICATION === "true" || sys.require_email_verification === "true";
+
+          if (!session?.user && !allowAnon) {
+            toast.error("Guest Playback Disabled", {
+              description: "Public audio streaming is disabled by system administrator. Please log in to listen.",
+              action: {
+                label: "Log in",
+                onClick: () => { window.location.href = "/login"; },
+              },
+            });
+            return;
+          }
+
+          if (session?.user && reqEmail && !(session.user as any)?.emailVerified) {
+            toast.error("Email Verification Required", {
+              description: "Email verification is required by system administrator before playing tracks.",
+            });
+            return;
+          }
+        })
+        .catch(() => {});
 
       // Check if track has a file path (restricted for logged-out users)
       if (!track.filePath) {

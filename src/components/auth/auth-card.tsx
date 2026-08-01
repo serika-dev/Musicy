@@ -43,11 +43,17 @@ export function AuthCard({ initialMode }: { initialMode: Mode }) {
   useEffect(() => {
     fetch("/api/settings/public")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) =>
-        setIsRegistrationAllowed(
-          data ? data.settings?.allow_registration !== "false" : true,
-        ),
-      )
+      .then((data) => {
+        if (!data || !data.settings) {
+          setIsRegistrationAllowed(true);
+          return;
+        }
+        const sys = data.settings;
+        // Prefer the uppercase key (what the admin panel writes).
+        // Only fall back to the old lowercase key if the uppercase one is absent.
+        const val = sys.ALLOW_REGISTRATION ?? sys.allow_registration ?? "true";
+        setIsRegistrationAllowed(val !== "false");
+      })
       .catch(() => setIsRegistrationAllowed(true));
   }, []);
 

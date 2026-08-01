@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/db"
+import { getSystemSetting } from "@/lib/settings"
 
 export async function validateApiKey(request: Request) {
+  const publicApiAccess = await getSystemSetting("PUBLIC_API_ACCESS", "true");
+  if (publicApiAccess === "false") {
+    return null; // Public API Access is disabled by admin!
+  }
+
   const authHeader = request.headers.get("Authorization")
   if (!authHeader?.startsWith("Bearer ")) return null
 

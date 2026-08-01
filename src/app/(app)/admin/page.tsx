@@ -484,7 +484,7 @@ export default function AdminPage() {
     }
   }, [activeTab]);
 
-  // Load system settings
+  // Load system settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       setIsSettingsLoading(true);
@@ -501,10 +501,8 @@ export default function AdminPage() {
       }
     };
 
-    if (activeTab === "settings") {
-      loadSettings();
-    }
-  }, [activeTab]);
+    loadSettings();
+  }, []);
 
   const handleUpdateSystemSetting = async (key: string, value: string) => {
     setIsUpdatingSettings(true);
@@ -1937,6 +1935,73 @@ export default function AdminPage() {
                   </div>
                 );
               })}
+
+              {/* Custom Database Stored Settings (if any exist beyond predefined ones) */}
+              {Object.keys(systemSettings).filter(
+                (k) =>
+                  ![
+                    "ALLOW_REGISTRATION",
+                    "PUBLIC_API_ACCESS",
+                    "MAINTENANCE_MODE",
+                    "ALLOW_ANONYMOUS_PLAYBACK",
+                    "REQUIRE_EMAIL_VERIFICATION",
+                    "SITE_NAME",
+                    "DEFAULT_AUDIO_QUALITY",
+                  ].includes(k)
+              ).length > 0 && (
+                <div className="pt-4 border-t border-zinc-800 space-y-3">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-purple-400">
+                    Custom Database Settings (Localhost / Custom Configs)
+                  </h4>
+                  {Object.keys(systemSettings)
+                    .filter(
+                      (k) =>
+                        ![
+                          "ALLOW_REGISTRATION",
+                          "PUBLIC_API_ACCESS",
+                          "MAINTENANCE_MODE",
+                          "ALLOW_ANONYMOUS_PLAYBACK",
+                          "REQUIRE_EMAIL_VERIFICATION",
+                          "SITE_NAME",
+                          "DEFAULT_AUDIO_QUALITY",
+                        ].includes(k)
+                    )
+                    .map((customKey) => (
+                      <div
+                        key={customKey}
+                        className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800"
+                      >
+                        <div className="space-y-0.5">
+                          <Label className="text-white font-bold text-xs">{customKey}</Label>
+                          <p className="text-[10px] text-zinc-400 font-mono">
+                            {systemSettings[customKey]}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={systemSettings[customKey] || ""}
+                            onChange={(e) =>
+                              setSystemSettings((prev) => ({
+                                ...prev,
+                                [customKey]: e.target.value,
+                              }))
+                            }
+                            className="w-48 h-8 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              handleUpdateSystemSetting(customKey, systemSettings[customKey] || "")
+                            }
+                            className="h-8 bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white"
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

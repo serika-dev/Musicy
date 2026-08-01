@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
+import { getSystemSetting } from "@/lib/settings"
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if registration is allowed
-    const model = (prisma as any).systemSetting || (prisma as any).system_setting || (prisma as any).SystemSetting;
-    const registrationSetting = model ? await model.findUnique({
-      where: { key: "allow_registration" }
-    }) : null;
-    
-    // Default to true if not set, but if set to "false", block registration
-    if (registrationSetting?.value === "false") {
+    // Enforce System Setting for User Registration
+    const allowRegistration = await getSystemSetting("ALLOW_REGISTRATION", "true");
+    if (allowRegistration === "false") {
       return NextResponse.json(
-        { message: "Registration is currently disabled by administrator" },
+        { message: "User registration is currently disabled by system administrator." },
         { status: 403 }
-      )
+      );
     }
 
     const { email, password, username, displayName } = await request.json()

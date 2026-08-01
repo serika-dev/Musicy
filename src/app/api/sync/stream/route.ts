@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       const heartbeat = setInterval(() => {
         send(`: ping\n\n`);
         prisma.device
-          .update({
+          .updateMany({
             where: { id: deviceId },
             data: { lastSeenAt: new Date() },
           })
@@ -98,14 +98,14 @@ export async function GET(request: NextRequest) {
         try {
           // Drop the row when the last stream for this id closes so ghosts
           // don't linger in the picker. Active flag is cleared first.
-          await prisma.device.update({
+          await prisma.device.updateMany({
             where: { id: deviceId },
             data: { isActive: false, lastSeenAt: new Date(0) },
           });
           // If no other live stream holds this id, delete the record
           if (!isDeviceLive(userId, deviceId)) {
             await prisma.device
-              .delete({ where: { id: deviceId } })
+              .deleteMany({ where: { id: deviceId } })
               .catch(() => {});
           }
         } catch {
