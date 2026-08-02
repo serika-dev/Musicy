@@ -72,15 +72,30 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ message: 'Collab not found' }, { status: 404 })
     }
 
-    // Find member artists by splitting name
-    const memberNames = collab.name.split(' & ').map(n => n.trim()).filter(Boolean)
-    const members: { id: string; name: string; imageUrl: string | null; verified: boolean }[] = []
-    for (const name of memberNames) {
-      const found = await prisma.artist.findFirst({
-        where: { name: { equals: name, mode: 'insensitive' } },
-        select: { id: true, name: true, imageUrl: true, verified: true },
-      })
-      if (found) members.push(found)
+    // Find member artists via explicit CollabMember relation, fall back to name splitting
+    let members: { id: string; name: string; imageUrl: string | null; verified: boolean }[] = []
+    const explicitMembers = await prisma.collabMember.findMany({
+      where: { collabId: id },
+      include: {
+        member: {
+          select: { id: true, name: true, imageUrl: true, verified: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (explicitMembers.length > 0) {
+      members = explicitMembers.map(m => m.member)
+    } else {
+      // Fallback: split name by ' & ' for legacy collabs
+      const memberNames = collab.name.split(' & ').map(n => n.trim()).filter(Boolean)
+      for (const name of memberNames) {
+        const found = await prisma.artist.findFirst({
+          where: { name: { equals: name, mode: 'insensitive' } },
+          select: { id: true, name: true, imageUrl: true, verified: true },
+        })
+        if (found) members.push(found)
+      }
     }
 
     return NextResponse.json({ ...collab, members })
@@ -120,45 +135,33 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ message: 'Collab not found' }, { status: 404 })
     }
 
-    let newName = collab.name
-
-    // If memberIds provided, rebuild name from member names
+    // If memberIds provided, update the CollabMember relation (without renaming the collab)
     if (memberIds && Array.isArray(memberIds)) {
-      const memberArtists = await prisma.artist.findMany({
-        where: { id: { in: memberIds } },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      })
-
-      if (memberArtists.length < 2) {
+      if (memberIds.length < 2) {
         return NextResponse.json(
           { message: 'A collaboration needs at least 2 artists' },
           { status: 400 }
         )
       }
 
-      newName = memberArtists.map(a => a.name).join(' & ')
-
-      // Check name uniqueness (excluding self)
-      const existing = await prisma.artist.findFirst({
-        where: {
-          name: { equals: newName, mode: 'insensitive' },
-          id: { not: id },
-        },
+      // Delete existing CollabMember entries for this collab
+      await prisma.collabMember.deleteMany({
+        where: { collabId: id },
       })
-      if (existing) {
-        return NextResponse.json(
-          { message: `Artist "${newName}" already exists` },
-          { status: 409 }
-        )
-      }
+
+      // Create new CollabMember entries
+      await prisma.collabMember.createMany({
+        data: memberIds.map(memberId => ({
+          collabId: id,
+          memberId,
+        })),
+      })
     }
 
-    // Update the collab artist
+    // Update the collab artist metadata (name is NOT changed)
     const updated = await prisma.artist.update({
       where: { id },
       data: {
-        name: newName,
         ...(bio !== undefined && { bio: bio || null }),
         ...(website !== undefined && { website: website || null }),
         ...(typeof verified === 'boolean' && { verified }),
@@ -215,16 +218,17 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       }
     }
 
-    // Fetch updated members
-    const memberNames = newName.split(' & ').map(n => n.trim()).filter(Boolean)
-    const members: { id: string; name: string; imageUrl: string | null; verified: boolean }[] = []
-    for (const name of memberNames) {
-      const found = await prisma.artist.findFirst({
-        where: { name: { equals: name, mode: 'insensitive' } },
-        select: { id: true, name: true, imageUrl: true, verified: true },
-      })
-      if (found) members.push(found)
-    }
+    // Fetch updated members from the explicit relation
+    const explicitMembers = await prisma.collabMember.findMany({
+      where: { collabId: id },
+      include: {
+        member: {
+          select: { id: true, name: true, imageUrl: true, verified: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+    const members = explicitMembers.map(m => m.member)
 
     return NextResponse.json({ ...updated, members })
   } catch (error) {

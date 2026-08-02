@@ -426,8 +426,8 @@ export default function AdminPage() {
     setCollabMembers(collabMembers.filter(m => m.id !== memberId));
   };
 
-  const collabPreviewName = collabMembers.length > 0
-    ? collabMembers.map(m => m.name).join(' & ')
+  const collabMemberNames = collabMembers.length > 0
+    ? collabMembers.map(m => m.name).join(', ')
     : '';
 
   const filteredAvailableArtists = availableArtists
@@ -2557,10 +2557,15 @@ export default function AdminPage() {
           <div className="space-y-5 py-3">
             {/* Preview name */}
             <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/20">
-              <Label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Collaboration Name (auto-generated)</Label>
+              <Label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Collaboration Name</Label>
               <p className="text-lg font-black text-white mt-1">
-                {collabPreviewName || "Add at least 2 members..."}
+                {editingCollab?.name || "Loading..."}
               </p>
+              {collabMemberNames && (
+                <p className="text-xs text-purple-300/70 font-medium mt-1">
+                  Members: {collabMemberNames}
+                </p>
+              )}
             </div>
 
             {/* Member artists management */}
@@ -2653,7 +2658,7 @@ export default function AdminPage() {
               <Avatar className="h-14 w-14 border-2 border-purple-500/40 shadow-lg shrink-0">
                 <AvatarImage src={collabForm.imageUrl} alt="Collab" />
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-bold text-lg">
-                  {(collabPreviewName?.charAt(0) || "C").toUpperCase()}
+                  {(editingCollab?.name?.charAt(0) || "C").toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">

@@ -160,24 +160,59 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
     const isCollab = artist.isCollab === true || (artist.isCollab === null && artist.name.includes(' & '))
 
-    // For collaborative artists, find the individual artists
+    // For collaborative artists, find the individual member artists
+    // Prefer explicit CollabMember relation, fall back to name splitting for legacy data
     let collaborationArtists: { id: string; name: string; imageUrl: string | null; verified: boolean }[] = []
     if (isCollab) {
-      const individualNames = artist.name.split(' & ').map(n => n.trim()).filter(Boolean)
-      for (const name of individualNames) {
-        const found = await prisma.artist.findFirst({
-          where: { name: { equals: name, mode: 'insensitive' } },
-          select: { id: true, name: true, imageUrl: true, verified: true },
-        })
-        if (found) collaborationArtists.push(found)
+      // Try explicit relation first
+      const explicitMembers = await prisma.collabMember.findMany({
+        where: { collabId: id },
+        include: {
+          member: {
+            select: { id: true, name: true, imageUrl: true, verified: true },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+
+      if (explicitMembers.length > 0) {
+        collaborationArtists = explicitMembers.map(m => m.member)
+      } else {
+        // Fallback: split name by ' & ' for legacy collabs without explicit members
+        const individualNames = artist.name.split(' & ').map(n => n.trim()).filter(Boolean)
+        for (const name of individualNames) {
+          const found = await prisma.artist.findFirst({
+            where: { name: { equals: name, mode: 'insensitive' } },
+            select: { id: true, name: true, imageUrl: true, verified: true },
+          })
+          if (found) collaborationArtists.push(found)
+        }
       }
     }
 
-    // For individual artists, find collaborations (collab artists whose name includes this artist's name)
+    // For individual artists, find collaborations they're part of
+    // Prefer explicit CollabMember relation, fall back to name matching for legacy data
     let collaborations: { id: string; name: string; imageUrl: string | null; bio: string | null }[] = []
     if (!isCollab) {
-      const collabArtists = await prisma.artist.findMany({
+      // Try explicit relation first
+      const explicitCollabs = await prisma.collabMember.findMany({
+        where: { memberId: id },
+        include: {
+          collab: {
+            select: { id: true, name: true, imageUrl: true, bio: true },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+
+      if (explicitCollabs.length > 0) {
+        collaborations = explicitCollabs.map(c => c.collab)
+      }
+
+      // Also check legacy name-based matching for collabs not yet migrated
+      const legacyCollabArtists = await prisma.artist.findMany({
         where: {
+          id: { notIn: collaborations.map(c => c.id) },
           OR: [
             { isCollab: true, name: { startsWith: `${artist.name} & `, mode: 'insensitive' } },
             { isCollab: true, name: { contains: ` & ${artist.name}`, mode: 'insensitive' } },
@@ -189,7 +224,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         },
         select: { id: true, name: true, imageUrl: true, bio: true },
       })
-      collaborations = collabArtists
+      collaborations = [...collaborations, ...legacyCollabArtists]
     }
 
     // Attach follow state

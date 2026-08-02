@@ -6,7 +6,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto"
 
 export const dynamic = "force-dynamic"
 
-const ACCOUNTS_URL = (process.env.SERIKA_ACCOUNTS_URL || "http://localhost:3600").replace(/\/$/, "")
+const ACCOUNTS_URL = (process.env.SERIKA_ACCOUNTS_URL || "https://accounts.serika.dev").replace(/\/$/, "")
 const MUSICY_BASE_URL = (process.env.MUSICY_BASE_URL || "http://localhost:3002").replace(/\/$/, "")
 const OAUTH_CLIENT_ID = process.env.MUSICY_OAUTH_CLIENT_ID || "serika-music"
 const OAUTH_CLIENT_SECRET = process.env.MUSICY_OAUTH_CLIENT_SECRET || ""

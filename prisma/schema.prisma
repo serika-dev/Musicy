@@ -130,7 +130,25 @@ model Artist {
   featuredInTracks Track[] @relation("TrackFeatures")
   featuredInAlbums Album[] @relation("AlbumFeatures")
 
+  // Collaboration relations
+  collabMembers     CollabMember[] @relation("CollabGroup")
+  collabOf          CollabMember[] @relation("CollabMember")
+
   @@map("artists")
+}
+
+// Explicit many-to-many for collaboration members
+// Allows collabs like "Chatter Chatter" to have members without " & " in the name
+model CollabMember {
+  id        String   @id @default(cuid())
+  collabId  String
+  collab    Artist   @relation("CollabGroup", fields: [collabId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    Artist   @relation("CollabMember", fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([collabId, memberId])
+  @@map("artist_collab_members")
 }
 
 model Album {
