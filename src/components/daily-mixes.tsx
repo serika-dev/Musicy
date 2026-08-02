@@ -1,28 +1,24 @@
 "use client"
 
-import Link from "next/link"
-import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { useDailyMixes } from "@/hooks/useDailyMixes"
 import { useMusicPlayer } from "@/contexts/music-player-context"
-import { Play, Pause } from "lucide-react"
+import { Carousel, CarouselSlide } from "@/components/shared/carousel"
+import { MediaCard } from "@/components/shared/media-card"
 
 export function DailyMixes() {
   const { data: dailyMixes, isLoading, error } = useDailyMixes()
-  const { playTrack, isPlaying, currentTrack } = useMusicPlayer()
+  const { playTrack } = useMusicPlayer()
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="p-4 animate-pulse">
-            <CardContent className="p-0">
-              <div className="w-full aspect-square bg-muted rounded-lg mb-4"></div>
-              <div className="h-6 bg-muted rounded mb-2"></div>
-              <div className="h-4 bg-muted rounded w-3/4"></div>
-            </CardContent>
-          </Card>
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex-none basis-[calc(45%-0.75rem)] sm:basis-[calc(33.333%-0.75rem)] md:basis-[calc(25%-0.75rem)] lg:basis-[calc(20%-0.75rem)] xl:basis-[calc(16.666%-0.75rem)] animate-pulse">
+            <div className="aspect-square bg-muted rounded-lg mb-2" />
+            <div className="h-4 bg-muted rounded mb-1 w-full" />
+            <div className="h-3 bg-muted rounded w-2/3" />
+          </div>
         ))}
       </div>
     )
@@ -50,81 +46,20 @@ export function DailyMixes() {
     }
   }
 
-  const isCurrentMixPlaying = (mix: any) => {
-    return mix.tracks?.some((track: any) => 
-      currentTrack?.id === track.id && isPlaying
-    )
-  }
-
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+    <Carousel>
       {dailyMixes.map((mix) => (
-        <Card 
-          key={mix.id} 
-          className="group hover:bg-card/60 transition-all duration-300 overflow-hidden cursor-pointer border-0 bg-transparent p-0 shadow-none"
-        >
-          <Link href={`/daily-mixes/${mix.id}`}>
-            <CardContent className="p-0 space-y-3">
-              {/* Cover Image Container */}
-              <div className="relative aspect-square bg-gradient-to-br from-primary/20 via-primary/30 to-primary/40 overflow-hidden rounded-md shadow-md">
-                {mix.coverImageUrl ? (
-                  <Image
-                    src={mix.coverImageUrl}
-                    alt={mix.name}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-                    priority={false}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted via-muted/80 to-muted/60">
-                    <div className="text-4xl opacity-40">🎵</div>
-                  </div>
-                )}
-                
-                {/* Play Button Overlay */}
-                <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                  <Button
-                    size="icon"
-                    className={`rounded-full w-10 h-10 shadow-lg ${
-                      isCurrentMixPlaying(mix) 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-primary text-primary-foreground'
-                    }`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handlePlayMix(mix)
-                    }}
-                  >
-                    {isCurrentMixPlaying(mix) ? (
-                      <Pause className="h-5 w-5" />
-                    ) : (
-                      <Play className="h-5 w-5 ml-0.5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Mix Info Compact */}
-              <div className="px-1">
-                <h3 className="font-bold text-sm leading-tight truncate">
-                  {mix.name}
-                </h3>
-                <p className="text-xs text-muted-foreground line-clamp-1 mt-1 font-medium">
-                  {mix.description}
-                </p>
-                <div className="flex items-center mt-1">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold opacity-70">
-                    Daily Mix • {mix.tracks?.length || 0} tracks
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Link>
-        </Card>
+        <CarouselSlide key={mix.id}>
+          <MediaCard
+            href={`/daily-mixes/${mix.id}`}
+            title={mix.name}
+            subtitle={mix.description}
+            imageUrl={mix.coverImageUrl}
+            badge={`${mix.tracks?.length || 0} tracks`}
+            onPlay={(e) => { e.preventDefault(); e.stopPropagation(); handlePlayMix(mix) }}
+          />
+        </CarouselSlide>
       ))}
-    </div>
-
+    </Carousel>
   )
 }

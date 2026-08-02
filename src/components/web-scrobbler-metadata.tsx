@@ -141,14 +141,16 @@ export function WebScrobblerMetadata({
         updateMetaTag('og:image', currentTrack.album.coverImageUrl)
       }
 
-      console.log('🎵 Web Scrobbler metadata updated:', {
-        title: currentTrack.title,
-        artist: currentTrack.artist.name,
-        album: currentTrack.album?.title,
-        isPlaying,
-        currentTime,
-        duration
-      })
+      // Update the <audio> element attributes so Web Scrobbler can detect track changes
+      const audioEl = document.querySelector('audio[aria-label="Music player"]')
+      if (audioEl) {
+        audioEl.setAttribute('data-track-title', currentTrack.title)
+        audioEl.setAttribute('data-track-artist', currentTrack.artist.name)
+        if (currentTrack.album?.title) {
+          audioEl.setAttribute('data-track-album', currentTrack.album.title)
+        }
+        audioEl.setAttribute('data-is-playing', isPlaying.toString())
+      }
     }
 
     updateScrobblerElements()

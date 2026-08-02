@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
         { title: { contains: search, mode: 'insensitive' } },
         { artist: { name: { contains: search, mode: 'insensitive' } } },
         { album: { title: { contains: search, mode: 'insensitive' } } },
+        { genre: { contains: search, mode: 'insensitive' } },
+        { featuredArtists: { some: { name: { contains: search, mode: 'insensitive' } } } },
       ]
     }
 
@@ -98,6 +100,7 @@ export async function GET(request: NextRequest) {
       total,
       limit,
       offset,
+      hasMore: offset + tracks.length < total,
     })
   } catch (error) {
     console.error("Error fetching tracks:", error)

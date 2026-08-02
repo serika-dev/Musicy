@@ -60,14 +60,14 @@ export function QuickAccess() {
 
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 gap-2 md:gap-4">
       {items.map((item, i) => (
-        <Link key={i} href={item.href} className="group relative overflow-hidden bg-card/40 hover:bg-card/60 transition-all rounded-md">
-          <div className="flex items-center gap-4">
-            <div className={`w-16 h-16 bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform duration-300`}>
-              <item.icon className="w-7 h-7 text-white" />
+        <Link key={i} href={item.href} className="group relative overflow-hidden bg-card/40 hover:bg-card/60 transition-all rounded-lg md:rounded-md">
+          <div className="flex items-center gap-3 md:gap-4 p-1">
+            <div className={`w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform duration-300 rounded-md`}>
+              <item.icon className="w-5 h-5 md:w-7 md:h-7 text-white" />
             </div>
-            <span className="font-bold text-sm md:text-base leading-none truncate pr-12">
+            <span className="font-bold text-xs md:text-sm lg:text-base leading-none truncate pr-8 md:pr-12">
               {item.name}
             </span>
             <Button 

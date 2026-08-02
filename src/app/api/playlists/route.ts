@@ -18,13 +18,21 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number(searchParams.get('limit')) || 10, 50)
     const offset = Math.max(Number(searchParams.get('offset')) || 0, 0)
     const userOnly = searchParams.get('userOnly') === 'true'
+    const search = searchParams.get('search')
     
-    let whereClause = {}
+    let whereClause: any = {}
     
     if (userOnly && session) {
       whereClause = { ownerId: session.user.id }
     } else {
       whereClause = { isPublic: true }
+    }
+
+    if (search) {
+      whereClause = {
+        ...whereClause,
+        name: { contains: search, mode: 'insensitive' },
+      }
     }
 
     const [playlists, total] = await Promise.all([

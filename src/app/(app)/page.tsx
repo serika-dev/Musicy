@@ -1,6 +1,6 @@
 "use client";
 
-import { Headphones, ListMusic, Music2, Play } from "lucide-react";
+import { Headphones, ListMusic, Music2, Play, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
@@ -9,19 +9,20 @@ import { ArtistImage } from "@/components/artist-image";
 import { DailyMixes } from "@/components/daily-mixes";
 import { FeaturedPlaylists } from "@/components/featured-playlists";
 import { QuickAccess } from "@/components/quick-access";
-import { RecentlyAdded } from "@/components/recently-added";
+import { Carousel, CarouselSlide } from "@/components/shared/carousel";
 import { MediaCard } from "@/components/shared/media-card";
 import { SectionHeader } from "@/components/shared/section-header";
+import { NewReleasesCards } from "@/components/new-releases-cards";
 import { Button } from "@/components/ui/button";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import { useAlbums } from "@/hooks/useAlbums";
-import { useArtists } from "@/hooks/useArtists";
+import { useFollowedArtists } from "@/hooks/useFollowedArtists";
+import { useUserFeed } from "@/hooks/useUserFeed";
 
 export default function Home() {
   const { data: session } = useSession();
   const [greeting, setGreeting] = useState("");
-  const { data: artistsData } = useArtists(undefined, 6, 0);
-  const { data: albumsData } = useAlbums(undefined, 6, 0);
+  const { data: feedData } = useUserFeed();
+  const { data: followedArtistsData } = useFollowedArtists(12, 0);
   const { playTrack } = useMusicPlayer();
 
   useEffect(() => {
@@ -64,14 +65,29 @@ export default function Home() {
 
   if (session) {
     const spotlightAlbum =
-      albumsData?.albums?.find((a) => a.coverImageUrl) ||
-      albumsData?.albums?.[0];
+      feedData?.followedAlbums?.find((a) => a.coverImageUrl) ||
+      feedData?.followedAlbums?.[0];
+
+    const followedArtists = followedArtistsData?.artists || [];
+    const recentlyPlayed = feedData?.recentlyPlayed || [];
+    const topArtists = feedData?.topArtists || [];
+    const recommendedArtists = feedData?.recommendedArtists || [];
 
     return (
-      <div className="space-y-10 pb-20">
-        {/* Immersive Greeting */}
-        <section className="pt-4 lg:pt-0">
-          <h1 className="text-3xl lg:text-5xl font-black tracking-tighter animate-in fade-in slide-in-from-left duration-1000">
+      <div className="space-y-8 pb-6 md:space-y-10">
+        {/* Featured Hero Spotlight - Full Bleed Top Banner */}
+        {(spotlightAlbum || (feedData?.followedAlbums && feedData.followedAlbums.length > 0)) && (
+          <section className="animate-in fade-in duration-700 -mx-3 -mt-4 md:-mx-6 md:-mt-6 lg:-mx-8 lg:-mt-6 mb-8">
+            <AlbumSpotlight
+              album={spotlightAlbum as any}
+              albums={feedData?.followedAlbums as any}
+            />
+          </section>
+        )}
+
+        {/* Greeting + Quick Access Grid */}
+        <section className="space-y-6 pt-2 lg:pt-0">
+          <h1 className="text-3xl lg:text-5xl font-black tracking-tighter animate-in fade-in slide-in-from-left duration-700">
             {greeting.split(",")[0]}
             <span className="text-primary">.</span>
             <br />
@@ -79,89 +95,272 @@ export default function Home() {
               {greeting.split(",")[1]}
             </span>
           </h1>
-        </section>
-
-        {/* Hero Spotlight */}
-        {spotlightAlbum && (
-          <section className="animate-in fade-in zoom-in-95 duration-1000 -mx-4 lg:mx-0">
-            <AlbumSpotlight album={spotlightAlbum} />
-          </section>
-        )}
-
-        {/* Quick Access */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-bold tracking-tight px-1">
-            Jump Back In
-          </h2>
           <QuickAccess />
         </section>
 
-        {/* Discover - Horizontal Scroll on Mobile */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-2xl font-bold tracking-tight">Discover</h2>
-          </div>
-          <div className="flex flex-col gap-8">
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold px-1">Your Daily Mixes</h3>
-              <DailyMixes />
-            </div>
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold px-1">Community Playlists</h3>
-              <FeaturedPlaylists />
-            </div>
-          </div>
-        </section>
-
-        {/* Top Albums */}
-        <section className="space-y-6">
-          <SectionHeader title="Top Albums" href="/albums" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {albumsData?.albums?.map((album) => (
-              <MediaCard
-                key={album.id}
-                href={`/albums/${album.id}`}
-                title={album.title}
-                subtitle={album.artist.name}
-                imageUrl={album.coverImageUrl}
-                badge="Album"
-                onPlay={(e) => handlePlayAlbum(e, album.id)}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Top Artists - Circular Horizontal Scroll */}
-        <section className="space-y-6">
-          <SectionHeader title="Favorite Artists" href="/artists" />
-          <div className="flex lg:grid lg:grid-cols-6 gap-6 overflow-x-auto pb-4 -mx-4 px-4 no-scrollbar lg:mx-0 lg:px-0">
-            {artistsData?.artists?.map((artist) => (
-              <Link
-                key={artist.id}
-                href={`/artists/${artist.id}`}
-                className="group flex flex-col items-center flex-shrink-0 w-24 lg:w-auto"
-              >
-                <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-3 ring-1 ring-border/10 group-active:scale-95 transition-transform duration-300">
-                  <ArtistImage
-                    artistId={artist.id}
-                    artistImageUrl={artist.imageUrl}
-                    artistName={artist.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    fallbackClassName="w-full h-full flex items-center justify-center bg-secondary/30"
-                  />
+        {/* Jump Back In - Recently Played */}
+        {recentlyPlayed.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <SectionHeader title="Jump Back In" subtitle="Pick up where you left off" />
+            {recentlyPlayed.length === 1 ? (
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-card via-card/90 to-background p-4 sm:p-5 flex items-center justify-between gap-4 group shadow-xl hover:border-primary/30 transition-all">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
+                    <img
+                      src={recentlyPlayed[0].album?.coverImageUrl || recentlyPlayed[0].coverImageUrl || "/placeholder-album.png"}
+                      alt={recentlyPlayed[0].title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); playTrack(recentlyPlayed[0]); }}
+                      className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Play className="w-8 h-8 fill-white text-white" />
+                    </button>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Last Played</span>
+                    <h3 className="font-bold text-base sm:text-lg text-foreground truncate">
+                      {recentlyPlayed[0].title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                      {recentlyPlayed[0].artist?.name}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[11px] font-bold truncate w-full text-center">
-                  {artist.name}
-                </p>
-              </Link>
-            ))}
-          </div>
+                <Button
+                  size="lg"
+                  className="rounded-full px-6 h-11 bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 shrink-0 hover:scale-105 active:scale-95 transition-all"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); playTrack(recentlyPlayed[0]); }}
+                >
+                  <Play className="mr-2 h-4 w-4 fill-current shrink-0" />
+                  Resume
+                </Button>
+              </div>
+            ) : (
+              <Carousel>
+                {recentlyPlayed.slice(0, 12).map((track) => (
+                  <CarouselSlide key={track.id}>
+                    <MediaCard
+                      href={`/tracks/${track.id}`}
+                      title={track.title}
+                      subtitle={track.artist?.name}
+                      subtitleHref={track.artist ? `/artists/${track.artist.id}` : undefined}
+                      imageUrl={track.album?.coverImageUrl || track.coverImageUrl}
+                      onPlay={(e) => { e.preventDefault(); e.stopPropagation(); playTrack(track); }}
+                    />
+                  </CarouselSlide>
+                ))}
+              </Carousel>
+            )}
+          </section>
+        )}
+
+        {/* New from Followed Artists */}
+        {feedData && feedData.followedAlbums.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <SectionHeader
+              title="New from Artists You Follow"
+              href="/albums"
+            />
+            <Carousel>
+              {feedData.followedAlbums.slice(0, 12).map((album) => (
+                <CarouselSlide key={album.id}>
+                  <MediaCard
+                    href={`/albums/${album.id}`}
+                    title={album.title}
+                    subtitle={album.artist.name}
+                    subtitleHref={`/artists/${album.artist.id}`}
+                    imageUrl={album.coverImageUrl}
+                    badge={
+                      album.albumType === "SINGLE"
+                        ? "Single"
+                        : album.albumType === "EP"
+                          ? "EP"
+                          : "Album"
+                    }
+                    onPlay={(e) => handlePlayAlbum(e, album.id)}
+                  />
+                </CarouselSlide>
+              ))}
+            </Carousel>
+          </section>
+        )}
+
+        {/* Recommended for You - Card carousel */}
+        {feedData && feedData.recommendedTracks.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold tracking-tight">
+                Recommended for You
+              </h2>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-muted-foreground font-semibold"
+                asChild
+              >
+                <Link href="/tracks">View all</Link>
+              </Button>
+            </div>
+            <Carousel>
+              {feedData.recommendedTracks.slice(0, 12).map((track) => (
+                <CarouselSlide key={track.id}>
+                  <MediaCard
+                    href={`/tracks/${track.id}`}
+                    title={track.title}
+                    subtitle={track.artist?.name}
+                    subtitleHref={track.artist ? `/artists/${track.artist.id}` : undefined}
+                    imageUrl={track.album?.coverImageUrl || track.coverImageUrl}
+                    onPlay={(e) => { e.preventDefault(); e.stopPropagation(); playTrack(track); }}
+                  />
+                </CarouselSlide>
+              ))}
+            </Carousel>
+          </section>
+        )}
+
+        {/* Daily Mixes */}
+        <section className="space-y-4 md:space-y-6">
+          <SectionHeader title="Your Daily Mixes" href="/daily-mixes" />
+          <DailyMixes />
         </section>
 
-        {/* Quick List Section */}
-        <section className="bg-gradient-to-b from-card/30 to-card/10 rounded-3xl p-6 border border-border/5">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold tracking-tight">New Releases</h2>
+        {/* Your Top Artists */}
+        {topArtists.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <SectionHeader title="Your Top Artists" href="/artists" />
+            <Carousel>
+              {topArtists.map((artist) => (
+                <CarouselSlide key={artist.id}>
+                  <Link
+                    href={`/artists/${artist.id}`}
+                    className="group flex flex-col items-center"
+                  >
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-2 ring-1 ring-border/10 group-active:scale-95 transition-transform duration-300">
+                      <ArtistImage
+                        artistId={artist.id}
+                        artistImageUrl={artist.imageUrl}
+                        artistName={artist.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        fallbackClassName="w-full h-full flex items-center justify-center bg-secondary/30"
+                      />
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold truncate w-full text-center">
+                      {artist.name}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      {artist._count.tracks} tracks
+                    </p>
+                  </Link>
+                </CarouselSlide>
+              ))}
+            </Carousel>
+          </section>
+        )}
+
+        {/* Artists We Think You'll Like */}
+        {recommendedArtists.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <SectionHeader title="Artists We Think You'll Like" href="/artists" />
+            <Carousel>
+              {recommendedArtists.map((artist) => (
+                <CarouselSlide key={artist.id}>
+                  <Link
+                    href={`/artists/${artist.id}`}
+                    className="group flex flex-col items-center"
+                  >
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-2 ring-1 ring-border/10 group-active:scale-95 transition-transform duration-300">
+                      <ArtistImage
+                        artistId={artist.id}
+                        artistImageUrl={artist.imageUrl}
+                        artistName={artist.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        fallbackClassName="w-full h-full flex items-center justify-center bg-secondary/30"
+                      />
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold truncate w-full text-center">
+                      {artist.name}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      {artist._count.tracks} tracks
+                    </p>
+                  </Link>
+                </CarouselSlide>
+              ))}
+            </Carousel>
+          </section>
+        )}
+
+        {/* Discover Albums (matching liked genres) */}
+        {feedData && feedData.discoverAlbums.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <SectionHeader
+              title="More to Explore"
+              subtitle="Based on your listening taste"
+              href="/albums"
+            />
+            <Carousel>
+              {feedData.discoverAlbums.slice(0, 12).map((album) => (
+                <CarouselSlide key={album.id}>
+                  <MediaCard
+                    href={`/albums/${album.id}`}
+                    title={album.title}
+                    subtitle={album.artist.name}
+                    subtitleHref={`/artists/${album.artist.id}`}
+                    imageUrl={album.coverImageUrl}
+                    badge="Album"
+                    onPlay={(e) => handlePlayAlbum(e, album.id)}
+                  />
+                </CarouselSlide>
+              ))}
+            </Carousel>
+          </section>
+        )}
+
+        {/* Followed Artists */}
+        {followedArtists.length > 0 && (
+          <section className="space-y-4 md:space-y-6">
+            <SectionHeader title="Artists You Follow" href="/artists" />
+            <Carousel>
+              {followedArtists.map((artist) => (
+                <CarouselSlide key={artist.id}>
+                  <Link
+                    href={`/artists/${artist.id}`}
+                    className="group flex flex-col items-center"
+                  >
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden bg-muted mb-2 ring-1 ring-border/10 group-active:scale-95 transition-transform duration-300">
+                      <ArtistImage
+                        artistId={artist.id}
+                        artistImageUrl={artist.imageUrl}
+                        artistName={artist.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        fallbackClassName="w-full h-full flex items-center justify-center bg-secondary/30"
+                      />
+                    </div>
+                    <p className="text-[11px] sm:text-xs font-bold truncate w-full text-center">
+                      {artist.name}
+                    </p>
+                  </Link>
+                </CarouselSlide>
+              ))}
+            </Carousel>
+          </section>
+        )}
+
+        {/* Community Playlists */}
+        <section className="space-y-4 md:space-y-6">
+          <SectionHeader title="Community Playlists" href="/playlists" />
+          <FeaturedPlaylists />
+        </section>
+
+        {/* New Releases - Card carousel */}
+        <section className="space-y-4 md:space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold tracking-tight">New Releases</h2>
+            </div>
             <Button
               variant="link"
               size="sm"
@@ -171,7 +370,7 @@ export default function Home() {
               <Link href="/tracks">View all</Link>
             </Button>
           </div>
-          <RecentlyAdded />
+          <NewReleasesCards />
         </section>
       </div>
     );
@@ -181,36 +380,40 @@ export default function Home() {
   return (
     <div className="space-y-16 pb-8">
       {/* Hero */}
-      <section className="relative text-center py-20">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent rounded-lg" />
-        <div className="relative max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-primary/15 via-background to-background p-8 md:p-14 lg:p-20 text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/20 rounded-full blur-[100px] pointer-events-none" />
+        <div className="relative max-w-3xl mx-auto space-y-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/20 border border-primary/30 text-primary text-xs sm:text-sm font-black tracking-wide shadow-lg shadow-primary/10 backdrop-blur-md">
             <Headphones className="w-4 h-4" />
-            Lossless Streaming
+            24-Bit FLAC Lossless Audio
           </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tight">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.08] drop-shadow-md">
             Music the way it was{" "}
-            <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
               meant to be heard
             </span>
           </h1>
-          <p className="text-muted-foreground text-base md:text-lg mb-8 max-w-xl mx-auto">
-            Stream in FLAC quality. Create playlists. Discover new artists. Part
-            of the Serika ecosystem.
+          <p className="text-muted-foreground text-base md:text-xl max-w-2xl mx-auto font-medium leading-relaxed">
+            Experience uncompressed studio fidelity. Build custom playlists, sync across devices, and discover underground tracks.
           </p>
-          <div className="flex gap-3 justify-center">
+          <div className="flex flex-wrap gap-4 justify-center pt-2">
             <Button
               size="lg"
-              className="bg-primary hover:bg-primary/90"
+              className="rounded-full px-9 h-13 text-base font-black bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all hover:scale-105"
               asChild
             >
               <Link href="/login">
-                <Play className="mr-2 h-5 w-5" />
+                <Play className="mr-2.5 h-5 w-5 fill-current" />
                 Start Listening
               </Link>
             </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/register">Create Account</Link>
+            <Button
+              variant="outline"
+              size="lg"
+              className="rounded-full px-8 h-13 text-base font-bold bg-white/5 hover:bg-white/10 border-white/15 backdrop-blur-xl text-white transition-all hover:scale-105"
+              asChild
+            >
+              <Link href="/register">Create Free Account</Link>
             </Button>
           </div>
         </div>

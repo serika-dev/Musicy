@@ -2,6 +2,7 @@
 
 import { ChevronUp, Music2 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { DownloadButton } from "@/components/download-button";
 import { LikeButton } from "@/components/shared/like-button";
@@ -66,12 +67,18 @@ export function PlayerBar() {
               )}
             </button>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">
+              <Link
+                href={`/tracks/${currentTrack.id}`}
+                className="block truncate text-sm font-medium hover:underline"
+              >
                 {currentTrack.title}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
+              </Link>
+              <Link
+                href={`/artists/${currentTrack.artist.id}`}
+                className="block truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
                 {currentTrack.artist.name}
-              </p>
+              </Link>
             </div>
             <LikeButton
               trackId={currentTrack.id}

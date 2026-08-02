@@ -98,7 +98,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           }}
         >
           <div className="flex min-h-full w-full flex-col">
-            <div className="flex-1 px-4 py-6 lg:px-8">{children}</div>
+            <div className="flex-1 px-3 py-4 md:px-6 md:py-6 lg:px-8">{children}</div>
             {/* Footer handles its own route visibility checks */}
             {!isAuthPage && <SiteFooter />}
           </div>

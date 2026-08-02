@@ -1265,6 +1265,26 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     onSeekTo: seekTo,
   });
 
+  // Track play tracking: record to listening history + increment playCount
+  const lastRecordedTrackIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentTrack || !isPlaying) return;
+    if (!session?.user?.id) return;
+    if (lastRecordedTrackIdRef.current === currentTrack.id) return;
+
+    lastRecordedTrackIdRef.current = currentTrack.id;
+
+    fetch("/api/track/play", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trackId: currentTrack.id,
+        duration: currentTrack.duration,
+        context: playbackContext,
+      }),
+    }).catch((err) => console.error("Failed to record play:", err));
+  }, [currentTrack, isPlaying, session?.user?.id, playbackContext]);
+
   useNativePlayback({
     currentTrack,
     isPlaying,

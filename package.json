@@ -50,6 +50,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.2",
+    "embla-carousel-autoplay": "^8.6.0",
+    "embla-carousel-react": "^8.6.0",
     "ioredis": "^5.9.3",
     "lucide-react": "^0.563.0",
     "music-metadata": "^10.9.1",

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { MediaCard } from "@/components/shared/media-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { MediaGridSkeleton } from "@/components/shared/skeletons";
-import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/shared/pagination";
 import { Input } from "@/components/ui/input";
 
 interface Artist {
@@ -73,7 +73,7 @@ export default function ArtistsPage() {
     page * limit,
   );
 
-  const hasMore = data ? (page + 1) * limit < data.total : false;
+  const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
   return (
     <div className="space-y-8">
@@ -135,21 +135,17 @@ export default function ArtistsPage() {
             ))}
           </div>
 
-          {hasMore && (
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={isLoading}
-                className="rounded-xl"
-              >
-                {isLoading ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(p) => {
+              setPage(p);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
 
           <p className="text-center text-sm text-muted-foreground">
-            Showing {data.artists.length} of {data.total} artists
+            Page {page + 1} of {totalPages} · {data.total} artists
           </p>
         </>
       )}

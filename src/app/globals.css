@@ -608,3 +608,16 @@ body[data-scroll-locked] {
   font-size: clamp(2.25rem, 1.5rem + 3.3vw, 4.5rem);
   line-height: 1.02;
 }
+
+/* Slide Progress Bar animation */
+@keyframes slideProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+
+

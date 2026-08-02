@@ -15,16 +15,25 @@ export async function GET(req: NextRequest) {
   const results: any = {}
 
   if (type.includes("track")) {
+    const trackWhere = {
+      OR: [
+        { title: { contains: query, mode: "insensitive" as const } },
+        { genre: { contains: query, mode: "insensitive" as const } },
+        { artist: { name: { contains: query, mode: "insensitive" as const } } },
+        { album: { title: { contains: query, mode: "insensitive" as const } } },
+        { featuredArtists: { some: { name: { contains: query, mode: "insensitive" as const } } } },
+      ]
+    }
     results.tracks = {
       items: (await prisma.track.findMany({
-        where: { title: { contains: query, mode: "insensitive" } },
+        where: trackWhere,
         include: { artist: true, album: true },
         take: limit,
         skip: offset,
       })).map(track => ({ ...track, fileSize: track.fileSize.toString() })),
       limit,
       offset,
-      total: await prisma.track.count({ where: { title: { contains: query, mode: "insensitive" } } })
+      total: await prisma.track.count({ where: trackWhere })
     }
   }
 
@@ -52,16 +61,23 @@ export async function GET(req: NextRequest) {
   }
 
   if (type.includes("album")) {
+    const albumWhere = {
+      OR: [
+        { title: { contains: query, mode: "insensitive" as const } },
+        { artist: { name: { contains: query, mode: "insensitive" as const } } },
+        { genre: { contains: query, mode: "insensitive" as const } },
+      ]
+    }
     results.albums = {
       items: await prisma.album.findMany({
-        where: { title: { contains: query, mode: "insensitive" } },
+        where: albumWhere,
         include: { artist: true },
         take: limit,
         skip: offset,
       }),
       limit,
       offset,
-      total: await prisma.album.count({ where: { title: { contains: query, mode: "insensitive" } } })
+      total: await prisma.album.count({ where: albumWhere })
     }
   }
 

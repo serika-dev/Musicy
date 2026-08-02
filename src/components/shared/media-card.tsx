@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Music2, Play } from "lucide-react"
 import type * as React from "react"
 
@@ -11,6 +12,8 @@ interface MediaCardProps {
   href: string
   title: string
   subtitle?: string
+  /** If provided, the subtitle becomes a link to this URL. */
+  subtitleHref?: string
   imageUrl?: string | null
   /** Render artwork as a circle (for artists). */
   rounded?: boolean
@@ -26,6 +29,7 @@ export function MediaCard({
   href,
   title,
   subtitle,
+  subtitleHref,
   imageUrl,
   rounded = false,
   badge,
@@ -33,6 +37,8 @@ export function MediaCard({
   fallback,
   className,
 }: MediaCardProps) {
+  const router = useRouter()
+
   return (
     <Link
       href={href}
@@ -80,16 +86,37 @@ export function MediaCard({
         </div>
 
         <div className={cn("px-0.5", rounded && "text-center")}>
-          <h3 className="truncate text-sm font-semibold leading-tight">
+          <h3 className="truncate text-xs md:text-sm font-semibold leading-tight">
             {title}
           </h3>
-          {subtitle && (
-            <p className="mt-1 line-clamp-1 text-xs font-medium text-muted-foreground">
-              {subtitle}
-            </p>
-          )}
+          {subtitle &&
+            (subtitleHref ? (
+              <span
+                role="link"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  router.push(subtitleHref)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    router.push(subtitleHref)
+                  }
+                }}
+                className="mt-1 line-clamp-1 text-[10px] md:text-xs font-medium text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+              >
+                {subtitle}
+              </span>
+            ) : (
+              <p className="mt-1 line-clamp-1 text-[10px] md:text-xs font-medium text-muted-foreground">
+                {subtitle}
+              </p>
+            ))}
           {badge && (
-            <span className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            <span className="mt-1 inline-block text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
               {badge}
             </span>
           )}

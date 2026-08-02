@@ -28,6 +28,12 @@ export async function GET(request: NextRequest) {
               mode: 'insensitive',
             }
           }
+        },
+        {
+          genre: {
+            contains: search,
+            mode: 'insensitive',
+          }
         }
       ]
     }

@@ -1,12 +1,12 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Music, Search } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/shared/empty-state";
-import { TrackListSkeleton } from "@/components/shared/skeletons";
-import { TrackListItem } from "@/components/track-list-item";
+import { MediaCard } from "@/components/shared/media-card";
+import { MediaGridSkeleton } from "@/components/shared/skeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMusicPlayer } from "@/contexts/music-player-context";
@@ -23,7 +23,9 @@ interface TracksResponse {
 export default function TracksPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { playTrack, isCurrentTrack, isPlaying } = useMusicPlayer();
+  const searchParams = useSearchParams();
+  const genre = searchParams.get("genre");
+  const { playTrack } = useMusicPlayer();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [data, setData] = useState<TracksResponse | null>(null);
@@ -45,6 +47,7 @@ export default function TracksPage() {
           offset: (page * limit).toString(),
         });
         if (search) params.set("search", search);
+        if (genre) params.set("genre", genre);
 
         const res = await fetch(`/api/tracks?${params}`);
         if (res.ok) {
@@ -59,7 +62,7 @@ export default function TracksPage() {
 
     const debounce = setTimeout(fetchTracks, search ? 300 : 0);
     return () => clearTimeout(debounce);
-  }, [page, search]);
+  }, [page, search, genre]);
 
   if (status === "loading" || !session) {
     return (
@@ -74,10 +77,10 @@ export default function TracksPage() {
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-4xl lg:text-5xl font-black tracking-tight">
-          Browse Tracks
+          {genre ? genre : "Browse Tracks"}
         </h1>
         <p className="text-muted-foreground font-medium">
-          Explore the full catalogue — {data?.total ?? "..."} tracks available
+          {data?.total ?? "..."} tracks{genre ? ` in ${genre}` : ""} — available
           in lossless quality.
         </p>
       </div>
@@ -96,45 +99,39 @@ export default function TracksPage() {
         />
       </div>
 
-      {/* Track list */}
-      <div className="space-y-1">
-        {isLoading ? (
-          <TrackListSkeleton count={8} />
-        ) : data?.tracks?.length ? (
-          data.tracks.map((track, idx) => (
-            <div
+      {/* Track grid */}
+      {isLoading ? (
+        <MediaGridSkeleton count={12} />
+      ) : data?.tracks?.length ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {data.tracks.map((track) => (
+            <MediaCard
               key={track.id}
-              className="flex items-center group/item hover:bg-white/5 rounded-2xl transition-colors pr-2"
-            >
-              <div className="w-10 text-center text-xs font-bold text-muted-foreground group-hover/item:text-foreground shrink-0">
-                {page * limit + idx + 1}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <TrackListItem
-                  track={track}
-                  isPlaying={isCurrentTrack(track.id) && isPlaying}
-                  isCurrentTrack={isCurrentTrack(track.id)}
-                  onPlay={() =>
-                    playTrack(track, data.tracks, {
-                      type: "standalone",
-                      id: "tracks",
-                      name: "Browse Tracks",
-                    })
-                  }
-                  showAddButton={true}
-                  className="bg-transparent hover:bg-transparent border-none"
-                />
-              </div>
-            </div>
-          ))
-        ) : (
-          <EmptyState
-            icon={<Music />}
-            title="No tracks found"
-            description="Try a different search term."
-          />
-        )}
-      </div>
+              href={`/tracks/${track.id}`}
+              title={track.title}
+              subtitle={track.artist.name}
+              subtitleHref={`/artists/${track.artist.id}`}
+              imageUrl={track.album?.coverImageUrl || track.coverImageUrl}
+              badge={track.genre}
+              onPlay={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                playTrack(track, data.tracks, {
+                  type: "standalone",
+                  id: "tracks",
+                  name: genre ? genre : "Browse Tracks",
+                });
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Music />}
+          title="No tracks found"
+          description="Try a different search term."
+        />
+      )}
 
       {/* Pagination */}
       {data && data.total > limit && (
