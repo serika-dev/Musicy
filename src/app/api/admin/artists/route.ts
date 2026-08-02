@@ -37,14 +37,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (filter === 'collab') {
-      whereClause.name = {
-        ...whereClause.name,
-        contains: ' & ',
-        mode: 'insensitive',
-      }
+      whereClause.OR = [
+        { isCollab: true },
+        { isCollab: null, name: { contains: ' & ', mode: 'insensitive' } },
+      ]
     } else if (filter === 'solo') {
+      whereClause.AND = [
+        { isCollab: { not: true } },
+      ]
       whereClause.NOT = {
-        name: { contains: ' & ', mode: 'insensitive' }
+        OR: [
+          { isCollab: true },
+          { isCollab: null, name: { contains: ' & ', mode: 'insensitive' } },
+        ]
       }
     }
 
@@ -58,6 +63,7 @@ export async function GET(request: NextRequest) {
           imageUrl: true,
           website: true,
           verified: true,
+          isCollab: true,
           createdAt: true,
           _count: {
             select: {

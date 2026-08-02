@@ -27,6 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         imageUrl: true,
         website: true,
         verified: true,
+        isCollab: true,
         createdAt: true,
         _count: {
           select: {
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const isCollab = artist.name.includes(' & ')
+    const isCollab = artist.isCollab === true || (artist.isCollab === null && artist.name.includes(' & '))
 
     // For collaborative artists, find the individual artists
     let collaborationArtists: { id: string; name: string; imageUrl: string | null; verified: boolean }[] = []
@@ -177,10 +178,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     if (!isCollab) {
       const collabArtists = await prisma.artist.findMany({
         where: {
-          name: { contains: ' & ' },
           OR: [
-            { name: { startsWith: `${artist.name} & `, mode: 'insensitive' } },
-            { name: { contains: ` & ${artist.name}`, mode: 'insensitive' } },
+            { isCollab: true, name: { startsWith: `${artist.name} & `, mode: 'insensitive' } },
+            { isCollab: true, name: { contains: ` & ${artist.name}`, mode: 'insensitive' } },
+            { isCollab: null, name: { contains: ' & ', mode: 'insensitive' }, OR: [
+              { name: { startsWith: `${artist.name} & `, mode: 'insensitive' } },
+              { name: { contains: ` & ${artist.name}`, mode: 'insensitive' } },
+            ] },
           ],
         },
         select: { id: true, name: true, imageUrl: true, bio: true },

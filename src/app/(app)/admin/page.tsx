@@ -432,7 +432,7 @@ export default function AdminPage() {
 
   const filteredAvailableArtists = availableArtists
     .filter(a => !collabMembers.find(m => m.id === a.id))
-    .filter(a => !a.name?.includes(' & '))
+    .filter(a => !(a.isCollab === true || (a.isCollab === null && a.name?.includes(' & '))))
     .filter(a => collabSearch ? a.name.toLowerCase().includes(collabSearch.toLowerCase()) : true)
     .slice(0, 10);
 
@@ -1715,7 +1715,7 @@ export default function AdminPage() {
                             <div className="font-bold text-sm text-white flex items-center gap-1.5">
                               {artist.name}
                               {artist.verified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-                              {artist.name?.includes(' & ') && (
+                              {(artist.isCollab === true || (artist.isCollab === null && artist.name?.includes(' & '))) && (
                                 <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
                               )}
                             </div>
@@ -1745,7 +1745,7 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {artist.name?.includes(' & ') && (
+                          {(artist.isCollab === true || (artist.isCollab === null && artist.name?.includes(' & '))) && (
                             <Button variant="outline" size="sm" asChild className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
                               <a href={`/collabs/${artist.id}`} target="_blank" rel="noreferrer">
                                 <ExternalLink className="w-3.5 h-3.5" /> View
@@ -2450,7 +2450,7 @@ export default function AdminPage() {
           <DialogHeader className="border-b border-zinc-800 pb-3">
             <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
               <UserIcon className="w-5 h-5 text-purple-400" />
-              {editingArtist?.name?.includes(' & ') ? 'Edit Collaboration' : 'Edit Artist Profile'}
+              {(editingArtist?.isCollab === true || (editingArtist?.isCollab === null && editingArtist?.name?.includes(' & '))) ? 'Edit Collaboration' : 'Edit Artist Profile'}
             </DialogTitle>
           </DialogHeader>
 
@@ -2538,7 +2538,7 @@ export default function AdminPage() {
           <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
             <Button variant="outline" onClick={() => setEditingArtist(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
             <Button onClick={handleUpdateArtist} disabled={isUpdatingArtist} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
-              {editingArtist?.name?.includes(' & ') ? 'Save Collaboration' : 'Save Artist'}
+              {(editingArtist?.isCollab === true || (editingArtist?.isCollab === null && editingArtist?.name?.includes(' & '))) ? 'Save Collaboration' : 'Save Artist'}
             </Button>
           </DialogFooter>
         </DialogContent>

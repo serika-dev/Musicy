@@ -6,6 +6,7 @@ import {
   Globe,
   Languages,
   Laptop,
+  Link2,
   Music,
   Palette,
   Play,
@@ -14,11 +15,15 @@ import {
   Shield,
   Speaker,
   Trash2,
+  Unlink,
+  Crown,
+  Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -247,6 +252,7 @@ function SettingRow({
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     settings: savedSettings,
     updateSettingsAsync,
@@ -348,6 +354,82 @@ export default function SettingsPage() {
     }
   };
 
+  // --- Serika Account linking ---
+  const [serikaLink, setSerikaLink] = useState<{
+    linked: boolean;
+    accountId?: string;
+    username?: string;
+    isPremium?: boolean;
+  } | null>(null);
+  const [linkLoading, setLinkLoading] = useState(true);
+  const [unlinking, setUnlinking] = useState(false);
+
+  const fetchSerikaLink = useCallback(async () => {
+    try {
+      const res = await fetch("/api/serika-account/me", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setSerikaLink(data);
+      } else {
+        setSerikaLink({ linked: false });
+      }
+    } catch {
+      setSerikaLink({ linked: false });
+    } finally {
+      setLinkLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSerikaLink();
+  }, [fetchSerikaLink]);
+
+  useEffect(() => {
+    const result = searchParams.get("serika_link");
+    if (result) {
+      if (result === "success") {
+        toast.success("Serika Account linked successfully!");
+        fetchSerikaLink();
+      } else if (result === "denied") {
+        toast.error("Linking was cancelled");
+      } else if (result === "invalid_state") {
+        toast.error("Invalid state. Please try again.");
+      } else if (result === "token_failed") {
+        toast.error("Failed to get authorization token");
+      } else if (result === "userinfo_failed") {
+        toast.error("Failed to get account info");
+      } else if (result === "error") {
+        toast.error("An error occurred during linking");
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("serika_link");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [searchParams, fetchSerikaLink]);
+
+  const handleLinkSerika = () => {
+    const returnUrl = `${window.location.origin}/settings`;
+    window.location.href = `/api/serika-account/link?return=${encodeURIComponent(returnUrl)}`;
+  };
+
+  const handleUnlinkSerika = async () => {
+    if (!confirm("Unlink your Serika Account? You will lose premium status sync.")) return;
+    setUnlinking(true);
+    try {
+      const res = await fetch("/api/serika-account/link", { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Serika Account unlinked");
+        setSerikaLink({ linked: false });
+      } else {
+        toast.error("Failed to unlink");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     if (!confirm("Are you absolutely sure? This cannot be undone.")) return;
     if (!confirm("Really delete your account permanently?")) return;
@@ -401,7 +483,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="lyrics" className="w-full">
-          <TabsList className="grid grid-cols-4 md:grid-cols-7 w-full">
+          <TabsList className="grid grid-cols-4 md:grid-cols-8 w-full">
             <TabsTrigger value="lyrics">
               <Languages className="w-4 h-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Lyrics</span>
@@ -425,6 +507,10 @@ export default function SettingsPage() {
             <TabsTrigger value="privacy">
               <Shield className="w-4 h-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Privacy</span>
+            </TabsTrigger>
+            <TabsTrigger value="account">
+              <Link2 className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Account</span>
             </TabsTrigger>
             <TabsTrigger value="notifications">
               <Bell className="w-4 h-4 sm:mr-1.5" />
@@ -762,6 +848,111 @@ export default function SettingsPage() {
                     Delete Account
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* SERIKA ACCOUNT */}
+          <TabsContent value="account" className="space-y-4 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="w-5 h-5" /> Serika Account
+                </CardTitle>
+                <CardDescription>
+                  Link your Serika Account to sync premium status and enable
+                  cross-platform features.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {linkLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : serikaLink?.linked ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-4 border border-border rounded-lg bg-muted/30">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {serikaLink.username?.[0]?.toUpperCase() || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {serikaLink.username || "Linked"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Serika Account ID: {serikaLink.accountId}
+                        </div>
+                      </div>
+                      {serikaLink.isPremium && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/15 text-amber-600 text-xs font-semibold">
+                          <Crown className="w-3.5 h-3.5" />
+                          Premium
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Crown className="w-4 h-4 text-amber-500" />
+                        <div>
+                          <div className="text-sm font-medium">Premium Status</div>
+                          <div className="text-xs text-muted-foreground">
+                            {serikaLink.isPremium
+                              ? "Active — synced from Serika Accounts"
+                              : "Not active — subscribe via accounts.serika.dev"}
+                          </div>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded ${
+                          serikaLink.isPremium
+                            ? "bg-green-500/15 text-green-600"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {serikaLink.isPremium ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={handleUnlinkSerika}
+                      disabled={unlinking}
+                      className="w-full"
+                    >
+                      {unlinking ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Unlink className="w-4 h-4 mr-2" />
+                      )}
+                      Unlink Serika Account
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Linking your Serika Account enables:
+                    </div>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        Premium status sync from Serika Accounts
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        Future cross-platform music syncing
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        Unified login across Serika products
+                      </li>
+                    </ul>
+                    <Button onClick={handleLinkSerika} className="w-full">
+                      <Link2 className="w-4 h-4 mr-2" />
+                      Link Serika Account
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
