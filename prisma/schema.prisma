@@ -112,6 +112,7 @@ model Artist {
   bannerUrl   String?
   website     String?
   verified    Boolean  @default(false)
+  isCollab    Boolean? // null = auto-detect via ' & ' in name, false = explicitly not a collab (e.g. MYTH & ROID), true = is a collab
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
