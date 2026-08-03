@@ -1,4 +1,5 @@
 import SwiftUI
+import CarPlay
 
 @main
 struct MusicyApp: App {
@@ -14,8 +15,9 @@ struct MusicyApp: App {
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        if connectingSceneSession.role == .templateApplicationScene {
-            let config = UISceneConfiguration(name: "Musicy-CarPlay", sessionRole: .templateApplicationScene)
+        let carPlayRole = UISceneSession.Role(rawValue: CPTemplateApplicationSceneSessionRoleApplication)
+        if connectingSceneSession.role == carPlayRole {
+            let config = UISceneConfiguration(name: "Musicy-CarPlay", sessionRole: carPlayRole)
             config.delegateClass = CarPlaySceneDelegate.self
             return config
         }
