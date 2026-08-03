@@ -62,49 +62,49 @@ struct HomeView: View {
 
                     if !(feed?.followedAlbums ?? []).isEmpty {
                         section("New from Artists You Follow") {
-                            AlbumRow(albums: feed?.followedAlbums ?? [])
+                            HomeAlbumRow(albums: feed?.followedAlbums ?? [])
                         }
                     }
 
                     if !(feed?.recommendedTracks ?? []).isEmpty {
                         section("Recommended for You") {
-                            TrackRow(tracks: feed?.recommendedTracks ?? [])
+                            HomeTrackRow(tracks: feed?.recommendedTracks ?? [])
                         }
                     }
 
                     if !albums.isEmpty {
                         section("New albums") {
-                            AlbumRow(albums: albums)
+                            HomeAlbumRow(albums: albums)
                         }
                     }
 
                     if !(feed?.topArtists ?? []).isEmpty {
                         section("Your Top Artists") {
-                            ArtistRow(artists: feed?.topArtists ?? [])
+                            HomeArtistRow(artists: feed?.topArtists ?? [])
                         }
                     }
 
                     if !(feed?.recommendedArtists ?? []).isEmpty {
                         section("Artists We Think You'll Like") {
-                            ArtistRow(artists: feed?.recommendedArtists ?? [])
+                            HomeArtistRow(artists: feed?.recommendedArtists ?? [])
                         }
                     }
 
                     if !(feed?.discoverAlbums ?? []).isEmpty {
                         section("More to Explore") {
-                            AlbumRow(albums: feed?.discoverAlbums ?? [])
+                            HomeAlbumRow(albums: feed?.discoverAlbums ?? [])
                         }
                     }
 
                     if !artists.isEmpty {
                         section("Artists") {
-                            ArtistRow(artists: artists)
+                            HomeArtistRow(artists: artists)
                         }
                     }
 
                     if !(feed?.newReleases ?? []).isEmpty {
                         section("New Releases") {
-                            AlbumRow(albums: feed?.newReleases ?? [])
+                            HomeAlbumRow(albums: feed?.newReleases ?? [])
                         }
                     }
 
@@ -237,7 +237,7 @@ struct FeaturedHero: View {
     }
 }
 
-struct AlbumRow: View {
+struct HomeAlbumRow: View {
     let albums: [Album]
 
     var body: some View {
@@ -256,7 +256,7 @@ struct AlbumRow: View {
     }
 }
 
-struct TrackRow: View {
+struct HomeTrackRow: View {
     let tracks: [Track]
 
     var body: some View {
@@ -273,7 +273,7 @@ struct TrackRow: View {
     }
 }
 
-struct ArtistRow: View {
+struct HomeArtistRow: View {
     let artists: [Artist]
 
     var body: some View {
