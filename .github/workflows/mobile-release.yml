@@ -15,35 +15,51 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Build release APK
-        uses: gradle/gradle-build-action@v3
+
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.7
-          arguments: assembleRelease
-          build-root-directory: mobile/android
+          gradle-version: '8.7'
+
+      # The release APK is unsigned and therefore not installable on a device;
+      # the debug APK ships alongside it so testers have something they can
+      # actually sideload.
+      - name: Build APKs
+        working-directory: mobile/android
+        run: gradle --no-daemon assembleRelease assembleDebug
+
       - uses: actions/upload-artifact@v4
         with:
-          name: musicy-android-release
-          path: mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: musicy-android-${{ inputs.version }}
+          path: |
+            mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
   ios:
     runs-on: blacksmith-6vcpu-macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - run: brew install xcodegen
+
       - working-directory: mobile/iOS
         run: xcodegen generate
+
       - working-directory: mobile/iOS
         run: |
           xcodebuild -scheme Musicy \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath DerivedData \
-            clean build
+            clean build \
+            CODE_SIGNING_ALLOWED=NO
+
       - uses: actions/upload-artifact@v4
         with:
-          name: musicy-ios-debug
+          name: musicy-ios-${{ inputs.version }}
           path: mobile/iOS/DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app
+          if-no-files-found: error

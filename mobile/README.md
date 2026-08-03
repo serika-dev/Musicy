@@ -62,9 +62,35 @@ If the Gradle wrapper is missing, install Gradle 8.7 and run `gradle wrapper` fi
 
 The service declares both `androidx.media3.session.MediaLibraryService` and the
 legacy `android.media.browse.MediaBrowserService` actions, and ships
-`automotive_app_desc.xml` with `media` and `search`. Because the car attaches to
-the same session as the app, playback started on the phone continues in the car
-and vice versa.
+`automotive_app_desc.xml` declaring `media`. Because the car attaches to the
+same session as the app, playback started on the phone continues in the car and
+vice versa.
+
+Two manifest entries must **not** come back, as either one hides the app from
+the car entirely:
+
+- `androidx.car.app.minCarApiLevel` — marks the app as a Car App Library app,
+  so the host looks for a `CarAppService`, finds none, and drops it.
+- any `<uses>` value in `automotive_app_desc.xml` other than the documented
+  ones — an unrecognised entry invalidates the whole descriptor.
+
+#### Musicy isn't showing up in my car
+
+If the app is sideloaded (an APK from CI rather than the Play Store), Android
+Auto hides it until you allow unknown sources — this is a host setting, not
+something the app can declare:
+
+1. Open the **Android Auto** settings on the phone (Settings → Connected
+   devices → Android Auto, or the standalone app on older versions).
+2. Tap the **Version** row about ten times to unlock **Developer settings**.
+3. From the ⋮ menu choose **Developer settings**, then enable
+   **Unknown sources**.
+4. Force-stop Android Auto and reconnect. Musicy appears in the car's app
+   launcher.
+
+If it appears but the browse list is empty, you are signed out — the car shows
+a **Sign in** button that opens the phone app. Signing in there populates the
+tree immediately.
 
 ## iOS
 
