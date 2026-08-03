@@ -88,11 +88,13 @@ class MusicyPlaybackService : MediaLibraryService() {
             .setId(SESSION_ID)
             .build()
 
+        // Media3 1.3 has no setSmallIcon on the provider; the status-bar icon
+        // is overridden instead by shipping our own drawable named
+        // media3_notification_small_icon, which shadows the library's.
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this)
-                .setChannelNameResourceId(R.string.channel_playback_name)
+                .setChannelName(R.string.channel_playback_name)
                 .build()
-                .apply { setSmallIcon(R.drawable.ic_notification) }
         )
 
         PlaybackBridge.attach(repo, library, serviceScope) { player }
