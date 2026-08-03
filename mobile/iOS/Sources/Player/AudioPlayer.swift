@@ -45,10 +45,12 @@ final class AudioPlayer: ObservableObject {
 
     private func configureSession() {
         do {
+            // A2DP routing comes with .playback already; .allowBluetooth only
+            // adds the mono HFP route, which is wrong for music.
             try AVAudioSession.sharedInstance().setCategory(
                 .playback,
                 mode: .default,
-                options: [.allowAirPlay, .allowBluetooth]
+                options: [.allowAirPlay]
             )
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {

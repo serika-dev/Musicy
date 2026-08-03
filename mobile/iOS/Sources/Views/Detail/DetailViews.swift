@@ -180,7 +180,13 @@ struct ArtistDetailView: View {
             .navigationTitle(artist.name)
             .navigationBarTitleDisplayMode(.inline)
             .task {
-                isFollowing = artist.isFollowing ?? ((try? await MusicyAPI.shared.getFollowState(id: artistId)) ?? false)
+                // `??` takes a non-async autoclosure, so the fallback fetch
+                // cannot live on its right-hand side.
+                if let known = artist.isFollowing {
+                    isFollowing = known
+                } else {
+                    isFollowing = (try? await MusicyAPI.shared.getFollowState(id: artistId)) ?? false
+                }
                 if artist.topTracks == nil {
                     tracks = (try? await MusicyAPI.shared.getArtistTracks(id: artistId))?.tracks ?? []
                 }
