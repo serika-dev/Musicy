@@ -1,0 +1,49 @@
+name: Mobile Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag'
+        required: true
+      notes:
+        description: 'Release notes'
+        required: false
+
+jobs:
+  android:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build release APK
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.7
+          arguments: assembleRelease
+          build-root-directory: mobile/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musicy-android-release
+          path: mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+  ios:
+    runs-on: blacksmith-6vcpu-macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - working-directory: mobile/iOS
+        run: xcodegen generate
+      - working-directory: mobile/iOS
+        run: |
+          xcodebuild -scheme Musicy \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -derivedDataPath DerivedData \
+            clean build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musicy-ios-debug
+          path: mobile/iOS/DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app

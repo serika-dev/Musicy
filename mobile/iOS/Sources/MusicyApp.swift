@@ -1,0 +1,26 @@
+import SwiftUI
+import CarPlay
+
+@main
+struct MusicyApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    var body: some Scene {
+        WindowGroup {
+            RootView()
+                .preferredColorScheme(.dark)
+        }
+    }
+}
+
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let carPlayRole: UISceneSession.Role = .carTemplateApplication
+        if connectingSceneSession.role == carPlayRole {
+            let config = UISceneConfiguration(name: "Musicy-CarPlay", sessionRole: carPlayRole)
+            config.delegateClass = CarPlaySceneDelegate.self
+            return config
+        }
+        return UISceneConfiguration(name: "Default", sessionRole: connectingSceneSession.role)
+    }
+}
