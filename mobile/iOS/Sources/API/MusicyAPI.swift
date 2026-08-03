@@ -123,6 +123,15 @@ final class MusicyAPI: ObservableObject {
         try await decode(User.self, path: "api/user/profile")
     }
 
+    func getUserSettings() async throws -> UserSettings {
+        try await decode(UserSettings.self, path: "api/user/settings")
+    }
+
+    func putUserSettings(_ settings: UserSettings) async throws {
+        let body = try JSONEncoder().encode(settings)
+        try await request(path: "api/user/settings", method: "PUT", body: body)
+    }
+
     // MARK: - Home
 
     func getFeed() async throws -> FeedResponse {
@@ -193,6 +202,19 @@ final class MusicyAPI: ObservableObject {
 
     func getLyrics(trackId: String) async throws -> LyricsResponse {
         try await decode(LyricsResponse.self, path: "api/tracks/\(trackId)/lyrics")
+    }
+
+    /// `mode` is "synced" or "plain", matching the lyrics being displayed.
+    func romanizeLyrics(trackId: String, mode: String, language: String?) async throws -> String {
+        let body = try JSONEncoder().encode(
+            RomanizeRequest(trackId: trackId, mode: mode, language: language)
+        )
+        return try await decode(
+            RomanizeResponse.self,
+            path: "api/lyrics/romanize",
+            method: "POST",
+            body: body
+        ).romanized
     }
 
     func search(query: String) async throws -> SearchResponse {

@@ -276,6 +276,39 @@ struct LyricsResponse: Codable {
     }
 }
 
+/// Romanization is computed and cached server-side, so a second request for
+/// the same track is just a database read.
+struct RomanizeRequest: Codable {
+    let trackId: String
+    let mode: String
+    let language: String?
+}
+
+struct RomanizeResponse: Codable {
+    let romanized: String
+    let language: String?
+}
+
+/// Account-wide settings, shared with the web app via /api/user/settings.
+struct UserSettings: Codable {
+    var autoRomanizeLyrics: Bool = false
+    var romanizeLanguage: String = "auto"
+    var showRomanizationAlongside: Bool = false
+    var theme: String = "dark"
+    var reducedMotion: Bool = false
+    var compactMode: Bool = false
+    var audioQuality: String = "auto"
+    var crossfadeSeconds: Int = 0
+    var normalizeVolume: Bool = false
+    var defaultVolume: Double = 1
+    var autoplayRecommendations: Bool = true
+    var gaplessPlayback: Bool = true
+    var showNowPlayingNotifications: Bool = false
+    var notifyOnNewReleases: Bool = true
+    var privateSession: Bool = false
+    var allowScrobbling: Bool = true
+}
+
 struct LikedSongsResponse: Codable {
     let tracks: [Track]
     let total: Int?

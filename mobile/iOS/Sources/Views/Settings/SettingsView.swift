@@ -4,18 +4,16 @@ struct SettingsView: View {
     @ObservedObject private var api = MusicyAPI.shared
     @ObservedObject private var sync = SyncClient.shared
     @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var settings = SettingsStore.shared
 
-    @State private var syncEnabled = SyncClient.shared.isEnabled
-    @State private var deviceName = SyncClient.shared.deviceName
-    @State private var autoplay = UserDefaults.standard.object(forKey: "musicy_autoplay") as? Bool ?? true
-    @State private var privateSession = UserDefaults.standard.bool(forKey: "musicy_private_session")
-    @State private var preferSyncedLyrics = UserDefaults.standard.object(forKey: "musicy_synced_lyrics") as? Bool ?? true
+    @State private var deviceName = SettingsStore.shared.deviceName
+    @State private var showReset = false
 
     var body: some View {
         List {
             Section("Musicy Connect") {
-                Toggle("Sync with my other devices", isOn: $syncEnabled)
-                    .onChange(of: syncEnabled) { _, value in sync.isEnabled = value }
+                Toggle("Sync with my other devices", isOn: $settings.syncEnabled)
+                    .onChange(of: settings.syncEnabled) { _, value in sync.isEnabled = value }
 
                 HStack {
                     Text("Device name")
@@ -23,7 +21,10 @@ struct SettingsView: View {
                     TextField("Device name", text: $deviceName)
                         .multilineTextAlignment(.trailing)
                         .foregroundColor(.secondary)
-                        .onSubmit { sync.deviceName = deviceName }
+                        .onSubmit {
+                            settings.deviceName = deviceName
+                            sync.deviceName = deviceName
+                        }
                 }
 
                 HStack {
@@ -38,24 +39,78 @@ struct SettingsView: View {
             }
 
             Section("Playback") {
-                Toggle("Autoplay recommendations", isOn: $autoplay)
-                    .onChange(of: autoplay) { _, value in
-                        UserDefaults.standard.set(value, forKey: "musicy_autoplay")
+                Toggle("Autoplay recommendations", isOn: $settings.autoplayRecommendations)
+                Toggle("Gapless playback", isOn: $settings.gaplessPlayback)
+                Toggle("Normalize volume", isOn: $settings.normalizeVolume)
+                Toggle("Resume where I left off", isOn: $settings.resumeOnLaunch)
+
+                Picker("Playback speed", selection: $settings.playbackSpeed) {
+                    Text("0.75×").tag(0.75)
+                    Text("1×").tag(1.0)
+                    Text("1.25×").tag(1.25)
+                    Text("1.5×").tag(1.5)
+                    Text("2×").tag(2.0)
+                }
+
+                Picker("Skip button jump", selection: $settings.seekStepSeconds) {
+                    Text("5s").tag(5)
+                    Text("10s").tag(10)
+                    Text("15s").tag(15)
+                    Text("30s").tag(30)
+                }
+
+                Picker("Audio quality", selection: $settings.audioQuality) {
+                    Text("Auto").tag("auto")
+                    Text("Low").tag("low")
+                    Text("Medium").tag("medium")
+                    Text("High").tag("high")
+                    Text("Lossless").tag("lossless")
+                }
+
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Default volume")
+                        Spacer()
+                        Text("\(Int(settings.defaultVolume * 100))%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                Toggle("Private session", isOn: $privateSession)
-                    .onChange(of: privateSession) { _, value in
-                        UserDefaults.standard.set(value, forKey: "musicy_private_session")
+                    Slider(value: $settings.defaultVolume, in: 0...1)
+                }
+            }
+
+            Section("Lyrics") {
+                Toggle("Prefer synced lyrics", isOn: $settings.preferSyncedLyrics)
+                Toggle("Romanize lyrics", isOn: $settings.autoRomanizeLyrics)
+                if settings.autoRomanizeLyrics {
+                    Toggle("Show original alongside", isOn: $settings.showRomanizationAlongside)
+                    Picker("Romanize language", selection: $settings.romanizeLanguage) {
+                        Text("Auto").tag("auto")
+                        Text("Japanese").tag("ja")
+                        Text("Korean").tag("ko")
+                        Text("Hindi").tag("hi")
                     }
+                }
+                Text("Japanese, Korean and Hindi lyrics are converted to the Latin alphabet.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section("Privacy") {
+                Toggle("Private session", isOn: $settings.privateSession)
+                Toggle("Allow scrobbling", isOn: $settings.allowScrobbling)
                 Text("A private session keeps what you play out of your listening history.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("Lyrics") {
-                Toggle("Prefer synced lyrics", isOn: $preferSyncedLyrics)
-                    .onChange(of: preferSyncedLyrics) { _, value in
-                        UserDefaults.standard.set(value, forKey: "musicy_synced_lyrics")
-                    }
+            Section("Appearance & feedback") {
+                Toggle("Reduced motion", isOn: $settings.reducedMotion)
+                Toggle("Haptic feedback", isOn: $settings.hapticFeedback)
+            }
+
+            Section("Storage") {
+                Toggle("Download on Wi-Fi only", isOn: $settings.downloadOnWifiOnly)
             }
 
             Section("Account") {
@@ -64,6 +119,9 @@ struct SettingsView: View {
                 if store.profile?.role == "ADMIN" {
                     webLink("Open admin", path: "/admin")
                 }
+                Text("Playback, lyrics and privacy settings are saved to your account, so they follow you to the web app and survive reinstalling Musicy.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section("About") {
@@ -76,11 +134,19 @@ struct SettingsView: View {
             }
 
             Section {
+                Button("Reset settings") { showReset = true }
                 Button("Sign out", role: .destructive) { store.signOut() }
             }
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await settings.pullFromAccount() }
+        .alert("Reset settings?", isPresented: $showReset) {
+            Button("Reset", role: .destructive) { settings.resetToDefaults() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Everything goes back to defaults. Your sign-in is kept.")
+        }
     }
 
     private var statusDetail: String {

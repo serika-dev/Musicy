@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerView: View {
     @ObservedObject private var player = AudioPlayer.shared
+    @ObservedObject private var clock = AudioPlayer.shared.clock
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var sync = SyncClient.shared
     @Environment(\.dismiss) private var dismiss
@@ -66,7 +67,7 @@ struct PlayerView: View {
                 .font(.footnote)
 
                 if showLyrics {
-                    LyricsPanel(track: track, position: player.position)
+                    LyricsPanel(track: track, position: clock.position)
                 }
             }
             .padding(20)
@@ -117,10 +118,10 @@ struct PlayerView: View {
         VStack(spacing: 4) {
             Slider(
                 value: Binding(
-                    get: { scrub ?? player.position },
+                    get: { scrub ?? clock.position },
                     set: { scrub = $0 }
                 ),
-                in: 0...max(player.duration, 1),
+                in: 0...max(clock.duration, 1),
                 onEditingChanged: { editing in
                     guard !editing, let target = scrub else { return }
                     if sync.isRemoteControlling {
@@ -132,9 +133,9 @@ struct PlayerView: View {
                 }
             )
             HStack {
-                Text(formatDuration(scrub ?? player.position))
+                Text(formatDuration(scrub ?? clock.position))
                 Spacer()
-                Text(formatDuration(player.duration))
+                Text(formatDuration(clock.duration))
             }
             .font(.caption2)
             .foregroundColor(.secondary)
@@ -184,63 +185,148 @@ struct PlayerView: View {
     }
 }
 
-/// Synced lyrics when the server has them, plain text otherwise — the same
-/// LRCLib data the web player renders.
+/**
+ The lyrics pane, matching the web player: big centred lines, the active one
+ bright and the rest dimmed, tap a line to jump there, and optional
+ romanization either replacing the original or sitting beneath it.
+ */
 private struct LyricsPanel: View {
     let track: Track
     let position: Double
 
+    @ObservedObject private var settings = SettingsStore.shared
     @State private var lyrics: LyricsResponse?
+    @State private var romanized: String?
     @State private var loaded = false
+    @State private var romanizing = false
+
+    private var syncedLines: [(time: Double, text: String)] {
+        guard settings.preferSyncedLyrics, let raw = lyrics?.syncedLyrics, !raw.isEmpty else { return [] }
+        return Self.parseLRC(raw)
+    }
+
+    /// Romanized text keyed by the original line's timestamp.
+    private var romanizedByTime: [Double: String] {
+        guard let romanized, !syncedLines.isEmpty else { return [:] }
+        return Dictionary(
+            Self.parseLRC(romanized).map { ($0.time, $0.text) },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
 
     var body: some View {
         Group {
             if !loaded {
                 ProgressView().padding()
             } else if let lyrics, lyrics.hasAnything {
-                if let synced = lyrics.syncedLyrics, !synced.isEmpty {
-                    syncedView(Self.parseLRC(synced))
+                if syncedLines.isEmpty {
+                    plainView(lyrics.plainLyrics ?? lyrics.syncedLyrics ?? "")
                 } else {
-                    Text(lyrics.plainLyrics ?? "")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    syncedView(syncedLines)
                 }
             } else {
                 Text("No lyrics found for this track.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
+
+            if romanizing {
+                Text("Romanizing…").font(.caption).foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .task(id: track.id) {
             loaded = false
+            romanized = nil
             lyrics = try? await MusicyAPI.shared.getLyrics(trackId: track.id)
             loaded = true
+            await loadRomanization()
         }
+        .task(id: romanizeKey) { await loadRomanization() }
+    }
+
+    private var romanizeKey: String {
+        "\(track.id)-\(settings.autoRomanizeLyrics)-\(settings.romanizeLanguage)"
+    }
+
+    private func loadRomanization() async {
+        guard settings.autoRomanizeLyrics, lyrics?.hasAnything == true else {
+            romanized = nil
+            return
+        }
+        romanizing = true
+        let mode = syncedLines.isEmpty ? "plain" : "synced"
+        let language = settings.romanizeLanguage == "auto" ? nil : settings.romanizeLanguage
+        romanized = try? await MusicyAPI.shared.romanizeLyrics(
+            trackId: track.id,
+            mode: mode,
+            language: language
+        )
+        romanizing = false
     }
 
     private func syncedView(_ lines: [(time: Double, text: String)]) -> some View {
         let activeIndex = lines.lastIndex(where: { $0.time <= position }) ?? 0
+        let map = romanizedByTime
         return ScrollViewReader { proxy in
             ScrollView {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                        Text(line.text.isEmpty ? "♪" : line.text)
-                            .font(.headline)
-                            .fontWeight(index == activeIndex ? .bold : .regular)
-                            .foregroundColor(index == activeIndex ? .primary : .secondary)
+                        let romanizedText = map[line.time].flatMap { $0 == line.text ? nil : $0 }
+                        Button {
+                            AudioPlayer.shared.seek(to: line.time)
+                        } label: {
+                            VStack(spacing: 3) {
+                                Text(
+                                    romanizedText != nil && !settings.showRomanizationAlongside
+                                        ? romanizedText!
+                                        : (line.text.isEmpty ? "♪" : line.text)
+                                )
+                                .font(index == activeIndex ? .title3.bold() : .headline)
+                                .foregroundColor(index == activeIndex ? .primary : .secondary.opacity(0.55))
+                                if let romanizedText, settings.showRomanizationAlongside {
+                                    Text(romanizedText)
+                                        .font(.subheadline.italic())
+                                        .foregroundColor(.secondary.opacity(index == activeIndex ? 0.9 : 0.4))
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
-                            .id(index)
+                        }
+                        .buttonStyle(.plain)
+                        .id(index)
                     }
                 }
                 .frame(maxWidth: .infinity)
             }
-            .frame(height: 260)
+            .frame(height: 300)
             .onChange(of: activeIndex) { _, newValue in
-                withAnimation { proxy.scrollTo(newValue, anchor: .center) }
+                if settings.reducedMotion {
+                    proxy.scrollTo(newValue, anchor: .center)
+                } else {
+                    withAnimation { proxy.scrollTo(newValue, anchor: .center) }
+                }
             }
         }
+    }
+
+    private func plainView(_ original: String) -> some View {
+        let body = romanized.flatMap { $0.isEmpty || $0 == original ? nil : $0 }
+        return ScrollView {
+            VStack(spacing: 16) {
+                Text(body != nil && !settings.showRomanizationAlongside ? body! : original)
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                if let body, settings.showRomanizationAlongside {
+                    Text(body)
+                        .font(.subheadline.italic())
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(height: 300)
     }
 
     /// Parses `[mm:ss.xx] text` lines out of an LRC payload.

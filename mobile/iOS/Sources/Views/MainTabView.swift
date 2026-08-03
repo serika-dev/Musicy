@@ -57,13 +57,14 @@ struct MiniPlayer: View {
     var onOpen: () -> Void
 
     @ObservedObject private var player = AudioPlayer.shared
+    @ObservedObject private var clock = AudioPlayer.shared.clock
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var sync = SyncClient.shared
 
     var body: some View {
         if let track = player.currentTrack {
             VStack(spacing: 0) {
-                ProgressView(value: min(max(player.position, 0), max(player.duration, 1)), total: max(player.duration, 1))
+                ProgressView(value: clock.progress)
                     .progressViewStyle(.linear)
                     .tint(.accentColor)
                     .frame(height: 2)

@@ -7,6 +7,19 @@ enum RepeatMode {
     case off, all, one
 }
 
+/// The moving playhead, published separately from `AudioPlayer`.
+///
+/// Folding it into the player meant every view observing playback redrew twice
+/// a second, which is what made scrolling feel sticky while music was playing.
+final class PlaybackClock: ObservableObject {
+    @Published fileprivate(set) var position: Double = 0
+    @Published fileprivate(set) var duration: Double = 0
+
+    var progress: Double {
+        duration > 0 ? min(max(position / duration, 0), 1) : 0
+    }
+}
+
 /// The app's single audio engine. The SwiftUI player, the lock screen, CarPlay
 /// and Musicy Connect all drive this one object so they never disagree about
 /// what is playing.
@@ -22,8 +35,11 @@ final class AudioPlayer: ObservableObject {
     @Published private(set) var queue: [Track] = []
     @Published private(set) var currentIndex: Int = 0
     @Published private(set) var isPlaying = false
-    @Published private(set) var position: Double = 0
-    @Published private(set) var duration: Double = 0
+    /// Read `clock.position` in views; only the scrubber and lyrics need it.
+    let clock = PlaybackClock()
+
+    var position: Double { clock.position }
+    var duration: Double { clock.duration }
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off
 
@@ -34,6 +50,7 @@ final class AudioPlayer: ObservableObject {
     private var statusObserver: NSKeyValueObservation?
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
+    private var rate: Float = 1
     private var listenStartedAt: Date?
     private var listenAccumulated: TimeInterval = 0
 
@@ -76,9 +93,9 @@ final class AudioPlayer: ObservableObject {
         ) { [weak self] time in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.position = time.seconds.isFinite ? time.seconds : 0
+                self.clock.position = time.seconds.isFinite ? time.seconds : 0
                 if let itemDuration = self.player.currentItem?.duration.seconds, itemDuration.isFinite {
-                    self.duration = itemDuration
+                    self.clock.duration = itemDuration
                 }
             }
         }
@@ -172,7 +189,12 @@ final class AudioPlayer: ObservableObject {
     }
 
     func toggle() {
-        if isPlaying { player.pause() } else { player.play() }
+        if isPlaying {
+            player.pause()
+        } else {
+            player.play()
+            if rate != 1 { player.rate = rate }
+        }
     }
 
     func next() {
@@ -202,12 +224,22 @@ final class AudioPlayer: ObservableObject {
 
     func seek(to seconds: Double) {
         player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600))
-        position = max(0, seconds)
+        clock.position = max(0, seconds)
         updateNowPlayingInfo()
     }
 
     func setVolume(_ value: Float) {
         player.volume = min(max(value, 0), 1)
+    }
+
+    func setRate(_ value: Float) {
+        rate = min(max(value, 0.5), 2)
+        if isPlaying { player.rate = rate }
+    }
+
+    /// Jumps by the user's configured step, used by the ±N second buttons.
+    func seekBy(_ seconds: Double) {
+        seek(to: max(0, position + seconds))
     }
 
     func toggleShuffle() {
@@ -253,11 +285,14 @@ final class AudioPlayer: ObservableObject {
         let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
         currentTrack = track
-        position = 0
-        duration = Double(track.duration ?? 0)
+        clock.position = 0
+        clock.duration = Double(track.duration ?? 0)
         listenAccumulated = 0
         listenStartedAt = nil
-        if autoPlay { player.play() }
+        if autoPlay {
+            player.play()
+            if rate != 1 { player.rate = rate }
+        }
         updateNowPlayingInfo()
         onStateChanged?()
     }
