@@ -68,7 +68,7 @@ fun MusicyApp() {
             )
         } else {
             val api = remember(config) { ApiClient.create(config) }
-            MainScreen(api, config.userName ?: "You") {
+            MainScreen(api, config.userName ?: "there") {
                 scope.launch { store.clear() }
             }
         }
@@ -191,7 +191,7 @@ fun MainScreen(api: app.serika.musicy.mobile.data.api.MusicyApi, userName: Strin
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) { HomeScreen(viewModel) }
+            composable(Screen.Home.route) { HomeScreen(viewModel, userName) }
             composable(Screen.Search.route) { SearchScreen(viewModel) }
             composable(Screen.Library.route) { LibraryScreen(viewModel) }
             composable(Screen.Profile.route) { ProfileScreen(userName, onLogout) }

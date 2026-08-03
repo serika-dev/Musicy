@@ -115,6 +115,10 @@ final class MusicyAPI: ObservableObject {
     }
 
     func getLikedSongs() async throws -> LikedSongsResponse {
-        try await decode(LikedSongsResponse.self, path: "api/user/liked-songs?limit=50")
+        try await decode(LikedSongsResponse.self, path: "api/mobile/liked-songs?limit=50")
+    }
+
+    func getFeed() async throws -> FeedResponse {
+        try await decode(FeedResponse.self, path: "api/mobile/feed")
     }
 }
