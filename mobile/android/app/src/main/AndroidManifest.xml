@@ -9,20 +9,15 @@
     <!-- Required from Android 13 for the media playback notification. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Declares Android Auto support to the Play Store / car host. -->
-    <uses-feature
-        android:name="android.hardware.type.automotive"
-        android:required="false" />
-
     <application
         android:name=".MusicyApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Musicy"
-        android:usesCleartextTraffic="false">
+        android:theme="@style/Theme.Musicy">
 
         <activity
             android:name=".MainActivity"
@@ -32,6 +27,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Marks Musicy as a music app to the launcher and to Auto. -->
+                <category android:name="android.intent.category.APP_MUSIC" />
             </intent-filter>
             <!-- "Play <song> on Musicy" from Assistant lands here. -->
             <intent-filter>
@@ -48,7 +45,8 @@
             <intent-filter>
                 <!-- Media3 controllers (the app itself). -->
                 <action android:name="androidx.media3.session.MediaLibraryService" />
-                <!-- Legacy MediaBrowser clients: Android Auto, Assistant, Wear. -->
+                <!-- This is the one Android Auto looks for when deciding
+                     whether Musicy belongs in the car's app list. -->
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
@@ -61,13 +59,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- Android Auto reads this to learn Musicy is a media app. It must be
+             the only car-related metadata: declaring androidx.car.app.* makes
+             the host expect a Car App Library CarAppService instead, and the
+             app is then dropped from the car's launcher. -->
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
-        <meta-data
-            android:name="androidx.car.app.minCarApiLevel"
-            android:value="1" />
-        <!-- Lets Android Auto show the browse tree before playback starts. -->
         <meta-data
             android:name="com.google.android.gms.car.notification.SmallIcon"
             android:resource="@drawable/ic_notification" />

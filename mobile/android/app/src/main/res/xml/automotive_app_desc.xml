@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only documented `uses` values belong here. An unrecognised entry makes the
+     Android Auto host reject the whole descriptor, which silently removes the
+     app from the car's launcher. -->
 <automotiveApp>
     <uses name="media" />
-    <!-- Enables the car's search button against our MediaLibraryService. -->
-    <uses name="search" />
 </automotiveApp>

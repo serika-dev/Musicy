@@ -2,13 +2,19 @@ name: Android CI
 
 on:
   push:
-    branches: [main, master]
+    # Feature branches build too, so an installable APK exists before a PR.
+    branches: [main, master, 'claude/**', 'devin/**', 'feature/**']
     paths:
       - 'mobile/android/**'
       - '.github/workflows/mobile-android.yml'
   pull_request:
     paths:
       - 'mobile/android/**'
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -23,15 +29,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Android app
-        uses: gradle/gradle-build-action@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.7
-          arguments: assembleDebug
-          build-root-directory: mobile/android
+          gradle-version: '8.7'
 
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: gradle --no-daemon --stacktrace assembleDebug
+
+      # A signed APK installs by tapping the artifact; the unsigned release
+      # output cannot be sideloaded, so debug is what we publish.
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: musicy-android-debug
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

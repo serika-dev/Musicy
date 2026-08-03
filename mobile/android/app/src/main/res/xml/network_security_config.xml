@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HTTPS everywhere by default, with one carve-out: self-hosted Musicy instances
+  are commonly reached over plain HTTP on a home network, and blocking that made
+  the "connect to any server" promise untrue for LAN setups. Public hosts still
+  require TLS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">local</domain>
+        <domain includeSubdomains="true">home.arpa</domain>
+    </domain-config>
+</network-security-config>

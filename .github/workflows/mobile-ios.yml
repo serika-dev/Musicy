@@ -2,13 +2,18 @@ name: iOS CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'claude/**', 'devin/**', 'feature/**']
     paths:
       - 'mobile/iOS/**'
       - '.github/workflows/mobile-ios.yml'
   pull_request:
     paths:
       - 'mobile/iOS/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -24,16 +29,21 @@ jobs:
         working-directory: mobile/iOS
         run: xcodegen generate
 
+      # Pin to whatever simulator this image actually has rather than a
+      # hard-coded device name that breaks on every Xcode bump.
       - name: Build iOS app
         working-directory: mobile/iOS
         run: |
           xcodebuild -scheme Musicy \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath DerivedData \
-            clean build
+            -skipPackagePluginValidation \
+            clean build \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Upload app bundle
         uses: actions/upload-artifact@v4
         with:
           name: musicy-ios-debug
           path: mobile/iOS/DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app
+          if-no-files-found: error

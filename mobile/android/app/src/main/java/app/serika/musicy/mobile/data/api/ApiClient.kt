@@ -27,6 +27,7 @@ object ApiClient {
 
     private val apis = mutableMapOf<ServerConfig, MusicyApi>()
     private val clients = mutableMapOf<ServerConfig, OkHttpClient>()
+    private val streamClients = mutableMapOf<ServerConfig, OkHttpClient>()
 
     /** `https://host` with no trailing slash. */
     fun normalizedBaseUrl(config: ServerConfig): String =
@@ -50,14 +51,10 @@ object ApiClient {
         return if (value.startsWith("/")) base + value else "$base/$value"
     }
 
-    @Synchronized
-    fun okHttp(config: ServerConfig): OkHttpClient = clients.getOrPut(config) {
+    private fun builder(config: ServerConfig): OkHttpClient.Builder =
         OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            // The sync stream is a long-lived SSE response, so per-call reads
-            // must never time out; the stream sends its own heartbeats.
-            .readTimeout(0, TimeUnit.MILLISECONDS)
             .retryOnConnectionFailure(true)
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder().apply {
@@ -72,6 +69,23 @@ object ApiClient {
             .addInterceptor(
                 HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
             )
+
+    /** Ordinary API calls: a hung request should fail, not wedge a screen. */
+    @Synchronized
+    fun okHttp(config: ServerConfig): OkHttpClient = clients.getOrPut(config) {
+        builder(config).readTimeout(30, TimeUnit.SECONDS).build()
+    }
+
+    /**
+     * The sync stream is a long-lived SSE response, so its reads must never
+     * time out — the server sends its own heartbeats. Kept separate so this
+     * setting can't leak into normal requests.
+     */
+    @Synchronized
+    fun streamOkHttp(config: ServerConfig): OkHttpClient = streamClients.getOrPut(config) {
+        builder(config)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .pingInterval(30, TimeUnit.SECONDS)
             .build()
     }
 

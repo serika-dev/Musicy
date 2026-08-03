@@ -261,6 +261,15 @@ class MusicyPlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = serviceScope.future {
+            // A signed-out browse is the car's problem to surface, not an empty
+            // list: Auto renders this as a "Sign in" button that opens the app.
+            if (!repo.config.value.isConfigured) {
+                return@future LibraryResult.ofError(
+                    SessionResult.RESULT_ERROR_SESSION_AUTHENTICATION_EXPIRED,
+                    signInLibraryParams()
+                )
+            }
+
             val children = withContext(Dispatchers.IO) {
                 runCatching { library.children(parentId) }
                     .onFailure { Log.w(TAG, "browse failed for $parentId: ${it.message}") }
@@ -352,6 +361,25 @@ class MusicyPlaybackService : MediaLibraryService() {
 
     private val searchCache = mutableMapOf<String, List<MediaItem>>()
 
+    /**
+     * Extras that turn a browse error into an actionable prompt in the car.
+     * Android Auto reads these legacy keys and renders a labelled button that
+     * launches the phone app so the user can sign in.
+     */
+    private fun signInLibraryParams(): LibraryParams {
+        val launch = PendingIntent.getActivity(
+            this,
+            1,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val extras = Bundle().apply {
+            putString(ERROR_RESOLUTION_ACTION_LABEL, getString(R.string.auto_sign_in_action))
+            putParcelable(ERROR_RESOLUTION_ACTION_INTENT, launch)
+        }
+        return LibraryParams.Builder().setExtras(extras).build()
+    }
+
     private suspend fun resolveItems(items: List<MediaItem>): List<MediaItem> = items.map { item ->
         if (item.localConfiguration != null) {
             item
@@ -415,6 +443,10 @@ class MusicyPlaybackService : MediaLibraryService() {
         const val COMMAND_TOGGLE_LIKE = "app.serika.musicy.TOGGLE_LIKE"
         const val COMMAND_REFRESH_LIBRARY = "app.serika.musicy.REFRESH_LIBRARY"
         const val ARG_TRACK_ID = "trackId"
+
+        // Legacy MediaBrowser keys Android Auto still reads for error actions.
+        private const val ERROR_RESOLUTION_ACTION_LABEL = "android.media.extras.ERROR_RESOLUTION_ACTION_LABEL"
+        private const val ERROR_RESOLUTION_ACTION_INTENT = "android.media.extras.ERROR_RESOLUTION_ACTION_INTENT"
     }
 }
 

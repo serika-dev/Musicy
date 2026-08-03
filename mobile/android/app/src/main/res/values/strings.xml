@@ -3,4 +3,5 @@
     <string name="app_name">Musicy</string>
     <string name="channel_playback_name">Playback</string>
     <string name="channel_playback_description">Shows the currently playing track</string>
+    <string name="auto_sign_in_action">Sign in</string>
 </resources>

@@ -132,7 +132,7 @@ class SyncClient(
             .header("Cache-Control", "no-cache")
             .build()
 
-        ApiClient.okHttp(config).newCall(request).execute().use { response ->
+        ApiClient.streamOkHttp(config).newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("sync stream HTTP ${response.code}")
             _connected.value = true
             val source = response.body?.source() ?: error("empty sync stream")
