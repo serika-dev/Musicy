@@ -41,9 +41,11 @@ fun HomeScreen(viewModel: AppViewModel, userName: String) {
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            item { GreetingHeader(userName, feed?.featuredAlbum) { first ->
-                viewModel.playTrack(first, listOf(first))
-            } }
+            item {
+                GreetingHeader(userName, feed?.featuredAlbum) { first ->
+                    viewModel.playTrack(first, listOf(first))
+                }
+            }
 
             if (isLoading) {
                 item {
@@ -53,100 +55,86 @@ fun HomeScreen(viewModel: AppViewModel, userName: String) {
                 }
             }
 
-            if (feed?.recentlyPlayed?.isNotEmpty() == true) {
-                section("Jump Back In") {
-                    TrackRow(feed.recentlyPlayed, viewModel)
-                }
-            }
+            feed?.recentlyPlayed?.let { if (it.isNotEmpty()) {
+                item { Section("Jump Back In") { TrackRow(it, viewModel) } }
+            } }
 
             if (viewModel.dailyMixes.isNotEmpty()) {
-                section("Made for you") {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp)
-                    ) {
-                        items(viewModel.dailyMixes) { mix ->
-                            MediaCard(
-                                imageUrl = mix.coverImageUrl,
-                                title = mix.name,
-                                subtitle = mix.description,
-                                onPlay = {
-                                    mix.tracks?.firstOrNull()?.let { first ->
-                                        viewModel.playTrack(first, mix.tracks)
+                item {
+                    Section("Made for you") {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp)
+                        ) {
+                            items(viewModel.dailyMixes) { mix ->
+                                MediaCard(
+                                    imageUrl = mix.coverImageUrl,
+                                    title = mix.name,
+                                    subtitle = mix.description,
+                                    onPlay = {
+                                        mix.tracks?.firstOrNull()?.let { first ->
+                                            viewModel.playTrack(first, mix.tracks)
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            if (feed?.followedAlbums?.isNotEmpty() == true) {
-                section("New from Artists You Follow") {
-                    AlbumRow(feed.followedAlbums, viewModel)
-                }
-            }
+            feed?.followedAlbums?.let { if (it.isNotEmpty()) {
+                item { Section("New from Artists You Follow") { AlbumRow(it, viewModel) } }
+            } }
 
-            if (feed?.recommendedTracks?.isNotEmpty() == true) {
-                section("Recommended for You") {
-                    TrackRow(feed.recommendedTracks, viewModel)
-                }
-            }
+            feed?.recommendedTracks?.let { if (it.isNotEmpty()) {
+                item { Section("Recommended for You") { TrackRow(it, viewModel) } }
+            } }
 
             if (viewModel.albums.isNotEmpty()) {
-                section("New albums") {
-                    AlbumRow(viewModel.albums, viewModel)
-                }
+                item { Section("New albums") { AlbumRow(viewModel.albums, viewModel) } }
             }
 
-            if (feed?.topArtists?.isNotEmpty() == true) {
-                section("Your Top Artists") {
-                    ArtistRow(feed.topArtists)
-                }
-            }
+            feed?.topArtists?.let { if (it.isNotEmpty()) {
+                item { Section("Your Top Artists") { ArtistRow(it) } }
+            } }
 
-            if (feed?.recommendedArtists?.isNotEmpty() == true) {
-                section("Artists We Think You'll Like") {
-                    ArtistRow(feed.recommendedArtists)
-                }
-            }
+            feed?.recommendedArtists?.let { if (it.isNotEmpty()) {
+                item { Section("Artists We Think You'll Like") { ArtistRow(it) } }
+            } }
 
-            if (feed?.discoverAlbums?.isNotEmpty() == true) {
-                section("More to Explore") {
-                    AlbumRow(feed.discoverAlbums, viewModel)
-                }
-            }
+            feed?.discoverAlbums?.let { if (it.isNotEmpty()) {
+                item { Section("More to Explore") { AlbumRow(it, viewModel) } }
+            } }
 
             if (viewModel.artists.isNotEmpty()) {
-                section("Artists") {
-                    ArtistRow(viewModel.artists)
-                }
+                item { Section("Artists") { ArtistRow(viewModel.artists) } }
             }
 
-            if (feed?.newReleases?.isNotEmpty() == true) {
-                section("New Releases") {
-                    AlbumRow(feed.newReleases, viewModel)
-                }
-            }
+            feed?.newReleases?.let { if (it.isNotEmpty()) {
+                item { Section("New Releases") { AlbumRow(it, viewModel) } }
+            } }
 
             if (viewModel.playlists.isNotEmpty()) {
-                section("Community playlists") {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp)
-                    ) {
-                        items(viewModel.playlists) { playlist ->
-                            MediaCard(
-                                imageUrl = playlist.coverImageUrl,
-                                title = playlist.name,
-                                subtitle = "${playlist.count?.tracks ?: 0} tracks",
-                                onPlay = {
-                                    playlist.tracks?.firstOrNull()?.track?.let { first ->
-                                        val list = playlist.tracks?.map { it.track } ?: emptyList()
-                                        viewModel.playTrack(first, list)
+                item {
+                    Section("Community playlists") {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp)
+                        ) {
+                            items(viewModel.playlists) { playlist ->
+                                MediaCard(
+                                    imageUrl = playlist.coverImageUrl,
+                                    title = playlist.name,
+                                    subtitle = "${playlist.count?.tracks ?: 0} tracks",
+                                    onPlay = {
+                                        playlist.tracks?.firstOrNull()?.track?.let { first ->
+                                            val list = playlist.tracks?.map { it.track } ?: emptyList()
+                                            viewModel.playTrack(first, list)
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -158,9 +146,11 @@ fun HomeScreen(viewModel: AppViewModel, userName: String) {
 }
 
 @Composable
-private fun LazyListScope.section(title: String, content: @Composable () -> Unit) {
-    item { SectionTitle(title) }
-    item { content() }
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle(title)
+        content()
+    }
 }
 
 @Composable
