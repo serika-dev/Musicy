@@ -46,4 +46,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: musicy-ios-debug
-          path: DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app
+          path: mobile/iOS/DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app
