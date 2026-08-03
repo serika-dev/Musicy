@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { getAuthSession } from "@/lib/mobile-auth";
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -9,7 +8,7 @@ interface RouteContext {
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     
     if (!session) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     
     if (!session) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -84,7 +83,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     
     if (!session) {
       return NextResponse.json({ isFollowing: false })

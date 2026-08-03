@@ -1,16 +1,15 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { getAuthSession } from '@/lib/mobile-auth'
 import { prisma } from '@/lib/db'
 
 interface RouteContext {
   params: Promise<{ id: string }>
 }
 
-export async function GET(_request: NextRequest, { params }: RouteContext) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     const { id } = await params
 
     if (!session?.user?.id) {
@@ -93,7 +92,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 // Save daily mix as playlist
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     
     if (!session?.user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })

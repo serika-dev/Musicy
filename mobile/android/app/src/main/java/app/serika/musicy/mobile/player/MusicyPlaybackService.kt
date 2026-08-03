@@ -1,375 +1,511 @@
 package app.serika.musicy.mobile.player
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaDescriptionCompat
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import androidx.media.MediaBrowserServiceCompat
+import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media.session.MediaButtonReceiver
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import app.serika.musicy.mobile.MainActivity
 import app.serika.musicy.mobile.R
-import app.serika.musicy.mobile.data.api.ApiClient
-import app.serika.musicy.mobile.data.api.MusicyApi
-import app.serika.musicy.mobile.data.model.ServerConfig
+import app.serika.musicy.mobile.data.MusicyRepository
 import app.serika.musicy.mobile.data.model.Track
-import app.serika.musicy.mobile.data.preferences.ServerConfigStore
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-private const val MEDIA_ROOT_ID = "__ROOT__"
-private const val TAG = "MusicyPlaybackSvc"
-private const val CHANNEL_ID = "musicy_playback"
-private const val NOTIFICATION_ID = 1
+/**
+ * The one place audio actually plays.
+ *
+ * The in-app UI, the notification, Bluetooth buttons and Android Auto all
+ * attach to this session, so there is a single queue and a single transport
+ * state no matter where the user pressed play.
+ */
+@OptIn(UnstableApi::class)
+class MusicyPlaybackService : MediaLibraryService() {
 
-class MusicyPlaybackService : MediaBrowserServiceCompat() {
-
-    private val job = SupervisorJob()
-    private val scope = CoroutineScope(Dispatchers.IO + job)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var player: ExoPlayer
-    private lateinit var mediaSession: MediaSessionCompat
-    private lateinit var api: MusicyApi
-    private lateinit var config: ServerConfig
+    private lateinit var session: MediaLibrarySession
+    private lateinit var repo: MusicyRepository
+    private lateinit var library: MusicyLibrary
 
-    private val handler = Handler(Looper.getMainLooper())
-
-    private var currentQueue: List<Track> = emptyList()
-    private var currentQueueIndex: Int = -1
+    /** Accumulates listening time so plays are scrobbled with a real duration. */
+    private var scrobbleTrackId: String? = null
+    private var scrobbleStartedAtMs: Long = 0L
+    private var scrobbleAccumulatedMs: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        repo = MusicyRepository.get(this)
+        library = MusicyLibrary(repo)
 
-        val store = ServerConfigStore(this)
-        config = try {
-            runBlocking { store.config.first() }
-        } catch (e: Exception) {
-            ServerConfig()
-        }
-        api = ApiClient.create(config)
-
-        player = ExoPlayer.Builder(this).build().apply {
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    updatePlaybackState(if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_ENDED) {
-                        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
-                    }
-                }
-            })
-        }
-
-        val sessionCallback = MediaSessionCallback()
-        mediaSession = MediaSessionCompat(this, "Musicy").apply {
-            setCallback(sessionCallback)
-            setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
-            setSessionActivity(
-                PendingIntent.getActivity(
-                    this@MusicyPlaybackService,
-                    0,
-                    Intent(this@MusicyPlaybackService, MainActivity::class.java),
-                    PendingIntent.FLAG_IMMUTABLE
-                )
+        player = ExoPlayer.Builder(this)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                /* handleAudioFocus = */ true
             )
-            isActive = true
-        }
-        sessionToken = mediaSession.sessionToken
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .build()
 
-        updatePlaybackState(PlaybackStateCompat.STATE_NONE)
+        player.addListener(PlaybackListener())
+
+        val sessionActivity = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        session = MediaLibrarySession.Builder(this, player, LibraryCallback())
+            .setSessionActivity(sessionActivity)
+            .setId(SESSION_ID)
+            .build()
+
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this)
+                .setChannelNameResourceId(R.string.channel_playback_name)
+                .build()
+                .apply { setSmallIcon(R.drawable.ic_notification) }
+        )
+
+        PlaybackBridge.attach(repo, library, serviceScope) { player }
+    }
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Swiping the app away while paused should not leave a dead
+        // notification behind; while playing, keep going in the background.
+        if (!player.playWhenReady || player.mediaItemCount == 0) {
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
+        flushScrobble()
+        PlaybackBridge.detach()
+        session.release()
         player.release()
-        mediaSession.release()
-        job.cancel()
+        serviceScope.cancel()
         super.onDestroy()
     }
 
-    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot? {
-        return BrowserRoot(MEDIA_ROOT_ID, null)
+    // -- scrobbling ---------------------------------------------------------
+
+    private fun startScrobble(trackId: String?) {
+        flushScrobble()
+        scrobbleTrackId = trackId
+        scrobbleAccumulatedMs = 0L
+        scrobbleStartedAtMs = if (player.isPlaying) System.currentTimeMillis() else 0L
     }
 
-    override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
-        result.detach()
-        scope.launch {
-            try {
-                val items = loadChildrenFor(parentId)
-                result.sendResult(items.toMutableList())
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading children for $parentId", e)
-                result.sendResult(mutableListOf())
+    private fun pauseScrobble() {
+        if (scrobbleStartedAtMs > 0L) {
+            scrobbleAccumulatedMs += System.currentTimeMillis() - scrobbleStartedAtMs
+            scrobbleStartedAtMs = 0L
+        }
+    }
+
+    private fun resumeScrobble() {
+        if (scrobbleTrackId != null && scrobbleStartedAtMs == 0L) {
+            scrobbleStartedAtMs = System.currentTimeMillis()
+        }
+    }
+
+    private fun flushScrobble() {
+        pauseScrobble()
+        val id = scrobbleTrackId
+        val seconds = (scrobbleAccumulatedMs / 1000L).toInt()
+        scrobbleTrackId = null
+        scrobbleAccumulatedMs = 0L
+        // Anything under a few seconds is a skip, not a listen.
+        if (id != null && seconds >= 5) repo.recordPlay(id, seconds)
+    }
+
+    private inner class PlaybackListener : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            startScrobble(mediaItem?.mediaId)
+            maybeExtendQueue()
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) resumeScrobble() else pauseScrobble()
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) flushScrobble()
+        }
+    }
+
+    /**
+     * Keeps the music going past the end of a short queue when the user has
+     * autoplay enabled, mirroring the web app's "autoplay recommendations".
+     */
+    private fun maybeExtendQueue() {
+        if (!repo.settings.value.autoplayRecommendations) return
+        val remaining = player.mediaItemCount - player.currentMediaItemIndex
+        if (remaining > 2 || player.mediaItemCount == 0) return
+        serviceScope.launch {
+            val existing = buildSet {
+                for (i in 0 until player.mediaItemCount) add(player.getMediaItemAt(i).mediaId)
             }
+            val extra = withContext(Dispatchers.IO) {
+                runCatching { repo.feed().recommendedTracks }.getOrDefault(emptyList())
+            }.filterNot { it.id in existing }.take(10)
+            if (extra.isEmpty()) return@launch
+            player.addMediaItems(extra.map { MediaItems.fromTrack(it, repo) })
         }
     }
 
-    private suspend fun loadChildrenFor(parentId: String): List<MediaBrowserCompat.MediaItem> = when (parentId) {
-        MEDIA_ROOT_ID -> listOf(
-            browsable("menu_daily_mixes", "Daily Mixes", "Mixes made for you", null),
-            browsable("menu_albums", "Albums", "Browse albums", null),
-            browsable("menu_artists", "Artists", "Browse artists", null),
-            browsable("menu_playlists", "Playlists", "Community playlists", null),
-            browsable("menu_liked", "Liked Songs", "Your liked tracks", null)
-        )
-        "menu_daily_mixes" -> api.getDailyMixes().map { mix ->
-            browsable("mix_${mix.id}", mix.name, mix.description ?: "", mix.coverImageUrl)
+    // -- browse tree --------------------------------------------------------
+
+    private inner class LibraryCallback : MediaLibrarySession.Callback {
+
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val available = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+                .buildUpon()
+                .add(SessionCommand(COMMAND_TOGGLE_LIKE, Bundle.EMPTY))
+                .add(SessionCommand(COMMAND_REFRESH_LIBRARY, Bundle.EMPTY))
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(available)
+                .build()
         }
-        "menu_albums" -> api.getAlbums(limit = 20).albums.map { album ->
-            browsable("album_${album.id}", album.title, album.artist?.name ?: "", album.coverImageUrl)
-        }
-        "menu_artists" -> api.getArtists(limit = 20).artists.map { artist ->
-            browsable("artist_${artist.id}", artist.name, "", artist.imageUrl)
-        }
-        "menu_playlists" -> api.getPlaylists(limit = 20).playlists.map { playlist ->
-            browsable("playlist_${playlist.id}", playlist.name, "${playlist.count?.tracks ?: 0} tracks", playlist.coverImageUrl)
-        }
-        "menu_liked" -> api.getLikedSongs(limit = 50).tracks.map { track ->
-            playable("track_${track.id}", track.title, track.artist?.name ?: "", track.album?.coverImageUrl ?: track.coverImageUrl)
-        }
-        else -> when {
-            parentId.startsWith("mix_") -> {
-                val id = parentId.removePrefix("mix_")
-                val mix = api.getDailyMixes().find { it.id == id }
-                mix?.tracks?.map { track ->
-                    playable("track_${track.id}", track.title, track.artist?.name ?: "", track.album?.coverImageUrl ?: track.coverImageUrl)
-                } ?: emptyList()
-            }
-            parentId.startsWith("album_") -> {
-                val id = parentId.removePrefix("album_")
-                val album = api.getAlbum(id)
-                album.tracks?.map { track ->
-                    playable("track_${track.id}", track.title, track.artist?.name ?: "", album.coverImageUrl ?: track.coverImageUrl)
-                } ?: emptyList()
-            }
-            parentId.startsWith("artist_") -> {
-                val id = parentId.removePrefix("artist_")
-                val tracks = api.getArtistTracks(id, limit = 50).tracks
-                tracks.map { track ->
-                    playable("track_${track.id}", track.title, track.artist?.name ?: "", track.album?.coverImageUrl ?: track.coverImageUrl)
-                }
-            }
-            parentId.startsWith("playlist_") -> {
-                val id = parentId.removePrefix("playlist_")
-                val playlist = api.getPlaylist(id)
-                playlist.tracks?.map { playlistTrack ->
-                    val track = playlistTrack.track
-                    playable("track_${track.id}", track.title, track.artist?.name ?: "", playlist.coverImageUrl ?: track.coverImageUrl)
-                } ?: emptyList()
-            }
-            else -> emptyList()
-        }
-    }
 
-    private fun browsable(mediaId: String, title: String, subtitle: String, iconUri: String?): MediaBrowserCompat.MediaItem {
-        val description = MediaDescriptionCompat.Builder()
-            .setMediaId(mediaId)
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setIconUri(iconUri?.let { Uri.parse(it) })
-            .build()
-        return MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_BROWSABLE)
-    }
-
-    private fun playable(mediaId: String, title: String, subtitle: String, iconUri: String?): MediaBrowserCompat.MediaItem {
-        val description = MediaDescriptionCompat.Builder()
-            .setMediaId(mediaId)
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setIconUri(iconUri?.let { Uri.parse(it) })
-            .build()
-        return MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
-    }
-
-    private fun playTrack(track: Track, queue: List<Track> = listOf(track), index: Int = 0) {
-        val url = track.filePath ?: return
-        currentQueue = queue
-        currentQueueIndex = index
-        val mediaItem = MediaItem.fromUri(url)
-        handler.post {
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            player.play()
-            updateMetadata(track)
-            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
-            startForeground(NOTIFICATION_ID, buildNotification())
-        }
-    }
-
-    private fun updateMetadata(track: Track) {
-        val builder = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, track.id)
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, track.title)
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, track.artist?.name)
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, track.album?.title)
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, (track.duration ?: 0).toLong() * 1000L)
-        track.album?.coverImageUrl?.let { builder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, it) }
-        track.coverImageUrl?.let { builder.putString(MediaMetadataCompat.METADATA_KEY_ART_URI, it) }
-        mediaSession.setMetadata(builder.build())
-    }
-
-    private fun updatePlaybackState(state: Int) {
-        val position = player.currentPosition.coerceAtLeast(0L)
-        val playbackState = PlaybackStateCompat.Builder()
-            .setState(state, position, 1.0f)
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-            )
-            .build()
-        mediaSession.setPlaybackState(playbackState)
-    }
-
-    private fun buildNotification(): android.app.Notification {
-        val prevAction = NotificationCompat.Action(
-            R.drawable.ic_skip_previous, "Previous",
-            MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
-        )
-        val playPauseAction = if (player.isPlaying) {
-            NotificationCompat.Action(
-                R.drawable.ic_pause, "Pause",
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_PAUSE)
-            )
-        } else {
-            NotificationCompat.Action(
-                R.drawable.ic_play, "Play",
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_PLAY)
-            )
-        }
-        val nextAction = NotificationCompat.Action(
-            R.drawable.ic_skip_next, "Next",
-            MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_NEXT)
-        )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(mediaSession.controller.metadata?.getString(MediaMetadataCompat.METADATA_KEY_TITLE) ?: "Musicy")
-            .setContentText(mediaSession.controller.metadata?.getString(MediaMetadataCompat.METADATA_KEY_ARTIST) ?: "")
-            .setSmallIcon(R.drawable.ic_notification)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
-                .setMediaSession(mediaSession.sessionToken)
-                .setShowActionsInCompactView(0, 1, 2))
-            .addAction(prevAction)
-            .addAction(playPauseAction)
-            .addAction(nextAction)
-            .setContentIntent(mediaSession.controller.sessionActivity)
-            .build()
-    }
-
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.channel_playback_name),
-            NotificationManager.IMPORTANCE_LOW
-        ).apply { description = getString(R.string.channel_playback_description) }
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
-    }
-
-    private inner class MediaSessionCallback : MediaSessionCompat.Callback() {
-        override fun onPlay() {
-            handler.post {
-                if (player.playbackState == Player.STATE_IDLE && player.currentMediaItem == null) {
-                    // nothing to resume
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> = when (customCommand.customAction) {
+            COMMAND_TOGGLE_LIKE -> serviceScope.future {
+                val trackId = args.getString(ARG_TRACK_ID) ?: player.currentMediaItem?.mediaId
+                if (trackId == null) {
+                    SessionResult(SessionResult.RESULT_ERROR_INVALID_STATE)
                 } else {
-                    player.play()
-                    startForeground(NOTIFICATION_ID, buildNotification())
+                    withContext(Dispatchers.IO) { repo.toggleLike(trackId) }
+                    SessionResult(SessionResult.RESULT_SUCCESS)
+                }
+            }
+            COMMAND_REFRESH_LIBRARY -> {
+                library.clearCaches()
+                this@MusicyPlaybackService.session.notifyChildrenChanged(MusicyLibrary.ROOT, Int.MAX_VALUE, null)
+                Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            else -> Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
+        }
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            val extras = Bundle().apply {
+                putBoolean(MediaItems.CONTENT_STYLE_SUPPORTED, true)
+                putInt(MediaItems.CONTENT_STYLE_BROWSABLE_HINT, MediaItems.CONTENT_STYLE_GRID)
+                putInt(MediaItems.CONTENT_STYLE_PLAYABLE_HINT, MediaItems.CONTENT_STYLE_LIST)
+            }
+            val root = MediaItem.Builder()
+                .setMediaId(MusicyLibrary.ROOT)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle("Musicy")
+                        .setIsBrowsable(true)
+                        .setIsPlayable(false)
+                        .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                        .setExtras(extras)
+                        .build()
+                )
+                .build()
+            return Futures.immediateFuture(
+                LibraryResult.ofItem(root, LibraryParams.Builder().setExtras(extras).build())
+            )
+        }
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = serviceScope.future {
+            val children = withContext(Dispatchers.IO) {
+                runCatching { library.children(parentId) }
+                    .onFailure { Log.w(TAG, "browse failed for $parentId: ${it.message}") }
+                    .getOrDefault(emptyList())
+            }
+            LibraryResult.ofItemList(ImmutableList.copyOf(children), params)
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            mediaId: String
+        ): ListenableFuture<LibraryResult<MediaItem>> = serviceScope.future {
+            val track = withContext(Dispatchers.IO) { library.trackFor(mediaId) }
+            if (track == null) {
+                LibraryResult.ofError(SessionResult.RESULT_ERROR_BAD_VALUE)
+            } else {
+                LibraryResult.ofItem(MediaItems.fromTrack(track, repo), null)
+            }
+        }
+
+        override fun onSearch(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<Void>> = serviceScope.future {
+            val results = withContext(Dispatchers.IO) {
+                runCatching { library.searchResults(query) }.getOrDefault(emptyList())
+            }
+            searchCache[query] = results
+            session.notifySearchResultChanged(browser, query, results.size, params)
+            LibraryResult.ofVoid()
+        }
+
+        override fun onGetSearchResult(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = serviceScope.future {
+            val cached = searchCache[query] ?: withContext(Dispatchers.IO) {
+                runCatching { library.searchResults(query) }.getOrDefault(emptyList())
+            }
+            LibraryResult.ofItemList(ImmutableList.copyOf(cached), params)
+        }
+
+        /**
+         * Android Auto and voice assistants hand back a bare media id; this
+         * turns it into something with a stream URL, expanding a single tap
+         * into the album or playlist it came from.
+         */
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future {
+            withContext(Dispatchers.IO) { expand(mediaItems, startIndex, startPositionMs) }
+        }
+
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<MutableList<MediaItem>> = serviceScope.future {
+            withContext(Dispatchers.IO) { resolveItems(mediaItems).toMutableList() }
+        }
+
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future {
+            // Resuming from a car or headset with no session: fall back to the
+            // user's liked songs so the play button is never a dead end.
+            val tracks = withContext(Dispatchers.IO) {
+                runCatching { repo.likedSongs(limit = 50) }.getOrDefault(emptyList())
+            }
+            MediaSession.MediaItemsWithStartPosition(
+                tracks.map { MediaItems.fromTrack(it, repo, MusicyLibrary.NODE_LIKED) },
+                0,
+                C.TIME_UNSET
+            )
+        }
+    }
+
+    private val searchCache = mutableMapOf<String, List<MediaItem>>()
+
+    private suspend fun resolveItems(items: List<MediaItem>): List<MediaItem> = items.map { item ->
+        if (item.localConfiguration != null) {
+            item
+        } else {
+            val track = library.trackFor(item.mediaId)
+            if (track != null) {
+                MediaItems.fromTrack(track, repo, MediaItems.parentIdOf(item))
+            } else {
+                item
+            }
+        }
+    }
+
+    private suspend fun expand(
+        items: List<MediaItem>,
+        startIndex: Int,
+        startPositionMs: Long
+    ): MediaSession.MediaItemsWithStartPosition {
+        val resolved = resolveItems(items)
+
+        if (resolved.size == 1) {
+            val single = resolved.first()
+            val parentId = MediaItems.parentIdOf(single)
+
+            // A browse folder was played directly ("play this album").
+            if (parentId == null && single.localConfiguration == null) {
+                val queue = library.queueFor(single.mediaId)
+                if (queue.isNotEmpty()) {
+                    return MediaSession.MediaItemsWithStartPosition(
+                        queue.map { MediaItems.fromTrack(it, repo, single.mediaId) },
+                        0,
+                        C.TIME_UNSET
+                    )
+                }
+            }
+
+            // A single song was tapped inside a folder: queue its siblings.
+            if (parentId != null) {
+                val queue = library.queueFor(parentId)
+                val index = queue.indexOfFirst { it.id == single.mediaId }
+                if (queue.size > 1 && index >= 0) {
+                    return MediaSession.MediaItemsWithStartPosition(
+                        queue.map { MediaItems.fromTrack(it, repo, parentId) },
+                        index,
+                        startPositionMs
+                    )
                 }
             }
         }
 
-        override fun onPause() {
-            handler.post {
-                player.pause()
-                stopForeground(false)
-                updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
-            }
-        }
+        return MediaSession.MediaItemsWithStartPosition(
+            resolved,
+            startIndex.coerceIn(0, (resolved.size - 1).coerceAtLeast(0)),
+            startPositionMs
+        )
+    }
 
-        override fun onStop() {
-            handler.post {
-                player.stop()
-                stopForeground(true)
-                updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
-            }
-        }
+    companion object {
+        private const val TAG = "MusicyPlayback"
+        const val SESSION_ID = "musicy_session"
+        const val COMMAND_TOGGLE_LIKE = "app.serika.musicy.TOGGLE_LIKE"
+        const val COMMAND_REFRESH_LIBRARY = "app.serika.musicy.REFRESH_LIBRARY"
+        const val ARG_TRACK_ID = "trackId"
+    }
+}
 
-        override fun onSkipToNext() {
-            if (currentQueue.isNotEmpty() && currentQueueIndex < currentQueue.size - 1) {
-                currentQueueIndex += 1
-                playTrack(currentQueue[currentQueueIndex], currentQueue, currentQueueIndex)
-            }
-        }
+/**
+ * Bridges the running service to the multi-device sync bus.
+ *
+ * Sync has to keep working while the UI is gone — a phone playing in the car
+ * should still show up as the active device on the web — so the SSE client is
+ * owned by the service rather than by a screen.
+ */
+@OptIn(UnstableApi::class)
+private object PlaybackBridge {
+    private var syncClient: app.serika.musicy.mobile.sync.SyncClient? = null
 
-        override fun onSkipToPrevious() {
-            if (currentQueue.isNotEmpty() && currentQueueIndex > 0) {
-                currentQueueIndex -= 1
-                playTrack(currentQueue[currentQueueIndex], currentQueue, currentQueueIndex)
-            }
-        }
+    fun attach(
+        repo: MusicyRepository,
+        library: MusicyLibrary,
+        scope: CoroutineScope,
+        player: () -> Player
+    ) {
+        val client = app.serika.musicy.mobile.sync.SyncClient(repo, scope)
+        syncClient = client
+        SyncHolder.client = client
 
-        override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-            mediaId ?: return
+        client.onCommand = { command ->
             scope.launch {
-                try {
-                    when {
-                        mediaId.startsWith("track_") -> {
-                            val id = mediaId.removePrefix("track_")
-                            val track = api.getTrack(id)
-                            playTrack(track)
-                        }
-                        mediaId.startsWith("mix_") -> {
-                            val id = mediaId.removePrefix("mix_")
-                            val mix = api.getDailyMixes().find { it.id == id }
-                            val tracks = mix?.tracks ?: emptyList()
-                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
-                        }
-                        mediaId.startsWith("album_") -> {
-                            val id = mediaId.removePrefix("album_")
-                            val album = api.getAlbum(id)
-                            val tracks = album.tracks ?: emptyList()
-                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
-                        }
-                        mediaId.startsWith("artist_") -> {
-                            val id = mediaId.removePrefix("artist_")
-                            val tracks = api.getArtistTracks(id, limit = 50).tracks
-                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
-                        }
-                        mediaId.startsWith("playlist_") -> {
-                            val id = mediaId.removePrefix("playlist_")
-                            val playlist = api.getPlaylist(id)
-                            val tracks = playlist.tracks?.map { it.track } ?: emptyList()
-                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
-                        }
-                        mediaId == "menu_liked" || mediaId == "shuffle_liked" -> {
-                            val tracks = api.getLikedSongs(limit = 50).tracks
-                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
+                val p = player()
+                when (command.action) {
+                    "play" -> p.play()
+                    "pause" -> p.pause()
+                    "toggle" -> if (p.isPlaying) p.pause() else p.play()
+                    "next" -> p.seekToNextMediaItem()
+                    "previous" -> p.seekToPreviousMediaItem()
+                    "seek" -> command.seconds?.let { p.seekTo((it * 1000).toLong()) }
+                    "setVolume" -> command.volume?.let { p.volume = it.toFloat().coerceIn(0f, 1f) }
+                    "claim" -> {
+                        client.claim()
+                        p.play()
+                    }
+                    "playTrack" -> command.trackId?.let { id ->
+                        val track: Track? = withContext(Dispatchers.IO) { library.trackFor(id) }
+                        if (track != null) {
+                            p.setMediaItem(MediaItems.fromTrack(track, repo))
+                            p.prepare()
+                            p.play()
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to play $mediaId", e)
                 }
             }
         }
+
+        client.onRemoteClaim = {
+            scope.launch { player().pause() }
+        }
+
+        client.start()
+
+        // Heartbeat: broadcast our transport state while we hold playback, on
+        // the same 2s cadence the web client uses.
+        scope.launch {
+            while (isActive) {
+                val p = player()
+                if (client.isThisDeviceActive && p.mediaItemCount > 0) {
+                    val queue = buildList {
+                        for (i in 0 until p.mediaItemCount) {
+                            MediaItems.toTrack(p.getMediaItemAt(i))?.let { add(it) }
+                        }
+                    }
+                    client.publishState(
+                        currentTrack = MediaItems.toTrack(p.currentMediaItem),
+                        isPlaying = p.isPlaying,
+                        positionSeconds = p.currentPosition / 1000.0,
+                        durationSeconds = p.duration.takeIf { it > 0 }?.div(1000.0) ?: 0.0,
+                        queue = queue,
+                        currentIndex = p.currentMediaItemIndex
+                    )
+                }
+                delay(2_000)
+            }
+        }
     }
+
+    fun detach() {
+        syncClient?.stop()
+        syncClient = null
+        SyncHolder.client = null
+    }
+}
+
+/** Process-wide handle so the UI can read sync state owned by the service. */
+object SyncHolder {
+    @Volatile
+    var client: app.serika.musicy.mobile.sync.SyncClient? = null
 }

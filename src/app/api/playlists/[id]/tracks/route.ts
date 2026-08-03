@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
+import { getAuthSession } from "@/lib/mobile-auth";
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -10,7 +9,7 @@ interface RouteContext {
 // Add track to playlist
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
@@ -137,7 +136,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 // Remove track from playlist
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

@@ -8,194 +8,248 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import app.serika.musicy.mobile.data.api.ApiClient
-import app.serika.musicy.mobile.data.preferences.ServerConfigStore
-import app.serika.musicy.mobile.ui.components.BottomPlayer
-import app.serika.musicy.mobile.ui.screens.HomeScreen
-import app.serika.musicy.mobile.ui.screens.LibraryScreen
-import app.serika.musicy.mobile.ui.screens.PlayerScreen
-import app.serika.musicy.mobile.ui.screens.ProfileScreen
-import app.serika.musicy.mobile.ui.screens.SearchScreen
-import app.serika.musicy.mobile.ui.screens.SetupScreen
-import app.serika.musicy.mobile.ui.theme.*
-import app.serika.musicy.mobile.ui.viewmodel.AppViewModel
+import androidx.navigation.navArgument
+import app.serika.musicy.mobile.data.MusicyRepository
+import app.serika.musicy.mobile.data.model.ServerConfig
+import app.serika.musicy.mobile.ui.components.Artwork
+import app.serika.musicy.mobile.ui.components.MiniPlayer
+import app.serika.musicy.mobile.ui.screens.*
+import app.serika.musicy.mobile.ui.theme.MusicyTheme
+import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
+import app.serika.musicy.mobile.ui.theme.Primary
+import app.serika.musicy.mobile.ui.theme.SurfaceVariant
+import app.serika.musicy.mobile.ui.viewmodel.MusicyViewModel
 import kotlinx.coroutines.launch
 
-sealed class Screen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    data object Home : Screen("home", "Home", Icons.Default.Home)
-    data object Search : Screen("search", "Search", Icons.Default.Search)
-    data object Library : Screen("library", "Library", Icons.Default.LibraryMusic)
-    data object Profile : Screen("profile", "Profile", Icons.Default.Person)
-    data object Player : Screen("player", "Now Playing", Icons.Default.LibraryMusic)
+private sealed class Tab(val route: String, val label: String, val icon: ImageVector) {
+    data object Home : Tab(Routes.HOME, "Home", Icons.Default.Home)
+    data object Search : Tab(Routes.SEARCH, "Search", Icons.Default.Search)
+    data object Library : Tab(Routes.LIBRARY, "Library", Icons.Default.LibraryMusic)
+    data object Profile : Tab(Routes.PROFILE, "Profile", Icons.Default.Person)
 }
+
+private val tabs = listOf(Tab.Home, Tab.Search, Tab.Library, Tab.Profile)
 
 @Composable
 fun MusicyApp() {
     MusicyTheme {
         val context = LocalContext.current
-        val store = remember { ServerConfigStore(context) }
-        val config by store.config.collectAsState(initial = app.serika.musicy.mobile.data.model.ServerConfig())
+        val repo = remember { MusicyRepository.get(context) }
+        val config by repo.config.collectAsState(initial = ServerConfig())
         val scope = rememberCoroutineScope()
 
-        if (config.baseUrl.isBlank() || config.apiKey.isBlank()) {
-            SetupScreen(
-                onSave = { url, key, userName ->
-                    scope.launch { store.save(url, key, userName) }
-                }
-            )
+        if (!config.isConfigured) {
+            SetupScreen(onSave = { url, key, userName ->
+                scope.launch { repo.serverConfigStore.save(url, key, userName) }
+            })
         } else {
-            val api = remember(config) { ApiClient.create(config) }
-            MainScreen(api, config.userName ?: "there") {
-                scope.launch { store.clear() }
-            }
+            MainScaffold(config = config)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(api: app.serika.musicy.mobile.data.api.MusicyApi, userName: String, onLogout: () -> Unit) {
+private fun MainScaffold(config: ServerConfig) {
+    // Keyed on the server config so signing into a different instance rebuilds
+    // the whole state tree instead of showing the previous account's data.
+    val vm: MusicyViewModel = viewModel(key = "musicy-${config.baseUrl}-${config.apiKey.takeLast(6)}")
     val navController = rememberNavController()
-    val viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory(api))
-    val track = viewModel.currentTrack
-    val isPlaying = viewModel.isPlaying
+    val nav = remember(navController) { Nav(navController) }
+
+    val playback by vm.player.state.collectAsState()
+    val liked by vm.likedTrackIds.collectAsState()
+    val toast by vm.toast.collectAsState()
+    val profile by vm.profile.collectAsState()
+    val snackbarHost = remember { SnackbarHostState() }
+
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val isPlayerRoute = currentRoute == Routes.PLAYER
+    val isTabRoute = tabs.any { it.route == currentRoute }
+
+    LaunchedEffect(toast) {
+        toast?.let {
+            snackbarHost.showSnackbar(it)
+            vm.consumeToast()
+        }
+    }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Surface),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Musicy",
-                                tint = Primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("Musicy", style = MaterialTheme.typography.titleLarge, color = OnBackground)
-                    }
-                },
-                actions = {
-                    Surface(
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .clip(CircleShape)
-                            .clickable { navController.navigate(Screen.Profile.route) },
-                        color = SurfaceVariant
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+            if (isTabRoute) {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(PrimaryContainer),
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(Primary),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = userName.take(1).uppercase(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = OnPrimary
+                                Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Musicy", style = MaterialTheme.typography.titleLarge)
+                        }
+                    },
+                    actions = {
+                        Row(
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .clip(CircleShape)
+                                .background(SurfaceVariant)
+                                .clickable { nav.profile() }
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Artwork(
+                                url = vm.repo.resolveUrl(profile?.avatarUrl),
+                                contentDescription = null,
+                                shape = CircleShape,
+                                icon = Icons.Default.Person,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
                             Text(
-                                text = userName,
+                                text = profile?.label ?: config.userName ?: "You",
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = OnBackground
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Background.copy(alpha = 0.85f),
-                    titleContentColor = OnBackground
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
                 )
-            )
+            }
         },
         bottomBar = {
-            Column {
-                if (track != null) {
-                    BottomPlayer(
-                        track = track,
-                        isPlaying = isPlaying,
-                        onToggle = { viewModel.togglePlayPause() },
-                        onOpen = { navController.navigate(Screen.Player.route) }
+            if (!isPlayerRoute) {
+                Column {
+                    MiniPlayer(
+                        state = playback,
+                        isLiked = playback.currentTrack?.id?.let { it in liked } == true,
+                        artworkUrl = vm.repo.resolveUrl(playback.currentTrack?.artworkUrl),
+                        onOpen = { nav.player() },
+                        onTogglePlay = {
+                            if (vm.isRemoteControlling) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause()
+                        },
+                        onNext = { if (vm.isRemoteControlling) vm.sendRemoteCommand("next") else vm.player.next() },
+                        onToggleLike = { playback.currentTrack?.let { vm.toggleLike(it) } }
                     )
-                }
-                NavigationBar(containerColor = Surface) {
-                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentDestination = navBackStackEntry?.destination
-                    listOf(Screen.Home, Screen.Search, Screen.Library, Screen.Profile).forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.label) },
-                            label = { Text(screen.label) },
-                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                    Spacer(Modifier.height(6.dp))
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                        tabs.forEach { tab ->
+                            val selected = backStackEntry?.destination?.hierarchy?.any { it.route == tab.route } == true
+                            NavigationBarItem(
+                                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                                label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
+                                selected = selected,
+                                onClick = {
+                                    navController.navigate(tab.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Primary,
-                                selectedTextColor = Primary,
-                                indicatorColor = PrimaryContainer
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Primary,
+                                    selectedTextColor = Primary,
+                                    unselectedIconColor = OnSurfaceVariant,
+                                    unselectedTextColor = OnSurfaceVariant,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
         }
-    ) { innerPadding ->
+    ) { padding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
+            startDestination = Routes.HOME,
+            modifier = Modifier.padding(padding)
         ) {
-            composable(Screen.Home.route) { HomeScreen(viewModel, userName) }
-            composable(Screen.Search.route) { SearchScreen(viewModel) }
-            composable(Screen.Library.route) { LibraryScreen(viewModel) }
-            composable(Screen.Profile.route) { ProfileScreen(userName, onLogout) }
-            composable(Screen.Player.route) { PlayerScreen(viewModel, onClose = { navController.popBackStack() }) }
+            composable(Routes.HOME) {
+                HomeScreen(vm, nav, profile?.label ?: config.userName ?: "there")
+            }
+            composable(Routes.SEARCH) { SearchScreen(vm, nav) }
+            composable(Routes.LIBRARY) { LibraryScreen(vm, nav) }
+            composable(Routes.PROFILE) { ProfileScreen(vm, nav) }
+            composable(Routes.SETTINGS) { SettingsScreen(vm, nav) }
+            composable(Routes.PLAYER) { PlayerScreen(vm, nav) }
+            composable(Routes.LIKED) { LikedSongsScreen(vm, nav) }
+            composable(Routes.DOWNLOADS) { DownloadsScreen(vm, nav) }
+
+            composable(
+                route = Routes.ALBUM,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entry ->
+                AlbumScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
+            }
+            composable(
+                route = Routes.ARTIST,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entry ->
+                ArtistScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
+            }
+            composable(
+                route = Routes.PLAYLIST,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entry ->
+                PlaylistScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
+            }
+            composable(
+                route = Routes.MIX,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entry ->
+                DailyMixScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
+            }
+            composable(
+                route = Routes.GENRE,
+                arguments = listOf(navArgument("name") { type = NavType.StringType })
+            ) { entry ->
+                val encoded = entry.arguments?.getString("name").orEmpty()
+                GenreScreen(vm, nav, java.net.URLDecoder.decode(encoded, "UTF-8"))
+            }
+            composable(
+                route = Routes.COLLECTION,
+                arguments = listOf(navArgument("kind") { type = NavType.StringType })
+            ) { entry ->
+                CollectionScreen(vm, nav, entry.arguments?.getString("kind").orEmpty())
+            }
         }
     }
 }

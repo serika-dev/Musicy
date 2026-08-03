@@ -1,8 +1,7 @@
 import { type NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { broadcastDeviceList } from "@/lib/devices";
+import { getAuthSession } from "@/lib/mobile-auth";
 import {
   isDeviceLive,
   publish,
@@ -16,7 +15,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession(request);
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }

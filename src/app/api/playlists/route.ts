@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
+import { getAuthSession } from "@/lib/mobile-auth";
 
 const createPlaylistSchema = z.object({
   name: z.string().min(1).max(100),
@@ -12,7 +11,7 @@ const createPlaylistSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
     const { searchParams } = new URL(request.url)
     
     const limit = Math.min(Number(searchParams.get('limit')) || 10, 50)
@@ -85,7 +84,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAuthSession(request)
 
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
