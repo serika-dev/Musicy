@@ -157,6 +157,7 @@ fun HomeScreen(viewModel: AppViewModel, userName: String) {
     }
 }
 
+@Composable
 private fun LazyListScope.section(title: String, content: @Composable () -> Unit) {
     item { SectionTitle(title) }
     item { content() }
