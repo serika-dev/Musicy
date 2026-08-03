@@ -10,6 +10,8 @@ import app.serika.musicy.mobile.player.PlayerConnection
 import app.serika.musicy.mobile.player.SyncHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,6 +97,11 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     init {
         player.connect()
         mirrorSyncClient()
+        viewModelScope.launch {
+            // Off the main thread, before any queue is built.
+            withContext(Dispatchers.IO) { repo.downloadStore.warmUp() }
+            repo.pullAccountSettings()
+        }
         viewModelScope.launch { repo.ensureLikedIdsLoaded() }
         loadHome()
         loadLibrary()
@@ -106,23 +113,25 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
-    /** Waits for the service's sync client, then mirrors its flows into ours. */
+    /**
+     * Waits for the service's sync client, then mirrors its flows into ours.
+     * The wait loop exits as soon as the client appears — it used to poll for
+     * the lifetime of the view model.
+     */
     private fun mirrorSyncClient() {
         viewModelScope.launch {
-            var bound: Any? = null
-            while (true) {
-                val client = SyncHolder.client
-                if (client != null && client !== bound) {
-                    bound = client
-                    syncMirrorJob?.cancel()
-                    syncMirrorJob = launch {
-                        launch { client.devices.collect { _syncDevices.value = it } }
-                        launch { client.activeDeviceId.collect { _syncActiveDeviceId.value = it } }
-                        launch { client.connected.collect { _syncConnected.value = it } }
-                        launch { client.deviceId.collect { _thisDeviceId.value = it } }
-                    }
-                }
-                delay(1_000)
+            var client = SyncHolder.client
+            while (client == null) {
+                delay(500)
+                client = SyncHolder.client
+            }
+            val bound = client
+            syncMirrorJob?.cancel()
+            syncMirrorJob = launch {
+                launch { bound.devices.collect { _syncDevices.value = it } }
+                launch { bound.activeDeviceId.collect { _syncActiveDeviceId.value = it } }
+                launch { bound.connected.collect { _syncConnected.value = it } }
+                launch { bound.deviceId.collect { _thisDeviceId.value = it } }
             }
         }
     }
@@ -135,15 +144,25 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             _home.value = Async.Loading
             _home.value = runCatching {
                 withContext(Dispatchers.IO) {
-                    val feed = runCatching { repo.feed() }.getOrNull()
-                    HomeState(
-                        feed = feed,
-                        dailyMixes = runCatching { repo.dailyMixes() }.getOrDefault(emptyList()),
-                        genres = runCatching { repo.genres() }.getOrDefault(emptyList()),
-                        albums = runCatching { repo.albums(limit = 20).albums }.getOrDefault(emptyList()),
-                        artists = runCatching { repo.artists(limit = 20).artists }.getOrDefault(emptyList()),
-                        playlists = runCatching { repo.playlists(limit = 20) }.getOrDefault(emptyList())
-                    )
+                    // Fired together rather than one after another: six serial
+                    // round-trips made the home screen feel broken on a slow
+                    // connection.
+                    coroutineScope {
+                        val feed = async { runCatching { repo.feed() }.getOrNull() }
+                        val mixes = async { runCatching { repo.dailyMixes() }.getOrDefault(emptyList()) }
+                        val genres = async { runCatching { repo.genres() }.getOrDefault(emptyList()) }
+                        val albums = async { runCatching { repo.albums(limit = 20).albums }.getOrDefault(emptyList()) }
+                        val artists = async { runCatching { repo.artists(limit = 20).artists }.getOrDefault(emptyList()) }
+                        val playlists = async { runCatching { repo.playlists(limit = 20) }.getOrDefault(emptyList()) }
+                        HomeState(
+                            feed = feed.await(),
+                            dailyMixes = mixes.await(),
+                            genres = genres.await(),
+                            albums = albums.await(),
+                            artists = artists.await(),
+                            playlists = playlists.await()
+                        )
+                    }
                 }
             }.fold(
                 onSuccess = { Async.Success(it) },
@@ -158,13 +177,20 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             _library.value = Async.Loading
             _library.value = runCatching {
                 withContext(Dispatchers.IO) {
-                    LibraryState(
-                        likedSongs = runCatching { repo.likedSongs() }.getOrDefault(emptyList()),
-                        playlists = runCatching { repo.playlists(limit = 50) }.getOrDefault(emptyList()),
-                        followedArtists = repo.followedArtists(),
-                        recentlyPlayed = repo.recentlyPlayed(),
-                        albums = runCatching { repo.albums(limit = 30).albums }.getOrDefault(emptyList())
-                    )
+                    coroutineScope {
+                        val liked = async { runCatching { repo.likedSongs() }.getOrDefault(emptyList()) }
+                        val playlists = async { runCatching { repo.playlists(limit = 50) }.getOrDefault(emptyList()) }
+                        val followed = async { repo.followedArtists() }
+                        val recent = async { repo.recentlyPlayed() }
+                        val albums = async { runCatching { repo.albums(limit = 30).albums }.getOrDefault(emptyList()) }
+                        LibraryState(
+                            likedSongs = liked.await(),
+                            playlists = playlists.await(),
+                            followedArtists = followed.await(),
+                            recentlyPlayed = recent.await(),
+                            albums = albums.await()
+                        )
+                    }
                 }
             }.fold(
                 onSuccess = { Async.Success(it) },
@@ -310,12 +336,55 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
 
     // -- settings -----------------------------------------------------------
 
-    fun setSyncEnabled(value: Boolean) = viewModelScope.launch { repo.settingsStore.setSyncEnabled(value) }
-    fun setDeviceName(value: String) = viewModelScope.launch { repo.settingsStore.setDeviceName(value) }
-    fun setAutoplay(value: Boolean) = viewModelScope.launch { repo.settingsStore.setAutoplayRecommendations(value) }
-    fun setGapless(value: Boolean) = viewModelScope.launch { repo.settingsStore.setGaplessPlayback(value) }
-    fun setPrivateSession(value: Boolean) = viewModelScope.launch { repo.settingsStore.setPrivateSession(value) }
-    fun setPreferSyncedLyrics(value: Boolean) = viewModelScope.launch { repo.settingsStore.setPreferSyncedLyrics(value) }
+    // Device-local preferences.
+    fun setSyncEnabled(value: Boolean) = device { setSyncEnabled(value) }
+    fun setDeviceName(value: String) = device { setDeviceName(value) }
+    fun setResumeOnLaunch(value: Boolean) = device { setResumeOnLaunch(value) }
+    fun setDownloadOnWifiOnly(value: Boolean) = device { setDownloadOnWifiOnly(value) }
+    fun setHapticFeedback(value: Boolean) = device { setHapticFeedback(value) }
+    fun setSkipSilence(value: Boolean) = device { setSkipSilence(value) }
+    fun setSeekStep(value: Int) = device { setSeekStepSeconds(value) }
+
+    fun setPlaybackSpeed(value: Float) = device {
+        setPlaybackSpeed(value)
+        player.setPlaybackSpeed(value)
+    }
+
+    // Account-wide preferences: saved locally, then pushed so they follow the
+    // user to the web app and survive a reinstall.
+    fun setAutoplay(value: Boolean) = account { setAutoplayRecommendations(value) }
+    fun setGapless(value: Boolean) = account { setGaplessPlayback(value) }
+    fun setPrivateSession(value: Boolean) = account { setPrivateSession(value) }
+    fun setAllowScrobbling(value: Boolean) = account { setAllowScrobbling(value) }
+    fun setNormalizeVolume(value: Boolean) = account { setNormalizeVolume(value) }
+    fun setAudioQuality(value: String) = account { setAudioQuality(value) }
+    fun setPreferSyncedLyrics(value: Boolean) = account { setPreferSyncedLyrics(value) }
+    fun setAutoRomanize(value: Boolean) = account { setAutoRomanizeLyrics(value) }
+    fun setRomanizeLanguage(value: String) = account { setRomanizeLanguage(value) }
+    fun setRomanizeAlongside(value: Boolean) = account { setShowRomanizationAlongside(value) }
+    fun setReducedMotion(value: Boolean) = account { setReducedMotion(value) }
+    fun setShowNowPlayingNotifications(value: Boolean) = account { setShowNowPlayingNotifications(value) }
+
+    fun setDefaultVolume(value: Float) = account {
+        setDefaultVolume(value)
+        player.setVolume(value)
+    }
+
+    fun resetSettings() {
+        viewModelScope.launch {
+            repo.settingsStore.resetToDefaults()
+            showToast("Settings reset")
+        }
+    }
+
+    private inline fun device(crossinline block: suspend app.serika.musicy.mobile.data.preferences.AppSettingsStore.() -> Unit): Job =
+        viewModelScope.launch { repo.settingsStore.block() }
+
+    private inline fun account(crossinline block: suspend app.serika.musicy.mobile.data.preferences.AppSettingsStore.() -> Unit): Job =
+        viewModelScope.launch {
+            repo.settingsStore.block()
+            repo.pushAccountSettings()
+        }
 
     fun signOut() {
         viewModelScope.launch {

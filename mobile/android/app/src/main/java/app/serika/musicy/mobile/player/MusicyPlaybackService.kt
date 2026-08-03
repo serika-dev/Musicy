@@ -98,6 +98,17 @@ class MusicyPlaybackService : MediaLibraryService() {
         )
 
         PlaybackBridge.attach(repo, library, serviceScope) { player }
+
+        // Keep the engine in step with the user's preferences.
+        serviceScope.launch {
+            repo.settings.collect { settings ->
+                player.skipSilenceEnabled = settings.skipSilence
+                if (player.playbackParameters.speed != settings.playbackSpeed) {
+                    player.setPlaybackSpeed(settings.playbackSpeed)
+                }
+                player.volume = settings.defaultVolume
+            }
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session

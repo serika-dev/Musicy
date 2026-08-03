@@ -36,6 +36,7 @@ import app.serika.musicy.mobile.ui.theme.SurfaceVariant
 @Composable
 fun MiniPlayer(
     state: PlaybackUiState,
+    progress: Float,
     isLiked: Boolean,
     artworkUrl: String?,
     onOpen: () -> Unit,
@@ -60,7 +61,7 @@ fun MiniPlayer(
                 .clickable(onClick = onOpen)
         ) {
             LinearProgressIndicator(
-                progress = { state.progress },
+                progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp),

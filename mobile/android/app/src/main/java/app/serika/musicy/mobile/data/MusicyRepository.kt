@@ -121,6 +121,19 @@ class MusicyRepository private constructor(context: Context) {
 
     suspend fun lyrics(id: String): LyricsResponse = api.getLyrics(id)
 
+    /**
+     * Romanized lyrics for a track. The server caches the result per track, so
+     * only the first request for a song is slow.
+     *
+     * @param mode "synced" or "plain", matching the lyrics being displayed.
+     */
+    suspend fun romanizedLyrics(trackId: String, mode: String): String? {
+        val language = _settings.value.romanizeLanguage.takeIf { it != "auto" }
+        return runCatching {
+            api.romanize(RomanizeRequest(trackId = trackId, mode = mode, language = language)).romanized
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
     suspend fun search(query: String, limit: Int = 20): SearchResponse =
         api.search(query = query, limit = limit)
 
@@ -143,6 +156,22 @@ class MusicyRepository private constructor(context: Context) {
     // -- library ------------------------------------------------------------
 
     suspend fun profile(): User = api.getProfile()
+
+    /**
+     * Pulls account-wide settings so preferences follow the user across
+     * devices, reinstalls and app updates.
+     */
+    suspend fun pullAccountSettings() {
+        val remote = runCatching { api.getUserSettings() }.getOrNull() ?: return
+        settingsStore.applyFromAccount(remote)
+    }
+
+    /** Pushes the account-scoped slice back up. Failures are not fatal. */
+    fun pushAccountSettings() {
+        scope.launch {
+            runCatching { api.putUserSettings(_settings.value.toUserSettings()) }
+        }
+    }
 
     suspend fun likedSongs(limit: Int = 200): List<Track> {
         val tracks = api.getLikedSongs(limit = limit).tracks
@@ -203,9 +232,9 @@ class MusicyRepository private constructor(context: Context) {
         return if (response?.isSuccessful == true) follow else !follow
     }
 
-    /** Fire-and-forget play scrobble; skipped entirely in a private session. */
+    /** Fire-and-forget play scrobble; skipped in a private session or opt-out. */
     fun recordPlay(trackId: String, seconds: Int, context: PlayContext? = null) {
-        if (_settings.value.privateSession) return
+        if (_settings.value.privateSession || !_settings.value.allowScrobbling) return
         scope.launch {
             runCatching { api.recordPlay(PlayRequest(trackId = trackId, duration = seconds, context = context)) }
         }

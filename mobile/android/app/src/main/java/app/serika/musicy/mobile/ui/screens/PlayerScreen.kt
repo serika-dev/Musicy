@@ -3,8 +3,6 @@ package app.serika.musicy.mobile.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -15,8 +13,10 @@ import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -28,11 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.serika.musicy.mobile.data.model.Track
 import app.serika.musicy.mobile.player.RepeatMode
 import app.serika.musicy.mobile.ui.Nav
 import app.serika.musicy.mobile.ui.components.*
@@ -42,17 +39,17 @@ import app.serika.musicy.mobile.ui.theme.Outline
 import app.serika.musicy.mobile.ui.theme.Primary
 import app.serika.musicy.mobile.ui.viewmodel.MusicyViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/** One line of an LRC file. */
-private data class LyricLine(val timeMs: Long, val text: String)
 
 @Composable
 fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     val state by vm.player.state.collectAsState()
+    // Position lives in its own flow so the scrubber and lyrics can tick
+    // without dragging the rest of the screen through a recomposition.
+    val position by vm.player.position.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
+    val settings by vm.settings.collectAsState()
     val devices by vm.syncDevices.collectAsState()
     val activeDeviceId by vm.syncActiveDeviceId.collectAsState()
     val thisDeviceId by vm.thisDeviceId.collectAsState()
@@ -66,6 +63,7 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
 
     val track = state.currentTrack
     val scope = rememberCoroutineScope()
+    val haptics = settings.hapticFeedback
 
     if (track == null) {
         EmptyState(
@@ -78,6 +76,21 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     }
 
     val isDownloaded = remember(track.id, downloading) { vm.repo.isDownloaded(track.id) }
+    val remote = vm.isRemoteControlling
+
+    val onTogglePlay = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause()
+    }
+    val onNext = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("next") else vm.player.next()
+    }
+    val onPrevious = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("previous") else vm.player.previous()
+    }
+    val onShuffle = rememberHapticClick(haptics) { vm.player.toggleShuffle() }
+    val onRepeat = rememberHapticClick(haptics) { vm.player.cycleRepeat() }
+    val onRewind = rememberHapticClick(haptics) { vm.player.seekBy(-settings.seekStepSeconds) }
+    val onForward = rememberHapticClick(haptics) { vm.player.seekBy(settings.seekStepSeconds) }
 
     Column(
         modifier = Modifier
@@ -97,12 +110,13 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("NOW PLAYING", style = MaterialTheme.typography.labelSmall, color = OnSurfaceVariant)
                 Text(
-                    text = when {
-                        vm.isRemoteControlling -> devices.firstOrNull { it.id == activeDeviceId }?.name ?: "Another device"
-                        else -> "This device"
+                    text = if (remote) {
+                        devices.firstOrNull { it.id == activeDeviceId }?.name ?: "Another device"
+                    } else {
+                        "This device"
                     },
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (vm.isRemoteControlling) Primary else OnSurfaceVariant,
+                    color = if (remote) Primary else OnSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -145,7 +159,7 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            IconButton(onClick = { vm.toggleLike(track) }) {
+            IconButton(onClick = rememberHapticClick(haptics) { vm.toggleLike(track) }) {
                 Icon(
                     imageVector = if (track.id in liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (track.id in liked) "Remove from Liked Songs" else "Add to Liked Songs",
@@ -177,20 +191,16 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
 
         Spacer(Modifier.height(12.dp))
 
-        // Seek bar. While the thumb is held, the local value wins so the bar
-        // doesn't fight the player's position updates.
-        val sliderValue = scrubPosition ?: state.progress
+        // While the thumb is held the local value wins, so the bar doesn't
+        // fight the player's own position updates.
+        val sliderValue = scrubPosition ?: position.progress
         Slider(
             value = sliderValue,
             onValueChange = { scrubPosition = it },
             onValueChangeFinished = {
                 scrubPosition?.let { fraction ->
-                    val target = (state.durationMs * fraction).toLong()
-                    if (vm.isRemoteControlling) {
-                        vm.sendRemoteCommand("seek", target / 1000.0)
-                    } else {
-                        vm.player.seekTo(target)
-                    }
+                    val target = (position.durationMs * fraction).toLong()
+                    if (remote) vm.sendRemoteCommand("seek", target / 1000.0) else vm.player.seekTo(target)
                 }
                 scrubPosition = null
             },
@@ -202,12 +212,12 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
-                formatDurationMs((state.durationMs * sliderValue).toLong()),
+                formatDurationMs((position.durationMs * sliderValue).toLong()),
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurfaceVariant
             )
             Text(
-                formatDurationMs(state.durationMs),
+                formatDurationMs(position.durationMs),
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurfaceVariant
             )
@@ -220,30 +230,21 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { vm.player.toggleShuffle() }) {
+            IconButton(onClick = onShuffle) {
                 Icon(
                     Icons.Default.Shuffle,
                     contentDescription = "Shuffle",
                     tint = if (state.shuffle) Primary else OnSurfaceVariant
                 )
             }
-            IconButton(
-                onClick = { if (vm.isRemoteControlling) vm.sendRemoteCommand("previous") else vm.player.previous() }
-            ) {
+            IconButton(onClick = onPrevious) {
                 Icon(Icons.Default.SkipPrevious, contentDescription = "Previous track", modifier = Modifier.size(34.dp))
             }
-            PlayPauseButton(
-                isPlaying = state.isPlaying,
-                onClick = { if (vm.isRemoteControlling) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause() },
-                size = 68.dp
-            )
-            IconButton(
-                enabled = state.hasNext || vm.isRemoteControlling,
-                onClick = { if (vm.isRemoteControlling) vm.sendRemoteCommand("next") else vm.player.next() }
-            ) {
+            PlayPauseButton(isPlaying = state.isPlaying, onClick = onTogglePlay, size = 68.dp)
+            IconButton(enabled = state.hasNext || remote, onClick = onNext) {
                 Icon(Icons.Default.SkipNext, contentDescription = "Next track", modifier = Modifier.size(34.dp))
             }
-            IconButton(onClick = { vm.player.cycleRepeat() }) {
+            IconButton(onClick = onRepeat) {
                 Icon(
                     imageVector = if (state.repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
                     contentDescription = "Repeat mode",
@@ -252,7 +253,25 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        if (!remote) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onRewind) {
+                    Icon(Icons.Default.Replay10, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("${settings.seekStepSeconds}s")
+                }
+                Spacer(Modifier.width(24.dp))
+                TextButton(onClick = onForward) {
+                    Text("${settings.seekStepSeconds}s")
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.Forward10, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -271,7 +290,14 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
         }
 
         AnimatedVisibility(visible = showLyrics) {
-            LyricsPanel(vm = vm, track = track, positionMs = state.positionMs)
+            LyricsPanel(
+                vm = vm,
+                track = track,
+                positionMs = position.positionMs,
+                onSeek = { target ->
+                    if (remote) vm.sendRemoteCommand("seek", target / 1000.0) else vm.player.seekTo(target)
+                }
+            )
         }
 
         Spacer(Modifier.height(32.dp))
@@ -299,100 +325,4 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             onTransfer = { vm.transferPlaybackTo(it) }
         )
     }
-}
-
-/**
- * Synced lyrics when the server has them, plain text otherwise — the same
- * LRCLib data the web player renders.
- */
-@Composable
-private fun LyricsPanel(vm: MusicyViewModel, track: Track, positionMs: Long) {
-    val lyrics by loadAsync(track.id) { vm.repo.lyrics(track.id) }
-    val settings by vm.settings.collectAsState()
-
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        val data = lyrics.valueOrNull
-        when {
-            lyrics is app.serika.musicy.mobile.ui.viewmodel.Async.Loading ->
-                CircularProgressIndicator(color = Primary, modifier = Modifier.padding(16.dp))
-
-            data == null || !data.hasAnything ->
-                Text(
-                    "No lyrics found for this track.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = OnSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-
-            settings.preferSyncedLyrics && !data.syncedLyrics.isNullOrBlank() ->
-                SyncedLyrics(parseLrc(data.syncedLyrics), positionMs)
-
-            else -> Text(
-                data.plainLyrics ?: data.syncedLyrics.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = OnSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-@Composable
-private fun SyncedLyrics(lines: List<LyricLine>, positionMs: Long) {
-    if (lines.isEmpty()) return
-    val activeIndex = remember(positionMs, lines) {
-        lines.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
-    }
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(activeIndex) {
-        // A beat of delay keeps the scroll from fighting a user drag.
-        delay(80)
-        listState.animateScrollToItem(activeIndex.coerceAtLeast(0))
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(280.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        items(lines.size) { index ->
-            val active = index == activeIndex
-            Text(
-                text = lines[index].text.ifBlank { "♪" },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                color = if (active) Color.White else OnSurfaceVariant.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-            )
-        }
-    }
-}
-
-/** Parses `[mm:ss.xx] text` lines out of an LRC payload. */
-private fun parseLrc(raw: String?): List<LyricLine> {
-    if (raw.isNullOrBlank()) return emptyList()
-    val pattern = Regex("""\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?]""")
-    return raw.lineSequence().mapNotNull { line ->
-        val match = pattern.find(line) ?: return@mapNotNull null
-        val minutes = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
-        val seconds = match.groupValues[2].toLongOrNull() ?: return@mapNotNull null
-        val fraction = match.groupValues[3]
-        val millis = when (fraction.length) {
-            0 -> 0L
-            1 -> fraction.toLong() * 100
-            2 -> fraction.toLong() * 10
-            else -> fraction.toLong()
-        }
-        LyricLine(
-            timeMs = minutes * 60_000 + seconds * 1_000 + millis,
-            text = line.substring(match.range.last + 1).trim()
-        )
-    }.sortedBy { it.timeMs }.toList()
 }

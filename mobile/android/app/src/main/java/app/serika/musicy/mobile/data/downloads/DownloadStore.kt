@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import app.serika.musicy.mobile.data.api.ApiClient
 import app.serika.musicy.mobile.data.model.Track
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -48,6 +49,18 @@ class DownloadStore(context: Context) {
     private val directory: File
         get() = File(appContext.filesDir, "downloads").apply { if (!exists()) mkdirs() }
 
+    /**
+     * trackId -> local file path, kept in memory.
+     *
+     * [localUri] is called while building every queue item, on the main thread.
+     * Hitting the filesystem there made long playlists visibly janky, so the
+     * directory is scanned once and then maintained as files come and go.
+     */
+    private val localFiles = ConcurrentHashMap<String, String>()
+
+    @Volatile
+    private var scanned = false
+
     val downloads: Flow<List<DownloadedTrack>> = dataStore.data.map { prefs ->
         prefs[INDEX_KEY]?.let { raw ->
             runCatching { json.decodeFromString<DownloadIndex>(raw).items }.getOrDefault(emptyList())
@@ -56,13 +69,21 @@ class DownloadStore(context: Context) {
 
     suspend fun current(): List<DownloadedTrack> = withContext(Dispatchers.IO) { downloads.first() }
 
-    fun fileFor(trackId: String): File? =
-        directory.listFiles()?.firstOrNull { it.nameWithoutExtension == trackId }?.takeIf { it.length() > 0 }
+    /** Populates the in-memory index. Safe to call repeatedly; scans once. */
+    suspend fun warmUp() = withContext(Dispatchers.IO) {
+        if (scanned) return@withContext
+        directory.listFiles()?.forEach { file ->
+            if (file.length() > 0) localFiles[file.nameWithoutExtension] = file.absolutePath
+        }
+        scanned = true
+    }
+
+    fun fileFor(trackId: String): File? = localFiles[trackId]?.let(::File)?.takeIf { it.length() > 0 }
 
     /** Local `file://` URI when the track is available offline. */
-    fun localUri(trackId: String): String? = fileFor(trackId)?.let { "file://${it.absolutePath}" }
+    fun localUri(trackId: String): String? = localFiles[trackId]?.let { "file://$it" }
 
-    fun isDownloaded(trackId: String): Boolean = fileFor(trackId) != null
+    fun isDownloaded(trackId: String): Boolean = localFiles.containsKey(trackId)
 
     suspend fun download(track: Track, client: OkHttpClient, remoteUrl: String): Result<DownloadedTrack> =
         withContext(Dispatchers.IO) {
@@ -82,6 +103,7 @@ class DownloadStore(context: Context) {
                     sizeBytes = target.length(),
                     downloadedAt = System.currentTimeMillis()
                 )
+                localFiles[track.id] = target.absolutePath
                 updateIndex { items -> items.filterNot { it.track.id == track.id } + entry }
                 entry
             }
@@ -89,11 +111,13 @@ class DownloadStore(context: Context) {
 
     suspend fun remove(trackId: String) = withContext(Dispatchers.IO) {
         fileFor(trackId)?.delete()
+        localFiles.remove(trackId)
         updateIndex { items -> items.filterNot { it.track.id == trackId } }
     }
 
     suspend fun clear() = withContext(Dispatchers.IO) {
         directory.listFiles()?.forEach { it.delete() }
+        localFiles.clear()
         updateIndex { emptyList() }
     }
 

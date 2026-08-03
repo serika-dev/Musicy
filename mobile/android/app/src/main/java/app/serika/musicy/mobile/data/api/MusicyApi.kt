@@ -7,6 +7,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -103,6 +104,9 @@ interface MusicyApi {
     @GET("api/tracks/{id}/lyrics")
     suspend fun getLyrics(@Path("id") id: String): LyricsResponse
 
+    @POST("api/lyrics/romanize")
+    suspend fun romanize(@Body body: RomanizeRequest): RomanizeResponse
+
     @GET("api/search")
     suspend fun search(
         @Query("q") query: String,
@@ -142,6 +146,12 @@ interface MusicyApi {
 
     @GET("api/user/profile")
     suspend fun getProfile(): User
+
+    @GET("api/user/settings")
+    suspend fun getUserSettings(): UserSettings
+
+    @PUT("api/user/settings")
+    suspend fun putUserSettings(@Body body: UserSettings): Response<Unit>
 
     @GET("api/mobile/liked-songs")
     suspend fun getLikedSongs(

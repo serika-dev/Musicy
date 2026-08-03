@@ -34,6 +34,7 @@ import app.serika.musicy.mobile.data.MusicyRepository
 import app.serika.musicy.mobile.data.model.ServerConfig
 import app.serika.musicy.mobile.ui.components.Artwork
 import app.serika.musicy.mobile.ui.components.MiniPlayer
+import app.serika.musicy.mobile.ui.components.rememberHapticClick
 import app.serika.musicy.mobile.ui.screens.*
 import app.serika.musicy.mobile.ui.theme.MusicyTheme
 import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
@@ -79,7 +80,12 @@ private fun MainScaffold(config: ServerConfig) {
     val nav = remember(navController) { Nav(navController) }
 
     val playback by vm.player.state.collectAsState()
+    // Separate flow: the mini-player's progress bar is the only thing here
+    // that needs to redraw on the position tick.
+    val progress by vm.player.position.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
+    val settings by vm.settings.collectAsState()
+    val haptics = settings.hapticFeedback
     val toast by vm.toast.collectAsState()
     val profile by vm.profile.collectAsState()
     val snackbarHost = remember { SnackbarHostState() }
@@ -159,14 +165,19 @@ private fun MainScaffold(config: ServerConfig) {
                 Column {
                     MiniPlayer(
                         state = playback,
+                        progress = progress.progress,
                         isLiked = playback.currentTrack?.id?.let { it in liked } == true,
                         artworkUrl = vm.repo.resolveUrl(playback.currentTrack?.artworkUrl),
                         onOpen = { nav.player() },
-                        onTogglePlay = {
+                        onTogglePlay = rememberHapticClick(haptics) {
                             if (vm.isRemoteControlling) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause()
                         },
-                        onNext = { if (vm.isRemoteControlling) vm.sendRemoteCommand("next") else vm.player.next() },
-                        onToggleLike = { playback.currentTrack?.let { vm.toggleLike(it) } }
+                        onNext = rememberHapticClick(haptics) {
+                            if (vm.isRemoteControlling) vm.sendRemoteCommand("next") else vm.player.next()
+                        },
+                        onToggleLike = rememberHapticClick(haptics) {
+                            playback.currentTrack?.let { vm.toggleLike(it) }
+                        }
                     )
                     Spacer(Modifier.height(6.dp))
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {

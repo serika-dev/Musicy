@@ -27,20 +27,29 @@ import kotlinx.coroutines.launch
 /** Repeat modes, named the way the web player names them. */
 enum class RepeatMode { OFF, ALL, ONE }
 
+/**
+ * Everything about playback *except* the moving playhead.
+ *
+ * Position deliberately lives in its own flow ([PlayerConnection.position]):
+ * folding it in here meant every screen observing playback recomposed twice a
+ * second, and each of those emissions rebuilt the whole queue.
+ */
 data class PlaybackUiState(
     val currentTrack: Track? = null,
     val queue: List<Track> = emptyList(),
     val currentIndex: Int = 0,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
-    val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val shuffle: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
     val volume: Float = 1f,
     val hasNext: Boolean = false,
     val hasPrevious: Boolean = false
-) {
+)
+
+/** The playhead, emitted on its own so only the scrubber and lyrics redraw. */
+data class PlaybackPosition(val positionMs: Long = 0L, val durationMs: Long = 0L) {
     val progress: Float
         get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
 }
@@ -62,13 +71,29 @@ class PlayerConnection(
     private val _state = MutableStateFlow(PlaybackUiState())
     val state: StateFlow<PlaybackUiState> = _state.asStateFlow()
 
+    private val _position = MutableStateFlow(PlaybackPosition())
+    val position: StateFlow<PlaybackPosition> = _position.asStateFlow()
+
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
 
     private var controller: MediaController? = null
 
+    /** Cached queue, rebuilt only when the timeline actually changes. */
+    private var cachedQueue: List<Track> = emptyList()
+
     private val listener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) = refresh()
+        override fun onEvents(player: Player, events: Player.Events) {
+            // Reading 200 media items back out of their Bundles is not free, so
+            // only redo it when the queue itself changed.
+            val queueChanged = events.containsAny(
+                Player.EVENT_TIMELINE_CHANGED,
+                Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED
+            )
+            refresh(rebuildQueue = queueChanged)
+            refreshPosition()
+        }
     }
 
     fun connect() {
@@ -80,16 +105,17 @@ class PlayerConnection(
                 controller = runCatching { futureController.get() }.getOrNull()
                 controller?.addListener(listener)
                 _connected.value = controller != null
-                refresh()
+                refresh(rebuildQueue = true)
+                refreshPosition()
             },
             MoreExecutors.directExecutor()
         )
 
         // The session only pushes events on change, so the scrubber needs its
-        // own tick to advance smoothly while a track plays.
+        // own tick. This updates the position flow alone — nothing else.
         scope.launch {
             while (isActive) {
-                if (controller?.isPlaying == true) refresh()
+                if (controller?.isPlaying == true) refreshPosition()
                 delay(500)
             }
         }
@@ -103,20 +129,29 @@ class PlayerConnection(
         _connected.value = false
     }
 
-    private fun refresh() {
+    private fun refreshPosition() {
         val player = controller ?: return
-        val queue = buildList {
-            for (i in 0 until player.mediaItemCount) {
-                MediaItems.toTrack(player.getMediaItemAt(i))?.let { add(it) }
+        _position.value = PlaybackPosition(
+            positionMs = player.currentPosition.coerceAtLeast(0L),
+            durationMs = player.duration.takeIf { it > 0 } ?: 0L
+        )
+    }
+
+    private fun refresh(rebuildQueue: Boolean) {
+        val player = controller ?: return
+        if (rebuildQueue) {
+            cachedQueue = buildList {
+                for (i in 0 until player.mediaItemCount) {
+                    MediaItems.toTrack(player.getMediaItemAt(i))?.let { add(it) }
+                }
             }
         }
         _state.value = PlaybackUiState(
             currentTrack = MediaItems.toTrack(player.currentMediaItem),
-            queue = queue,
+            queue = cachedQueue,
             currentIndex = player.currentMediaItemIndex.coerceAtLeast(0),
             isPlaying = player.isPlaying,
             isBuffering = player.playbackState == Player.STATE_BUFFERING,
-            positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it > 0 } ?: 0L,
             shuffle = player.shuffleModeEnabled,
             repeatMode = when (player.repeatMode) {
@@ -183,6 +218,8 @@ class PlayerConnection(
         if (index in 0 until player.mediaItemCount) {
             player.seekTo(index, 0L)
             player.play()
+            refresh(rebuildQueue = false)
+            refreshPosition()
         }
     }
 
@@ -193,27 +230,47 @@ class PlayerConnection(
             player.play()
             claimPlaybackForThisDevice()
         }
+        refresh(rebuildQueue = false)
     }
 
-    fun next() = controller?.seekToNextMediaItem() ?: Unit
+    fun next() {
+        controller?.seekToNextMediaItem()
+        refreshPosition()
+    }
 
     /** Restarts the track first, like every other music app's back button. */
     fun previous() {
         val player = controller ?: return
         if (player.currentPosition > 3_000L) player.seekTo(0L) else player.seekToPreviousMediaItem()
+        refreshPosition()
     }
 
     fun seekTo(ms: Long) {
         controller?.seekTo(ms.coerceAtLeast(0L))
+        refreshPosition()
     }
 
     fun setVolume(value: Float) {
         controller?.volume = value.coerceIn(0f, 1f)
     }
 
+    fun setPlaybackSpeed(value: Float) {
+        controller?.setPlaybackSpeed(value.coerceIn(0.5f, 2f))
+    }
+
+    /** Jumps by the user's configured step, used by the ±N second buttons. */
+    fun seekBy(seconds: Int) {
+        val player = controller ?: return
+        val target = (player.currentPosition + seconds * 1000L).coerceAtLeast(0L)
+        val duration = player.duration
+        player.seekTo(if (duration > 0) target.coerceAtMost(duration) else target)
+        refreshPosition()
+    }
+
     fun toggleShuffle() {
         val player = controller ?: return
         player.shuffleModeEnabled = !player.shuffleModeEnabled
+        refresh(rebuildQueue = false)
     }
 
     fun cycleRepeat() {
@@ -223,6 +280,7 @@ class PlayerConnection(
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
+        refresh(rebuildQueue = false)
     }
 
     fun stop() {

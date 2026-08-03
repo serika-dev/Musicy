@@ -70,7 +70,9 @@ fun TrackActionsHost(
     var pendingPlaylistTrack by remember { mutableStateOf<Track?>(null) }
 
     val track = selected
-    if (track != null) {
+    // Guarded so the actions sheet is gone before the playlist picker opens;
+    // showing both at once left two dimmed scrims stacked on each other.
+    if (track != null && pendingPlaylistTrack == null) {
         TrackActionsSheet(
             track = track,
             isLiked = track.id in liked,
@@ -79,7 +81,10 @@ fun TrackActionsHost(
             onToggleLike = { vm.toggleLike(track) },
             onPlayNext = { vm.player.playNext(track) },
             onAddToQueue = { vm.player.addToQueue(listOf(track)) },
-            onAddToPlaylist = { pendingPlaylistTrack = track },
+            onAddToPlaylist = {
+                pendingPlaylistTrack = track
+                onDismiss()
+            },
             onOpenAlbum = track.album?.id?.takeIf { it.isNotBlank() }?.let { id -> { nav.album(id) } },
             onOpenArtist = track.artist?.id?.takeIf { it.isNotBlank() }?.let { id -> { nav.artist(id) } },
             onRemove = onRemoveFromPlaylist?.let { remove -> { remove(track) } }

@@ -273,6 +273,45 @@ data class LyricsResponse(
     val hasAnything: Boolean get() = !plainLyrics.isNullOrBlank() || !syncedLyrics.isNullOrBlank()
 }
 
+/**
+ * Romanization is computed and cached server-side, so a second request for the
+ * same track is just a database read.
+ */
+@Serializable
+data class RomanizeRequest(
+    val trackId: String,
+    val mode: String,
+    val language: String? = null
+)
+
+@Serializable
+data class RomanizeResponse(
+    val romanized: String = "",
+    val language: String? = null,
+    val cached: Boolean? = null
+)
+
+/** Account-wide settings, shared with the web app via /api/user/settings. */
+@Serializable
+data class UserSettings(
+    val autoRomanizeLyrics: Boolean = false,
+    val romanizeLanguage: String = "auto",
+    val showRomanizationAlongside: Boolean = false,
+    val theme: String = "dark",
+    val reducedMotion: Boolean = false,
+    val compactMode: Boolean = false,
+    val audioQuality: String = "auto",
+    val crossfadeSeconds: Int = 0,
+    val normalizeVolume: Boolean = false,
+    val defaultVolume: Float = 1f,
+    val autoplayRecommendations: Boolean = true,
+    val gaplessPlayback: Boolean = true,
+    val showNowPlayingNotifications: Boolean = false,
+    val notifyOnNewReleases: Boolean = true,
+    val privateSession: Boolean = false,
+    val allowScrobbling: Boolean = true
+)
+
 @Serializable
 data class LikedSongsResponse(
     val tracks: List<Track> = emptyList(),
