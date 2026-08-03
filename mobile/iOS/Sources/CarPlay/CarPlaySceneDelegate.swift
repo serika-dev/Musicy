@@ -147,7 +147,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private func playTracks(_ tracks: [Track]) {
         guard let first = tracks.first else { return }
         AudioPlayer.shared.play(track: first, tracks: tracks)
-        let nowPlaying = CPNowPlayingTemplate.shared()
+        let nowPlaying = CPNowPlayingTemplate.shared
         interfaceController?.pushTemplate(nowPlaying, animated: true, completion: nil)
     }
 }

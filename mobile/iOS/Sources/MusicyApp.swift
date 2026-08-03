@@ -15,7 +15,7 @@ struct MusicyApp: App {
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        let carPlayRole = CPTemplateApplicationSceneSessionRoleApplication
+        let carPlayRole: UISceneSession.Role = .carTemplateApplication
         if connectingSceneSession.role == carPlayRole {
             let config = UISceneConfiguration(name: "Musicy-CarPlay", sessionRole: carPlayRole)
             config.delegateClass = CarPlaySceneDelegate.self
