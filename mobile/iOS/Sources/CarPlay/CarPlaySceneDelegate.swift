@@ -148,6 +148,8 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         guard let first = tracks.first else { return }
         AudioPlayer.shared.play(track: first, tracks: tracks)
         let nowPlaying = CPNowPlayingTemplate.shared
-        interfaceController?.pushTemplate(nowPlaying, animated: true, completion: nil)
+        DispatchQueue.main.async {
+            self.interfaceController?.pushTemplate(nowPlaying, animated: true, completion: nil)
+        }
     }
 }

@@ -6,7 +6,39 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class ServerConfig(
     val baseUrl: String = "",
-    val apiKey: String = ""
+    val apiKey: String = "",
+    val userName: String? = null
+)
+
+@Serializable
+data class RegisterRequest(
+    val email: String,
+    val password: String,
+    val username: String,
+    val displayName: String
+)
+
+@Serializable
+data class LoginRequest(
+    val email: String,
+    val password: String
+)
+
+@Serializable
+data class AuthResponse(
+    val message: String? = null,
+    val apiKey: String? = null,
+    val user: User? = null
+)
+
+@Serializable
+data class User(
+    val id: String,
+    val email: String,
+    val username: String? = null,
+    val displayName: String? = null,
+    val avatarUrl: String? = null,
+    val role: String? = null
 )
 
 @Serializable

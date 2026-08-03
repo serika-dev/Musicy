@@ -127,6 +127,33 @@ struct PublicSettingsResponse: Codable {
     let settings: [String: String]
 }
 
+struct RegisterRequest: Codable {
+    let email: String
+    let password: String
+    let username: String
+    let displayName: String
+}
+
+struct LoginRequest: Codable {
+    let email: String
+    let password: String
+}
+
+struct AuthResponse: Codable {
+    let message: String?
+    let apiKey: String?
+    let user: User?
+}
+
+struct User: Codable {
+    let id: String
+    let email: String
+    let username: String?
+    let displayName: String?
+    let avatarUrl: String?
+    let role: String?
+}
+
 struct PlayRequest: Codable {
     let trackId: String
     let duration: Int?

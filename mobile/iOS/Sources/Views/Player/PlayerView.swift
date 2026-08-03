@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerView: View {
     @StateObject private var player = AudioPlayer.shared
+    @State private var progress: Double = 0.25
 
     var body: some View {
         ZStack {
@@ -11,22 +12,38 @@ struct PlayerView: View {
                     Spacer()
                     AsyncImage(url: (track.album?.coverImageUrl ?? track.coverImageUrl).flatMap { URL(string: $0) }) { phase in
                         if let image = phase.image {
-                            image.resizable().aspectRatio(contentMode: .fit)
+                            image.resizable().aspectRatio(contentMode: .fill)
                         } else {
                             Color("Surface")
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .padding(.horizontal, 32)
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 28))
+                    .padding(.horizontal, 24)
 
                     VStack(spacing: 8) {
                         Text(track.title)
                             .font(.title2.bold())
                             .multilineTextAlignment(.center)
+                            .lineLimit(2)
                         Text(track.artist?.name ?? "")
-                            .font(.body)
+                            .font(.title3)
                             .foregroundColor(.secondary)
                     }
+
+                    VStack(spacing: 8) {
+                        Slider(value: $progress, in: 0...1)
+                            .tint(Color("AccentColor"))
+                        HStack {
+                            Text("0:42")
+                            Spacer()
+                            Text("3:14")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 24)
 
                     HStack(spacing: 40) {
                         Button { player.previous() } label: {
@@ -43,6 +60,7 @@ struct PlayerView: View {
                                 .font(.title)
                         }
                     }
+                    .foregroundColor(.primary)
                     Spacer()
                 }
                 .padding()

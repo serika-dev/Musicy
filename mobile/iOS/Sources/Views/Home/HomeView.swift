@@ -6,15 +6,22 @@ struct HomeView: View {
     @State private var artists: [Artist] = []
     @State private var playlists: [Playlist] = []
     @State private var error: String?
+    @State private var loading = true
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 28) {
                     greeting
 
+                    if loading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    }
+
                     if !mixes.isEmpty {
-                        section("Your Daily Mixes") {
+                        section("Made for you") {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 16) {
                                     ForEach(mixes) { mix in
@@ -31,7 +38,7 @@ struct HomeView: View {
                     }
 
                     if !albums.isEmpty {
-                        section("New Albums") {
+                        section("New albums") {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 16) {
                                     ForEach(albums) { album in
@@ -52,7 +59,7 @@ struct HomeView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 16) {
                                     ForEach(artists) { artist in
-                                        MediaCard(imageURL: artist.imageUrl, title: artist.name, subtitle: nil) {}
+                                        ArtistCard(artist: artist)
                                     }
                                 }
                                 .padding(.horizontal)
@@ -61,7 +68,7 @@ struct HomeView: View {
                     }
 
                     if !playlists.isEmpty {
-                        section("Community Playlists") {
+                        section("Community playlists") {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 16) {
                                     ForEach(playlists) { playlist in
@@ -79,7 +86,7 @@ struct HomeView: View {
                 }
                 .padding(.vertical)
             }
-            .background(Color("Background"))
+            .background(Color("Background").ignoresSafeArea())
             .navigationTitle("Home")
         }
         .task { await load() }
@@ -116,6 +123,8 @@ struct HomeView: View {
     }
 
     private func load() async {
+        loading = true
+        defer { loading = false }
         do {
             async let m: [DailyMix] = MusicyAPI.shared.getDailyMixes()
             async let a: AlbumsResponse = MusicyAPI.shared.getAlbums()
@@ -128,5 +137,28 @@ struct HomeView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+}
+
+struct ArtistCard: View {
+    let artist: Artist
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AsyncImage(url: artist.imageUrl.flatMap { URL(string: $0) }) { phase in
+                if let image = phase.image {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Color("Surface")
+                }
+            }
+            .frame(width: 132, height: 132)
+            .clipShape(Circle())
+
+            Text(artist.name)
+                .font(.subheadline.bold())
+                .lineLimit(1)
+        }
+        .frame(width: 132)
     }
 }

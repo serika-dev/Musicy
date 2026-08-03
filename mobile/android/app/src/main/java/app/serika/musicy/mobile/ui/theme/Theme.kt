@@ -19,13 +19,16 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = OnPrimary,
     primaryContainer = PrimaryContainer,
     onPrimaryContainer = OnPrimary,
+    secondary = SecondaryViolet,
     background = Background,
     onBackground = OnBackground,
     surface = Surface,
-    onSurface = OnSurface,
     surfaceVariant = SurfaceVariant,
+    surfaceContainerHighest = SurfaceHighlight,
+    onSurface = OnSurface,
     onSurfaceVariant = OnSurfaceVariant,
-    outline = Outline
+    outline = Outline,
+    error = Error
 )
 
 @Composable

@@ -17,6 +17,12 @@ class MusicyAPI {
         didSet { UserDefaults.standard.set(apiKey, forKey: "musicy_api_key") }
     }
 
+    @Published var userName: String = UserDefaults.standard.string(forKey: "musicy_user_name") ?? "" {
+        didSet { UserDefaults.standard.set(userName, forKey: "musicy_user_name") }
+    }
+
+    var isAuthenticated: Bool { !baseURL.isEmpty && !apiKey.isEmpty }
+
     func fullURL(path: String) -> URL? {
         let normalized = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard !normalized.isEmpty else { return nil }
@@ -46,6 +52,19 @@ class MusicyAPI {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(T.self, from: data)
+    }
+
+    func login(email: String, password: String) async throws -> AuthResponse {
+        let body = try JSONEncoder().encode(LoginRequest(email: email, password: password))
+        return try await decode(AuthResponse.self, path: "api/auth/mobile/login", method: "POST", body: body)
+    }
+
+    func register(email: String, password: String, username: String, displayName: String) async throws -> AuthResponse {
+        let body = try JSONEncoder().encode(RegisterRequest(email: email, password: password, username: username, displayName: displayName))
+        let response = try await request(path: "api/auth/register", method: "POST", body: body)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(AuthResponse.self, from: response)
     }
 
     func getPublicSettings() async throws -> PublicSettingsResponse {

@@ -7,21 +7,22 @@ struct MediaCard: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
                 AsyncImage(url: imageURL.flatMap { URL(string: $0) }) { phase in
                     if let image = phase.image {
                         image.resizable().aspectRatio(contentMode: .fill)
                     } else {
-                        Color("Surface").overlay(
-                            Image(systemName: "music.note")
-                                .font(.title)
-                                .foregroundColor(Color("AccentColor"))
-                        )
+                        Color("Surface")
+                            .overlay(
+                                Image(systemName: "music.note")
+                                    .font(.title)
+                                    .foregroundColor(Color("AccentColor"))
+                            )
                     }
                 }
                 .frame(width: 152, height: 152)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 Button(action: action) {
                     Image(systemName: "play.fill")
@@ -37,6 +38,7 @@ struct MediaCard: View {
             Text(title)
                 .font(.subheadline.bold())
                 .lineLimit(1)
+                .foregroundColor(.primary)
             if let subtitle = subtitle {
                 Text(subtitle)
                     .font(.caption)

@@ -15,7 +15,7 @@ struct TrackRow: View {
                     }
                 }
                 .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(track.title)
@@ -28,6 +28,10 @@ struct TrackRow: View {
                 }
 
                 Spacer()
+
+                Image(systemName: "play.fill")
+                    .font(.title3)
+                    .foregroundColor(Color("AccentColor"))
             }
             .padding(.vertical, 4)
         }

@@ -1,13 +1,17 @@
 import SwiftUI
 
 struct RootView: View {
-    @AppStorage("musicy_base_url") private var baseURL = ""
+    @StateObject private var api = MusicyAPI.shared
 
     var body: some View {
-        if baseURL.isEmpty {
-            SetupView()
-        } else {
-            MainTabView()
+        Group {
+            if api.isAuthenticated {
+                MainTabView()
+                    .environmentObject(api)
+            } else {
+                SetupView()
+                    .environmentObject(api)
+            }
         }
     }
 }

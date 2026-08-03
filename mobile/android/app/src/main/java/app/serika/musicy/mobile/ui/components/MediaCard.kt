@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.serika.musicy.mobile.ui.theme.*
 import coil.compose.AsyncImage
 
 @Composable
@@ -33,7 +34,7 @@ fun MediaCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
         ) {
             AsyncImage(
                 model = imageUrl,
@@ -47,24 +48,31 @@ fun MediaCard(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(8.dp)
-                        .size(36.dp)
+                        .size(40.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Primary)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = OnPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            color = OnBackground
         )
         if (subtitle != null) {
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = OnSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

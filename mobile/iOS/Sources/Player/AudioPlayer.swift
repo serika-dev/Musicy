@@ -23,6 +23,28 @@ class AudioPlayer: ObservableObject {
         observer = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
             self?.isPlaying = player.timeControlStatus == .playing
         }
+
+        setupRemoteCommands()
+    }
+
+    private func setupRemoteCommands() {
+        let center = MPRemoteCommandCenter.shared()
+        center.playCommand.addTarget { [weak self] _ in
+            self?.player.play()
+            return .success
+        }
+        center.pauseCommand.addTarget { [weak self] _ in
+            self?.player.pause()
+            return .success
+        }
+        center.nextTrackCommand.addTarget { [weak self] _ in
+            self?.next()
+            return .success
+        }
+        center.previousTrackCommand.addTarget { [weak self] _ in
+            self?.previous()
+            return .success
+        }
     }
 
     func play(track: Track, tracks: [Track] = []) {

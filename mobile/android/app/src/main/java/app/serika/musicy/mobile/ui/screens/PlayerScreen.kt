@@ -1,6 +1,8 @@
 package app.serika.musicy.mobile.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -17,76 +19,113 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.serika.musicy.mobile.ui.theme.*
 import app.serika.musicy.mobile.ui.viewmodel.AppViewModel
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerScreen(viewModel: AppViewModel) {
+fun PlayerScreen(viewModel: AppViewModel, onClose: () -> Unit) {
     val track = viewModel.currentTrack ?: return
+    var progress by remember { mutableFloatStateOf(0.25f) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Now Playing") },
                 navigationIcon = {
-                    IconButton(onClick = { /* pop handled by nav */ }) {
+                    IconButton(onClick = onClose) {
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Close")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
             )
-        }
+        },
+        containerColor = Background
     ) { pad ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(pad)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            AsyncImage(
-                model = track.album?.coverImageUrl ?: track.coverImageUrl,
-                contentDescription = track.title,
-                contentScale = ContentScale.Crop,
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(24.dp))
-            )
+                    .clip(RoundedCornerShape(28.dp)),
+                color = Surface
+            ) {
+                AsyncImage(
+                    model = track.album?.coverImageUrl ?: track.coverImageUrl,
+                    contentDescription = track.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = track.title,
                     style = MaterialTheme.typography.headlineSmall,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = OnBackground
                 )
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = track.artist?.name ?: "",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.titleMedium,
+                    color = OnSurfaceVariant
                 )
             }
+
+            Column {
+                Slider(
+                    value = progress,
+                    onValueChange = { progress = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Primary,
+                        activeTrackColor = Primary,
+                        inactiveTrackColor = SurfaceHighlight
+                    )
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("0:42", style = MaterialTheme.typography.labelSmall, color = OnSurfaceVariant)
+                    Text("3:14", style = MaterialTheme.typography.labelSmall, color = OnSurfaceVariant)
+                }
+            }
+
             Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.previousTrack() }) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(48.dp))
+                IconButton(onClick = { viewModel.previousTrack() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(40.dp), tint = OnBackground)
                 }
                 FilledIconButton(
                     onClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.size(72.dp)
+                    modifier = Modifier.size(80.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Primary)
                 ) {
                     Icon(
                         imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (viewModel.isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(44.dp),
+                        tint = OnPrimary
                     )
                 }
-                IconButton(onClick = { viewModel.nextTrack() }) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(48.dp))
+                IconButton(onClick = { viewModel.nextTrack() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(40.dp), tint = OnBackground)
                 }
             }
         }

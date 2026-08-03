@@ -48,6 +48,9 @@ class MusicyPlaybackService : MediaBrowserServiceCompat() {
 
     private val handler = Handler(Looper.getMainLooper())
 
+    private var currentQueue: List<Track> = emptyList()
+    private var currentQueueIndex: Int = -1
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -194,8 +197,10 @@ class MusicyPlaybackService : MediaBrowserServiceCompat() {
         return MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
     }
 
-    private fun playTrack(track: Track) {
+    private fun playTrack(track: Track, queue: List<Track> = listOf(track), index: Int = 0) {
         val url = track.filePath ?: return
+        currentQueue = queue
+        currentQueueIndex = index
         val mediaItem = MediaItem.fromUri(url)
         handler.post {
             player.setMediaItem(mediaItem)
@@ -227,13 +232,19 @@ class MusicyPlaybackService : MediaBrowserServiceCompat() {
                 PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PAUSE or
                         PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                        PlaybackStateCompat.ACTION_STOP
+                        PlaybackStateCompat.ACTION_STOP or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
             )
             .build()
         mediaSession.setPlaybackState(playbackState)
     }
 
     private fun buildNotification(): android.app.Notification {
+        val prevAction = NotificationCompat.Action(
+            R.drawable.ic_skip_previous, "Previous",
+            MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
+        )
         val playPauseAction = if (player.isPlaying) {
             NotificationCompat.Action(
                 R.drawable.ic_pause, "Pause",
@@ -245,6 +256,10 @@ class MusicyPlaybackService : MediaBrowserServiceCompat() {
                 MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_PLAY)
             )
         }
+        val nextAction = NotificationCompat.Action(
+            R.drawable.ic_skip_next, "Next",
+            MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_NEXT)
+        )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(mediaSession.controller.metadata?.getString(MediaMetadataCompat.METADATA_KEY_TITLE) ?: "Musicy")
@@ -254,8 +269,10 @@ class MusicyPlaybackService : MediaBrowserServiceCompat() {
             .setOnlyAlertOnce(true)
             .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
                 .setMediaSession(mediaSession.sessionToken)
-                .setShowActionsInCompactView(0))
+                .setShowActionsInCompactView(0, 1, 2))
+            .addAction(prevAction)
             .addAction(playPauseAction)
+            .addAction(nextAction)
             .setContentIntent(mediaSession.controller.sessionActivity)
             .build()
     }
@@ -297,14 +314,60 @@ class MusicyPlaybackService : MediaBrowserServiceCompat() {
             }
         }
 
+        override fun onSkipToNext() {
+            if (currentQueue.isNotEmpty() && currentQueueIndex < currentQueue.size - 1) {
+                currentQueueIndex += 1
+                playTrack(currentQueue[currentQueueIndex], currentQueue, currentQueueIndex)
+            }
+        }
+
+        override fun onSkipToPrevious() {
+            if (currentQueue.isNotEmpty() && currentQueueIndex > 0) {
+                currentQueueIndex -= 1
+                playTrack(currentQueue[currentQueueIndex], currentQueue, currentQueueIndex)
+            }
+        }
+
         override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-            val id = mediaId?.removePrefix("track_") ?: return
+            mediaId ?: return
             scope.launch {
                 try {
-                    val track = api.getTrack(id)
-                    playTrack(track)
+                    when {
+                        mediaId.startsWith("track_") -> {
+                            val id = mediaId.removePrefix("track_")
+                            val track = api.getTrack(id)
+                            playTrack(track)
+                        }
+                        mediaId.startsWith("mix_") -> {
+                            val id = mediaId.removePrefix("mix_")
+                            val mix = api.getDailyMixes().find { it.id == id }
+                            val tracks = mix?.tracks ?: emptyList()
+                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
+                        }
+                        mediaId.startsWith("album_") -> {
+                            val id = mediaId.removePrefix("album_")
+                            val album = api.getAlbum(id)
+                            val tracks = album.tracks ?: emptyList()
+                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
+                        }
+                        mediaId.startsWith("artist_") -> {
+                            val id = mediaId.removePrefix("artist_")
+                            val tracks = api.getArtistTracks(id, limit = 50).tracks
+                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
+                        }
+                        mediaId.startsWith("playlist_") -> {
+                            val id = mediaId.removePrefix("playlist_")
+                            val playlist = api.getPlaylist(id)
+                            val tracks = playlist.tracks?.map { it.track } ?: emptyList()
+                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
+                        }
+                        mediaId == "menu_liked" || mediaId == "shuffle_liked" -> {
+                            val tracks = api.getLikedSongs(limit = 50).tracks
+                            tracks.firstOrNull()?.let { playTrack(it, tracks, 0) }
+                        }
+                    }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to load track $id", e)
+                    Log.e(TAG, "Failed to play $mediaId", e)
                 }
             }
         }
