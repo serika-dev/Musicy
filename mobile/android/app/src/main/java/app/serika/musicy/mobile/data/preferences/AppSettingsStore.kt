@@ -94,7 +94,9 @@ class AppSettingsStore(context: Context) {
     suspend fun setPreferSyncedLyrics(value: Boolean) = edit { it[SYNCED_LYRICS] = value }
     suspend fun setDefaultVolume(value: Float) = edit { it[VOLUME] = value.coerceIn(0f, 1f) }
 
-    private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
+    // DataStore's transform is a suspending lambda; a plain function type is
+    // not a subtype of it.
+    private suspend fun edit(block: suspend (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         dataStore.edit(block)
     }
 }

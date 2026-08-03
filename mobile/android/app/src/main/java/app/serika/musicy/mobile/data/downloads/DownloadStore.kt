@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -28,7 +29,7 @@ data class DownloadedTrack(
 )
 
 @Serializable
-private data class DownloadIndex(val items: List<DownloadedTrack> = emptyList())
+internal data class DownloadIndex(val items: List<DownloadedTrack> = emptyList())
 
 private val Context.downloadsDataStore: DataStore<Preferences> by preferencesDataStore(name = "downloads")
 
