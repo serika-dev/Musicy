@@ -103,7 +103,7 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
 
             results is Async.Loading -> ScreenLoader()
 
-            results is Async.Failure -> ErrorBox((results as Async.Failure).message) { vm.search(query) }
+            results is Async.Failure -> ErrorBox((results as Async.Failure).message, onRetry = { vm.search(query) })
 
             results is Async.Success -> {
                 val data = (results as Async.Success).value

@@ -5,8 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.serika.musicy.mobile.data.model.Track
+import app.serika.musicy.mobile.player.MusicyLibrary
 import app.serika.musicy.mobile.ui.CollectionKind
 import app.serika.musicy.mobile.ui.Nav
 import app.serika.musicy.mobile.ui.components.*
@@ -61,7 +60,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
 
     when (val state = library) {
         is Async.Loading -> ScreenLoader()
-        is Async.Failure -> ErrorBox(state.message) { vm.loadLibrary(force = true) }
+        is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadLibrary(force = true) })
         is Async.Success -> {
             val data = state.value
             Column(modifier = Modifier.fillMaxSize()) {
@@ -188,7 +187,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
                                 currentTrackId = playback.currentTrack?.id,
                                 isPlaying = playback.isPlaying,
                                 resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
-                                onPlay = { index -> vm.play(data.likedSongs, index, "node_liked") },
+                                onPlay = { index -> vm.play(data.likedSongs, index, MusicyLibrary.NODE_LIKED) },
                                 onToggleLike = { vm.toggleLike(it) },
                                 onMore = { actionTrack = it }
                             )
@@ -303,19 +302,4 @@ private fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Un
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         containerColor = SurfaceVariant
     )
-}
-
-/** Shared square grid used by the "see all" collection pages. */
-@Composable
-internal fun MediaGrid(
-    itemCount: Int,
-    key: (Int) -> Any,
-    content: @Composable (Int) -> Unit
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 150.dp),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-    ) {
-        items(count = itemCount, key = { index -> key(index) }) { index -> content(index) }
-    }
 }
