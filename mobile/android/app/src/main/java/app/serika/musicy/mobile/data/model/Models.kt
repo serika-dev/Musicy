@@ -189,3 +189,17 @@ data class LikedSongsResponse(
     val offset: Int,
     @SerialName("hasMore") val hasMore: Boolean
 )
+
+@Serializable
+data class FeedResponse(
+    val featuredAlbum: Album? = null,
+    val followedAlbums: List<Album> = emptyList(),
+    val recommendedTracks: List<Track> = emptyList(),
+    val discoverAlbums: List<Album> = emptyList(),
+    val likedGenres: List<String> = emptyList(),
+    val followedArtistCount: Int? = null,
+    val recentlyPlayed: List<Track> = emptyList(),
+    val topArtists: List<Artist> = emptyList(),
+    val recommendedArtists: List<Artist> = emptyList(),
+    val newReleases: List<Album> = emptyList()
+)

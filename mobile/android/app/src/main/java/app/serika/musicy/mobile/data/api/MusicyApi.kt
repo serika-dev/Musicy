@@ -67,9 +67,12 @@ interface MusicyApi {
     @GET("api/tracks/{id}/lyrics")
     suspend fun getLyrics(@Path("id") id: String): LyricsResponse
 
-    @GET("api/user/liked-songs")
+    @GET("api/mobile/liked-songs")
     suspend fun getLikedSongs(
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0
     ): LikedSongsResponse
+
+    @GET("api/mobile/feed")
+    suspend fun getFeed(): FeedResponse
 }

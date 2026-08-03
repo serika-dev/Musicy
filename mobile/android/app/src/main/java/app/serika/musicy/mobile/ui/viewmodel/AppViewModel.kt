@@ -32,11 +32,19 @@ class AppViewModel(val api: MusicyApi) : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    var feed by mutableStateOf<FeedResponse?>(null)
+        private set
+    var feedLoaded by mutableStateOf(false)
+        private set
+
     fun loadHome() {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
             try {
+                val response = api.getFeed()
+                feed = response
+                feedLoaded = true
                 dailyMixes = api.getDailyMixes()
                 albums = api.getAlbums(limit = 20).albums
                 artists = api.getArtists(limit = 20).artists

@@ -166,3 +166,16 @@ struct LikedSongsResponse: Codable {
     let offset: Int
     let hasMore: Bool
 }
+
+struct FeedResponse: Codable {
+    let featuredAlbum: Album?
+    let followedAlbums: [Album]
+    let recommendedTracks: [Track]
+    let discoverAlbums: [Album]
+    let likedGenres: [String]
+    let followedArtistCount: Int?
+    let recentlyPlayed: [Track]
+    let topArtists: [Artist]
+    let recommendedArtists: [Artist]
+    let newReleases: [Album]
+}
