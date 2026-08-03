@@ -264,6 +264,7 @@ private fun ServerPage(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AuthPage(
     baseUrl: String,
