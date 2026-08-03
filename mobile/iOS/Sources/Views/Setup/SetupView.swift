@@ -23,7 +23,7 @@ struct SetupView: View {
                     AuthSetupPage(baseURL: baseURL) { key, user in
                         api.baseURL = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                         api.apiKey = key
-                        api.userName = user.displayName ?? user.username ?? user.email
+                        api.userName = user.label
                         page = .welcome
                     } onBack: {
                         page = .server

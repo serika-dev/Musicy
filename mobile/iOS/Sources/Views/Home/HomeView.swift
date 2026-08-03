@@ -1,312 +1,292 @@
 import SwiftUI
 
 struct HomeView: View {
-    @State private var feed: FeedResponse?
-    @State private var mixes: [DailyMix] = []
-    @State private var albums: [Album] = []
-    @State private var artists: [Artist] = []
-    @State private var playlists: [Playlist] = []
-    @State private var error: String?
-    @State private var loading = true
-
-    private var api: MusicyAPI { MusicyAPI.shared }
+    @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var api = MusicyAPI.shared
+    @ObservedObject private var player = AudioPlayer.shared
+    @State private var actionTrack: Track?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                LazyVStack(alignment: .leading, spacing: 22) {
                     greeting
+                    quickAccess
 
-                    if loading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                    if let featured = store.feed?.featuredAlbum {
+                        featuredCard(featured)
                     }
 
-                    if let featured = feed?.featuredAlbum {
-                        FeaturedHero(album: featured)
+                    if !store.genres.isEmpty {
+                        SectionHeader("Browse categories", seeAll: .collection(.genres))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(store.genres) { genre in
+                                    NavigationLink(value: Route.genre(genre.name)) {
+                                        CategoryTile(name: genre.name, count: genre.count, height: 84)
+                                            .frame(width: 150)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                             .padding(.horizontal)
+                        }
                     }
 
-                    if !(feed?.recentlyPlayed ?? []).isEmpty {
-                        section("Jump Back In") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(feed?.recentlyPlayed ?? []) { track in
-                                        MediaCard(imageURL: track.album?.coverImageUrl ?? track.coverImageUrl, title: track.title, subtitle: track.artist?.name) {
-                                            AudioPlayer.shared.play(track: track, tracks: [track])
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
+                    if !store.dailyMixes.isEmpty {
+                        SectionHeader(
+                            "Made for you",
+                            subtitle: "Daily mixes built from what you play",
+                            seeAll: .collection(.mixes)
+                        )
+                        horizontalRow(store.dailyMixes) { mix in
+                            NavigationLink(value: Route.mix(mix.id)) {
+                                MediaCard(
+                                    imageURL: mix.coverImageUrl ?? mix.tracks?.first?.artworkUrl,
+                                    title: mix.name,
+                                    subtitle: mix.description ?? "\(mix.trackCount) tracks",
+                                    width: 164,
+                                    playAction: { player.play(tracks: mix.tracks ?? []) }
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    let recommended = Array((store.feed?.recommendedTracks ?? []).prefix(8))
+                    if !recommended.isEmpty {
+                        SectionHeader("Recommended for you", subtitle: "Based on your listening")
+                        VStack(spacing: 0) {
+                            ForEach(Array(recommended.enumerated()), id: \.element.id) { index, track in
+                                TrackRow(
+                                    track: track,
+                                    isCurrent: player.currentTrack?.id == track.id,
+                                    action: { player.play(tracks: recommended, startAt: index) },
+                                    onMore: { actionTrack = track }
+                                )
                             }
                         }
+                        .padding(.horizontal)
                     }
 
-                    if !mixes.isEmpty {
-                        section("Made for you") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(mixes) { mix in
-                                        MediaCard(imageURL: mix.coverImageUrl, title: mix.name, subtitle: mix.description) {
-                                            if let tracks = mix.tracks, let first = tracks.first {
-                                                AudioPlayer.shared.play(track: first, tracks: tracks)
-                                            }
-                                        }
+                    let recent = store.feed?.recentlyPlayed ?? store.recentlyPlayed
+                    if !recent.isEmpty {
+                        SectionHeader("Jump back in", seeAll: .collection(.recent))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .top, spacing: 14) {
+                                ForEach(Array(recent.enumerated()), id: \.element.id) { index, track in
+                                    Button {
+                                        player.play(tracks: recent, startAt: index)
+                                    } label: {
+                                        MediaCard(
+                                            imageURL: track.artworkUrl,
+                                            title: track.title,
+                                            subtitle: track.artistLine,
+                                            width: 134
+                                        )
                                     }
+                                    .buttonStyle(.plain)
                                 }
-                                .padding(.horizontal)
                             }
+                            .padding(.horizontal)
                         }
                     }
 
-                    if !(feed?.followedAlbums ?? []).isEmpty {
-                        section("New from Artists You Follow") {
-                            HomeAlbumRow(albums: feed?.followedAlbums ?? [])
-                        }
+                    let newReleases = store.feed?.newReleases ?? store.albums
+                    if !newReleases.isEmpty {
+                        SectionHeader("New releases", seeAll: .collection(.newReleases))
+                        albumRow(newReleases)
                     }
 
-                    if !(feed?.recommendedTracks ?? []).isEmpty {
-                        section("Recommended for You") {
-                            HomeTrackRow(tracks: feed?.recommendedTracks ?? [])
-                        }
+                    if let followed = store.feed?.followedAlbums, !followed.isEmpty {
+                        SectionHeader("From artists you follow")
+                        albumRow(followed)
                     }
 
-                    if !albums.isEmpty {
-                        section("New albums") {
-                            HomeAlbumRow(albums: albums)
-                        }
+                    if let topArtists = store.feed?.topArtists, !topArtists.isEmpty {
+                        SectionHeader("Your top artists", seeAll: .collection(.artists))
+                        artistRow(topArtists)
                     }
 
-                    if !(feed?.topArtists ?? []).isEmpty {
-                        section("Your Top Artists") {
-                            HomeArtistRow(artists: feed?.topArtists ?? [])
-                        }
+                    if let discover = store.feed?.discoverAlbums, !discover.isEmpty {
+                        SectionHeader("Discover", subtitle: "Albums in genres you like")
+                        albumRow(discover)
                     }
 
-                    if !(feed?.recommendedArtists ?? []).isEmpty {
-                        section("Artists We Think You'll Like") {
-                            HomeArtistRow(artists: feed?.recommendedArtists ?? [])
-                        }
+                    if let suggested = store.feed?.recommendedArtists, !suggested.isEmpty {
+                        SectionHeader("Artists you might like")
+                        artistRow(suggested)
                     }
 
-                    if !(feed?.discoverAlbums ?? []).isEmpty {
-                        section("More to Explore") {
-                            HomeAlbumRow(albums: feed?.discoverAlbums ?? [])
-                        }
-                    }
-
-                    if !artists.isEmpty {
-                        section("Artists") {
-                            HomeArtistRow(artists: artists)
-                        }
-                    }
-
-                    if !(feed?.newReleases ?? []).isEmpty {
-                        section("New Releases") {
-                            HomeAlbumRow(albums: feed?.newReleases ?? [])
-                        }
-                    }
-
-                    if !playlists.isEmpty {
-                        section("Community playlists") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(playlists) { playlist in
-                                        MediaCard(imageURL: playlist.coverImageUrl, title: playlist.name, subtitle: "\(playlist._count?.tracks ?? 0) tracks") {
-                                            if let tracks = playlist.tracks?.map({ $0.track }), let first = tracks.first {
-                                                AudioPlayer.shared.play(track: first, tracks: tracks)
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
+                    if !store.playlists.isEmpty {
+                        SectionHeader("Featured playlists", seeAll: .collection(.playlists))
+                        horizontalRow(store.playlists) { playlist in
+                            NavigationLink(value: Route.playlist(playlist.id)) {
+                                MediaCard(
+                                    imageURL: playlist.coverImageUrl,
+                                    title: playlist.name,
+                                    subtitle: "\(playlist.trackCount) tracks",
+                                    systemImage: "music.note.list"
+                                )
                             }
+                            .buttonStyle(.plain)
                         }
+                    }
+
+                    if let error = store.errorMessage {
+                        EmptyStateView(title: "Can't load your feed", message: error, systemImage: "wifi.slash")
                     }
                 }
                 .padding(.vertical)
+                .padding(.bottom, 140)
             }
-            .background(Color("Background").ignoresSafeArea())
-            .navigationTitle("Home")
+            .navigationBarTitleDisplayMode(.inline)
+            .refreshable { await store.reload() }
+            .task { await store.loadIfNeeded() }
+            .musicyDestinations()
+            .sheet(item: $actionTrack) { track in
+                TrackActionsSheet(track: track)
+            }
         }
-        .task { await load() }
     }
 
     private var greeting: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(greetingText), \(firstName).")
-                .font(.largeTitle.bold())
-            Text("Ready to lose yourself in the music?")
+        VStack(alignment: .leading, spacing: 2) {
+            Text(Self.greetingText).font(.largeTitle.bold())
+            Text("Welcome back, \(store.profile?.label ?? api.userName)")
+                .font(.subheadline)
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal)
     }
 
-    private var greetingText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 0..<5: return "Good night"
+    private var quickAccess: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                quickTile("Liked Songs", "heart.fill", route: .liked)
+                quickTile("Recently played", "clock.arrow.circlepath", route: .collection(.recent))
+            }
+            HStack(spacing: 8) {
+                quickTile("Playlists", "music.note.list", route: .collection(.playlists))
+                quickTile("Artists", "person.2.fill", route: .collection(.followed))
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func quickTile(_ title: String, _ symbol: String, route: Route) -> some View {
+        NavigationLink(value: route) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .foregroundColor(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(title).font(.subheadline.bold()).lineLimit(1)
+                Spacer()
+            }
+            .padding(8)
+            .background(Color("Surface"))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func featuredCard(_ album: Album) -> some View {
+        NavigationLink(value: Route.album(album.id)) {
+            ZStack(alignment: .bottom) {
+                Artwork(url: album.coverImageUrl, cornerRadius: 16)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 190)
+                LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("FEATURED").font(.caption2.bold()).foregroundColor(.accentColor)
+                        Text(album.title).font(.title2.bold()).foregroundColor(.white).lineLimit(2)
+                        Text(album.artist?.name ?? "").font(.subheadline).foregroundColor(.white.opacity(0.8))
+                    }
+                    Spacer()
+                    Button {
+                        player.play(tracks: album.tracks ?? [])
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding(14)
+                            .background(Color.accentColor)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(16)
+            }
+            .frame(height: 190)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func albumRow(_ albums: [Album]) -> some View {
+        horizontalRow(albums) { album in
+            NavigationLink(value: Route.album(album.id)) {
+                MediaCard(imageURL: album.coverImageUrl, title: album.title, subtitle: album.artist?.name)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func artistRow(_ artists: [Artist]) -> some View {
+        horizontalRow(artists) { artist in
+            NavigationLink(value: Route.artist(artist.id)) {
+                MediaCard(
+                    imageURL: artist.imageUrl,
+                    title: artist.name,
+                    subtitle: artist._count?.tracks.map { "\($0) tracks" } ?? "Artist",
+                    circular: true,
+                    systemImage: "person.fill"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func horizontalRow<Item: Identifiable, Content: View>(
+        _ items: [Item],
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 14) {
+                ForEach(items) { item in content(item) }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private static var greetingText: String {
+        switch Calendar.current.component(.hour, from: Date()) {
         case 5..<12: return "Good morning"
         case 12..<18: return "Good afternoon"
-        default: return "Good evening"
-        }
-    }
-
-    private var firstName: String {
-        let name = api.userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return "there" }
-        return name.split(separator: " ").first.map(String.init) ?? name
-    }
-
-    @ViewBuilder
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title3.bold())
-                .padding(.horizontal)
-            content()
-        }
-    }
-
-    private func load() async {
-        loading = true
-        defer { loading = false }
-        do {
-            async let f: FeedResponse = api.getFeed()
-            async let m: [DailyMix] = api.getDailyMixes()
-            async let a: AlbumsResponse = api.getAlbums()
-            async let ar: ArtistsResponse = api.getArtists()
-            async let p: PlaylistsResponse = api.getPlaylists()
-            feed = try await f
-            mixes = try await m
-            albums = try await a.albums
-            artists = try await ar.artists
-            playlists = try await p.playlists
-        } catch {
-            self.error = error.localizedDescription
+        case 18..<22: return "Good evening"
+        default: return "Late night listening"
         }
     }
 }
 
-struct FeaturedHero: View {
-    let album: Album
-
-    var body: some View {
-        HStack(spacing: 16) {
-            AsyncImage(url: album.coverImageUrl.flatMap { URL(string: $0) }) { phase in
-                if let image = phase.image {
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } else {
-                    Color("Surface")
-                }
-            }
-            .frame(width: 96, height: 96)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Featured")
-                    .font(.caption.bold())
-                    .foregroundColor(Color("AccentColor"))
-                Text(album.title)
-                    .font(.title3.bold())
-                    .lineLimit(1)
-                Text(album.artist?.name ?? "")
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            Button {
-                if let track = album.tracks?.first {
-                    AudioPlayer.shared.play(track: track, tracks: album.tracks ?? [track])
-                }
-            } label: {
-                Image(systemName: "play.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 52, height: 52)
-                    .background(Color("AccentColor"))
-                    .clipShape(Circle())
+/// Registers every `Route` once so each tab's stack can push the same screens.
+extension View {
+    func musicyDestinations() -> some View {
+        navigationDestination(for: Route.self) { route in
+            switch route {
+            case let .album(id): AlbumDetailView(albumId: id)
+            case let .artist(id): ArtistDetailView(artistId: id)
+            case let .playlist(id): PlaylistDetailView(playlistId: id)
+            case let .mix(id): DailyMixDetailView(mixId: id)
+            case let .genre(name): GenreDetailView(genre: name)
+            case .liked: LikedSongsView()
+            case .settings: SettingsView()
+            case let .collection(kind): CollectionView(kind: kind)
             }
         }
-        .padding()
-        .background(Color("Surface"))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-    }
-}
-
-struct HomeAlbumRow: View {
-    let albums: [Album]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                ForEach(albums) { album in
-                    MediaCard(imageURL: album.coverImageUrl, title: album.title, subtitle: album.artist?.name) {
-                        if let track = album.tracks?.first {
-                            AudioPlayer.shared.play(track: track, tracks: album.tracks ?? [track])
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-}
-
-struct HomeTrackRow: View {
-    let tracks: [Track]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                ForEach(tracks) { track in
-                    MediaCard(imageURL: track.album?.coverImageUrl ?? track.coverImageUrl, title: track.title, subtitle: track.artist?.name) {
-                        AudioPlayer.shared.play(track: track, tracks: [track])
-                    }
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-}
-
-struct HomeArtistRow: View {
-    let artists: [Artist]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                ForEach(artists) { artist in
-                    ArtistCard(artist: artist)
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-}
-
-struct ArtistCard: View {
-    let artist: Artist
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AsyncImage(url: artist.imageUrl.flatMap { URL(string: $0) }) { phase in
-                if let image = phase.image {
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } else {
-                    Color("Surface")
-                }
-            }
-            .frame(width: 132, height: 132)
-            .clipShape(Circle())
-
-            Text(artist.name)
-                .font(.subheadline.bold())
-                .lineLimit(1)
-        }
-        .frame(width: 132)
     }
 }

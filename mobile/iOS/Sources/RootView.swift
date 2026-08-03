@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
-    @StateObject private var api = MusicyAPI.shared
+    @ObservedObject private var api = MusicyAPI.shared
 
     var body: some View {
         Group {
@@ -13,5 +13,6 @@ struct RootView: View {
                     .environmentObject(api)
             }
         }
+        .preferredColorScheme(.dark)
     }
 }

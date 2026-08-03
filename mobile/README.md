@@ -1,19 +1,35 @@
 # Musicy Mobile
 
-Native mobile apps for Musicy. Both apps are first-class native clients with a shared dark, violet-accented design inspired by the Musicy web app.
+Native mobile apps for Musicy. Both are first-class native clients built to
+match the web app: the same dark, violet-accented design, the same catalogue,
+and the same multi-device playback hand-off.
 
 ## Structure
 
-- `android/` — Kotlin + Jetpack Compose app with Android Auto support.
-- `iOS/` — SwiftUI iOS app with CarPlay support.
+- `android/` — Kotlin + Jetpack Compose, Media3/ExoPlayer, Android Auto.
+- `iOS/` — SwiftUI, `AVPlayer`, CarPlay.
 
 ## Features
 
-- **Self-hosted / custom endpoint** — On first launch each app asks for a server URL and an API key. This lets the same app connect to any Musicy instance, including self-hosted ones.
-- **Native playback** — Android uses ExoPlayer, iOS uses `AVPlayer`.
-- **Home, Search, Library, and Player screens**.
-- **Android Auto / CarPlay** — Browse Daily Mixes, Albums, Artists, Playlists, and Liked Songs directly from the car UI.
-- **API key authentication** — Uses Musicy's existing API-key support for native clients.
+- **Self-hosted / custom endpoint** — on first launch each app asks for a
+  server URL and signs in, so the same build works against any Musicy
+  instance. Credentials are an API key sent as `Authorization: Bearer …`.
+- **Real playback** — one shared engine per app drives the in-app UI, the
+  system notification / lock screen, headset buttons and the car. Queue,
+  shuffle, repeat, seek, gapless-ish autoplay and play-history scrobbling.
+- **Full catalogue** — home feed, search, genre categories, albums, artists,
+  playlists, daily mixes, liked songs, recently played, followed artists and
+  "see all" index pages for each.
+- **Player** — artwork, scrubbing, queue editing, synced lyrics (LRCLib, the
+  same source the web player uses) and device switching.
+- **Musicy Connect** — the phone joins the same device bus as the browser, so
+  playback can be claimed here or handed to another device, and remote
+  transport commands work in both directions.
+- **Android Auto / CarPlay** — browse Home, Library, Albums, Artists,
+  Playlists, Genres, Liked Songs and Recently Played, then play a whole list
+  or a single song from it. Android also supports assistant search.
+- **Offline downloads (Android)** — saved tracks play from local storage with
+  no network, mirroring the web app's Downloads page.
 
 ## Android
 
@@ -32,9 +48,23 @@ cd mobile/android
 
 If the Gradle wrapper is missing, install Gradle 8.7 and run `gradle wrapper` first.
 
+### Architecture
+
+| Piece | Role |
+| --- | --- |
+| `MusicyPlaybackService` | `MediaLibraryService` owning the one `ExoPlayer`, the browse tree and the sync client |
+| `MusicyLibrary` | Browse nodes for Android Auto, plus the queue cache that turns one tapped song into its whole album |
+| `PlayerConnection` | `MediaController` wrapper the Compose screens observe |
+| `SyncClient` | SSE client for `/api/sync/stream`, publishing and receiving Connect events |
+| `MusicyRepository` | Shared data access, liked-song cache, downloads and settings |
+
 ### Android Auto
 
-The `MusicyPlaybackService` is a `MediaBrowserServiceCompat` that exposes the root catalogue to Android Auto via the `automotive_app_desc.xml` manifest declaration. The service uses the configured endpoint and API key from DataStore.
+The service declares both `androidx.media3.session.MediaLibraryService` and the
+legacy `android.media.browse.MediaBrowserService` actions, and ships
+`automotive_app_desc.xml` with `media` and `search`. Because the car attaches to
+the same session as the app, playback started on the phone continues in the car
+and vice versa.
 
 ## iOS
 
@@ -51,11 +81,22 @@ xcodegen generate
 xcodebuild -scheme Musicy -destination 'platform=iOS Simulator,name=iPhone 15' clean build
 ```
 
+### Architecture
+
+| Piece | Role |
+| --- | --- |
+| `AudioPlayer` | Single `AVPlayer` engine: queue, auto-advance, seek, remote commands, now-playing info |
+| `LibraryStore` | Shared app state — feed, playlists, liked-song set, profile |
+| `SyncClient` | SSE client for Musicy Connect |
+| `CarPlaySceneDelegate` | Browse templates mirroring the Android Auto tree |
+
 ### CarPlay
 
-The app declares a `CPTemplateApplicationSceneSessionRoleApplication` scene in `Info.plist` with `CarPlaySceneDelegate` as the delegate. The delegate builds a list-based browse UI and uses the shared `AudioPlayer` for playback.
+The app declares a `CPTemplateApplicationSceneSessionRoleApplication` scene in
+`Info.plist` with `CarPlaySceneDelegate` as the delegate.
 
-> Note: CarPlay entitlements (`com.apple.developer.carplay-audio`) are required to run on a physical device; the iOS Simulator build does not enforce them.
+> Note: CarPlay entitlements (`com.apple.developer.carplay-audio`) are required
+> to run on a physical device; the iOS Simulator build does not enforce them.
 
 ## CI
 
@@ -65,16 +106,23 @@ The app declares a `CPTemplateApplicationSceneSessionRoleApplication` scene in `
 
 ## API support
 
-The mobile clients consume the same public and authenticated endpoints as the web app:
+The mobile clients consume the same endpoints as the web app. Everything below
+accepts an API key via `Authorization: Bearer <api-key>`.
 
-- `GET /api/settings/public` — health / availability check
-- `GET /api/daily-mixes`
-- `GET /api/albums`, `GET /api/albums/{id}`
-- `GET /api/artists`, `GET /api/artists/{id}/tracks`
-- `GET /api/playlists`, `GET /api/playlists/{id}`
-- `GET /api/search`
-- `GET /api/tracks/{id}`, `POST /api/track/play`
-- `GET /api/tracks/{id}/lyrics`
-- `GET /api/user/liked-songs`
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /api/mobile/login`, `POST /api/auth/register`, `GET /api/user/profile` |
+| Home | `GET /api/mobile/feed`, `GET /api/daily-mixes`, `GET /api/daily-mixes/{id}`, `GET /api/genres` |
+| Catalogue | `GET /api/albums`, `/api/albums/{id}`, `/api/artists`, `/api/artists/{id}`, `/api/artists/{id}/tracks`, `/api/artists/{id}/albums`, `/api/tracks`, `/api/tracks/{id}`, `/api/tracks/{id}/lyrics`, `/api/search` |
+| Library | `GET /api/mobile/liked-songs`, `POST`/`DELETE /api/user/liked-songs`, `GET /api/user/recently-played`, `GET /api/user/followed-artists`, `POST`/`DELETE /api/artists/{id}/follow` |
+| Playlists | `GET`/`POST /api/playlists`, `GET /api/playlists/{id}`, `POST`/`DELETE /api/playlists/{id}/tracks` |
+| Playback | `POST /api/track/play` |
+| Connect | `GET /api/sync/stream`, `POST /api/sync/publish`, `GET /api/sync/devices` |
 
-Authenticated calls send `Authorization: Bearer <api-key>`.
+Several of these previously accepted only a NextAuth browser session. They now
+go through `getAuthSession` in `src/lib/mobile-auth.ts`, which accepts either a
+cookie session or a Bearer API key, so native clients get the same access the
+web app has.
+
+Password changes remain browser-only on purpose — an API key should not be able
+to rotate the account password.

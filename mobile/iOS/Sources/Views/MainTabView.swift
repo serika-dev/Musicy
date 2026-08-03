@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @StateObject private var api = MusicyAPI.shared
-    @StateObject private var player = AudioPlayer.shared
+    @ObservedObject private var player = AudioPlayer.shared
+    @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var sync = SyncClient.shared
     @State private var showPlayer = false
 
     var body: some View {
@@ -18,62 +19,97 @@ struct MainTabView: View {
                     .tabItem { Label("Profile", systemImage: "person.fill") }
             }
 
-            VStack(spacing: 0) {
-                if let track = player.currentTrack {
-                    MiniPlayer(track: track) { showPlayer = true }
-                        .padding(.bottom, 8)
-                }
+            if player.currentTrack != nil {
+                MiniPlayer { showPlayer = true }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 52)
+                    .transition(.move(edge: .bottom))
             }
-            .padding(.bottom, 48)
         }
+        .animation(.easeInOut(duration: 0.2), value: player.currentTrack)
         .sheet(isPresented: $showPlayer) {
             PlayerView()
-                .presentationBackground(.black.opacity(0.9))
+        }
+        .task {
+            await store.loadIfNeeded()
+            sync.start()
+        }
+        .overlay(alignment: .top) {
+            if let toast = store.toast {
+                Text(toast)
+                    .font(.footnote.bold())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial, in: Capsule())
+                    .padding(.top, 8)
+                    .task(id: toast) {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        store.toast = nil
+                    }
+            }
         }
     }
 }
 
+/// The floating now-playing bar, matching the web app's rounded player card
+/// that sits just above the tab bar.
 struct MiniPlayer: View {
-    let track: Track
-    @StateObject private var player = AudioPlayer.shared
     var onOpen: () -> Void
 
+    @ObservedObject private var player = AudioPlayer.shared
+    @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var sync = SyncClient.shared
+
     var body: some View {
-        Button(action: onOpen) {
-            HStack(spacing: 12) {
-                AsyncImage(url: (track.album?.coverImageUrl ?? track.coverImageUrl).flatMap { URL(string: $0) }) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        Color("Surface")
+        if let track = player.currentTrack {
+            VStack(spacing: 0) {
+                ProgressView(value: min(max(player.position, 0), max(player.duration, 1)), total: max(player.duration, 1))
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+                    .frame(height: 2)
+
+                HStack(spacing: 12) {
+                    Button(action: onOpen) {
+                        HStack(spacing: 12) {
+                            Artwork(url: track.artworkUrl, cornerRadius: 8)
+                                .frame(width: 44, height: 44)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(track.title).font(.subheadline.bold()).lineLimit(1)
+                                Text(track.artistLine).font(.caption).foregroundColor(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                        }
                     }
-                }
-                .frame(width: 48, height: 48)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.title)
-                        .font(.subheadline.bold())
-                        .lineLimit(1)
-                    Text(track.artist?.name ?? "")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
+                    Button { store.toggleLike(track) } label: {
+                        Image(systemName: store.isLiked(track.id) ? "heart.fill" : "heart")
+                            .foregroundColor(store.isLiked(track.id) ? .red : .secondary)
+                    }
+                    .buttonStyle(.plain)
 
-                Spacer()
+                    Button {
+                        sync.isRemoteControlling ? sync.sendCommand("toggle") : player.toggle()
+                    } label: {
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title3)
+                            .foregroundColor(.accentColor)
+                    }
+                    .buttonStyle(.plain)
 
-                Button { player.toggle() } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title3)
-                        .foregroundColor(Color("AccentColor"))
+                    Button {
+                        sync.isRemoteControlling ? sync.sendCommand("next") : player.next()
+                    } label: {
+                        Image(systemName: "forward.fill").foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding()
-            .background(Color("Surface").opacity(0.95))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .padding(.horizontal)
+            .background(Color("Surface").opacity(0.98))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(radius: 8)
         }
-        .buttonStyle(.plain)
     }
 }

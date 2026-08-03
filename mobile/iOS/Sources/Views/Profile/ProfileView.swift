@@ -1,43 +1,90 @@
 import SwiftUI
 
 struct ProfileView: View {
-    @StateObject private var api = MusicyAPI.shared
+    @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var api = MusicyAPI.shared
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                Spacer().frame(height: 32)
-                ZStack {
-                    Circle()
-                        .fill(Color("PrimaryContainer"))
-                        .frame(width: 96, height: 96)
-                    Text(api.userName.prefix(1).uppercased())
-                        .font(.system(size: 42, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                Text(api.userName)
-                    .font(.title2.bold())
-                Text("Connected to \(api.baseURL)")
-                    .font(.callout)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(spacing: 10) {
+                        Artwork(url: store.profile?.avatarUrl, systemImage: "person.fill", circular: true)
+                            .frame(width: 96, height: 96)
+                        Text(store.profile?.label ?? api.userName)
+                            .font(.title2.bold())
+                        if let email = store.profile?.email {
+                            Text(email).font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 24)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.3), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                    HStack(spacing: 10) {
+                        statCard("Liked", store.likedSongs.count, "heart.fill", route: .liked)
+                        statCard("Playlists", store.playlists.count, "music.note.list", route: .collection(.playlists))
+                        statCard("Following", store.followedArtists.count, "person.2.fill", route: .collection(.followed))
+                    }
                     .padding(.horizontal)
 
-                Spacer()
+                    VStack(spacing: 0) {
+                        NavigationLink(value: Route.settings) {
+                            profileRow("Settings", "gearshape")
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink(value: Route.collection(.albums)) {
+                            profileRow("Albums", "square.stack")
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink(value: Route.collection(.followed)) {
+                            profileRow("Followed artists", "person.2")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal)
 
-                Button("Sign out & switch server") {
-                    api.apiKey = ""
-                    api.userName = ""
-                    api.baseURL = ""
+                    Text("Connected to \(api.normalizedBaseURL)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.red.opacity(0.8))
-                .controlSize(.large)
-                .padding(.horizontal)
-
-                Spacer()
+                .padding(.bottom, 140)
             }
-            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .task { await store.loadIfNeeded() }
+            .musicyDestinations()
         }
+    }
+
+    private func statCard(_ label: String, _ value: Int, _ symbol: String, route: Route) -> some View {
+        NavigationLink(value: route) {
+            VStack(spacing: 4) {
+                Image(systemName: symbol).foregroundColor(.accentColor)
+                Text("\(value)").font(.headline)
+                Text(label).font(.caption).foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color("Surface"))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func profileRow(_ title: String, _ symbol: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol).frame(width: 22)
+            Text(title)
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+        }
+        .padding(.vertical, 14)
     }
 }

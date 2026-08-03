@@ -1,88 +1,324 @@
 import AVFoundation
 import Combine
 import MediaPlayer
+import UIKit
 
-class AudioPlayer: ObservableObject {
+enum RepeatMode {
+    case off, all, one
+}
+
+/// The app's single audio engine. The SwiftUI player, the lock screen, CarPlay
+/// and Musicy Connect all drive this one object so they never disagree about
+/// what is playing.
+///
+/// Everything runs on the main queue: `AVPlayer` callbacks are hopped there so
+/// the `@Published` values are always safe for SwiftUI to read.
+final class AudioPlayer: ObservableObject {
     static let shared = AudioPlayer()
+
     let player = AVPlayer()
 
-    @Published var isPlaying = false
-    @Published var currentTrack: Track?
-    @Published var queue: [Track] = []
+    @Published private(set) var currentTrack: Track?
+    @Published private(set) var queue: [Track] = []
+    @Published private(set) var currentIndex: Int = 0
+    @Published private(set) var isPlaying = false
+    @Published private(set) var position: Double = 0
+    @Published private(set) var duration: Double = 0
+    @Published var shuffle = false
+    @Published var repeatMode: RepeatMode = .off
 
-    private var observer: Any?
+    /// Called whenever transport state changes, so the sync client can
+    /// broadcast without this type knowing anything about the network.
+    var onStateChanged: (() -> Void)?
 
-    init() {
+    private var statusObserver: NSKeyValueObservation?
+    private var timeObserver: Any?
+    private var endObserver: NSObjectProtocol?
+    private var listenStartedAt: Date?
+    private var listenAccumulated: TimeInterval = 0
+
+    private init() {
+        configureSession()
+        observePlayer()
+        setupRemoteCommands()
+    }
+
+    private func configureSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetooth])
+            try AVAudioSession.sharedInstance().setCategory(
+                .playback,
+                mode: .default,
+                options: [.allowAirPlay, .allowBluetooth]
+            )
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             print("Audio session error: \(error)")
         }
+    }
 
-        observer = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
-            self?.isPlaying = player.timeControlStatus == .playing
+    private func observePlayer() {
+        statusObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let playing = player.timeControlStatus == .playing
+                if playing { self.resumeListenTimer() } else { self.pauseListenTimer() }
+                self.isPlaying = playing
+                self.updateNowPlayingInfo()
+                self.onStateChanged?()
+            }
         }
 
-        setupRemoteCommands()
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] time in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.position = time.seconds.isFinite ? time.seconds : 0
+                if let itemDuration = self.player.currentItem?.duration.seconds, itemDuration.isFinite {
+                    self.duration = itemDuration
+                }
+            }
+        }
+
+        // Without this the queue stalls after every song.
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async { self?.handleTrackFinished() }
+        }
     }
 
     private func setupRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
         center.playCommand.addTarget { [weak self] _ in
-            self?.player.play()
+            DispatchQueue.main.async { self?.player.play() }
             return .success
         }
         center.pauseCommand.addTarget { [weak self] _ in
-            self?.player.pause()
+            DispatchQueue.main.async { self?.player.pause() }
+            return .success
+        }
+        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+            DispatchQueue.main.async { self?.toggle() }
             return .success
         }
         center.nextTrackCommand.addTarget { [weak self] _ in
-            self?.next()
+            DispatchQueue.main.async { self?.next() }
             return .success
         }
         center.previousTrackCommand.addTarget { [weak self] _ in
-            self?.previous()
+            DispatchQueue.main.async { self?.previous() }
+            return .success
+        }
+        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            DispatchQueue.main.async { self?.seek(to: event.positionTime) }
             return .success
         }
     }
 
+    // MARK: - Transport
+
+    func play(tracks: [Track], startAt index: Int = 0) {
+        let playable = tracks.filter { !($0.filePath ?? "").isEmpty }
+        guard !playable.isEmpty else { return }
+        let requestedId = tracks.indices.contains(index) ? tracks[index].id : playable[0].id
+        queue = shuffle ? playable.shuffled() : playable
+        currentIndex = queue.firstIndex(where: { $0.id == requestedId }) ?? 0
+        loadCurrent(autoPlay: true)
+    }
+
     func play(track: Track, tracks: [Track] = []) {
-        guard let urlString = track.filePath, let url = URL(string: urlString) else { return }
-        let item = AVPlayerItem(url: url)
-        player.replaceCurrentItem(with: item)
-        player.play()
-        currentTrack = track
-        queue = tracks.isEmpty ? [track] : tracks
-        updateNowPlayingInfo()
+        play(tracks: tracks.isEmpty ? [track] : tracks,
+             startAt: tracks.firstIndex(where: { $0.id == track.id }) ?? 0)
+    }
+
+    func playNext(_ track: Track) {
+        guard !queue.isEmpty else {
+            play(tracks: [track])
+            return
+        }
+        queue.insert(track, at: min(currentIndex + 1, queue.count))
+        onStateChanged?()
+    }
+
+    func addToQueue(_ tracks: [Track]) {
+        let playable = tracks.filter { !($0.filePath ?? "").isEmpty }
+        guard !playable.isEmpty else { return }
+        if queue.isEmpty {
+            play(tracks: playable)
+        } else {
+            queue.append(contentsOf: playable)
+            onStateChanged?()
+        }
+    }
+
+    func removeFromQueue(at index: Int) {
+        guard queue.indices.contains(index), index != currentIndex else { return }
+        queue.remove(at: index)
+        if index < currentIndex { currentIndex -= 1 }
+        onStateChanged?()
+    }
+
+    func skip(to index: Int) {
+        guard queue.indices.contains(index) else { return }
+        currentIndex = index
+        loadCurrent(autoPlay: true)
     }
 
     func toggle() {
-        if isPlaying {
-            player.pause()
-        } else {
-            player.play()
-        }
+        if isPlaying { player.pause() } else { player.play() }
     }
 
     func next() {
-        guard let current = currentTrack, let index = queue.firstIndex(where: { $0.id == current.id }), index < queue.count - 1 else { return }
-        play(track: queue[index + 1], tracks: queue)
+        guard !queue.isEmpty else { return }
+        if currentIndex + 1 < queue.count {
+            currentIndex += 1
+            loadCurrent(autoPlay: true)
+        } else if repeatMode == .all {
+            currentIndex = 0
+            loadCurrent(autoPlay: true)
+        }
     }
 
+    /// Restarts the track first, like every other music app's back button.
     func previous() {
-        guard let current = currentTrack, let index = queue.firstIndex(where: { $0.id == current.id }), index > 0 else { return }
-        play(track: queue[index - 1], tracks: queue)
+        if position > 3 {
+            seek(to: 0)
+            return
+        }
+        guard currentIndex > 0 else {
+            seek(to: 0)
+            return
+        }
+        currentIndex -= 1
+        loadCurrent(autoPlay: true)
+    }
+
+    func seek(to seconds: Double) {
+        player.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600))
+        position = max(0, seconds)
+        updateNowPlayingInfo()
+    }
+
+    func setVolume(_ value: Float) {
+        player.volume = min(max(value, 0), 1)
+    }
+
+    func toggleShuffle() {
+        shuffle.toggle()
+        guard !queue.isEmpty, let current = currentTrack else { return }
+        if shuffle {
+            var rest = queue.filter { $0.id != current.id }
+            rest.shuffle()
+            queue = [current] + rest
+        }
+        currentIndex = queue.firstIndex(where: { $0.id == current.id }) ?? 0
+        onStateChanged?()
+    }
+
+    func cycleRepeat() {
+        switch repeatMode {
+        case .off: repeatMode = .all
+        case .all: repeatMode = .one
+        case .one: repeatMode = .off
+        }
+    }
+
+    func stop() {
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        flushListen()
+        queue = []
+        currentTrack = nil
+        currentIndex = 0
+        isPlaying = false
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        onStateChanged?()
+    }
+
+    // MARK: - Internals
+
+    private func loadCurrent(autoPlay: Bool) {
+        guard queue.indices.contains(currentIndex) else { return }
+        flushListen()
+        let track = queue[currentIndex]
+        guard let url = MusicyAPI.shared.absoluteURL(track.filePath) else { return }
+
+        let item = AVPlayerItem(url: url)
+        player.replaceCurrentItem(with: item)
+        currentTrack = track
+        position = 0
+        duration = Double(track.duration ?? 0)
+        listenAccumulated = 0
+        listenStartedAt = nil
+        if autoPlay { player.play() }
+        updateNowPlayingInfo()
+        onStateChanged?()
+    }
+
+    private func handleTrackFinished() {
+        flushListen()
+        if repeatMode == .one {
+            seek(to: 0)
+            player.play()
+            return
+        }
+        next()
+    }
+
+    private func resumeListenTimer() {
+        if listenStartedAt == nil { listenStartedAt = Date() }
+    }
+
+    private func pauseListenTimer() {
+        if let started = listenStartedAt {
+            listenAccumulated += Date().timeIntervalSince(started)
+            listenStartedAt = nil
+        }
+    }
+
+    /// Scrobbles the finished track with how long it was actually heard.
+    private func flushListen() {
+        pauseListenTimer()
+        let seconds = Int(listenAccumulated)
+        let trackId = currentTrack?.id
+        listenAccumulated = 0
+        guard let trackId, seconds >= 5 else { return }
+        Task { try? await MusicyAPI.shared.recordPlay(trackId: trackId, seconds: seconds) }
     }
 
     private func updateNowPlayingInfo() {
+        guard let track = currentTrack else { return }
         var info = [String: Any]()
-        info[MPMediaItemPropertyTitle] = currentTrack?.title
-        info[MPMediaItemPropertyArtist] = currentTrack?.artist?.name
-        info[MPMediaItemPropertyAlbumTitle] = currentTrack?.album?.title
-        if let duration = currentTrack?.duration {
-            info[MPMediaItemPropertyPlaybackDuration] = NSNumber(value: Double(duration))
-        }
+        info[MPMediaItemPropertyTitle] = track.title
+        info[MPMediaItemPropertyArtist] = track.artistLine
+        info[MPMediaItemPropertyAlbumTitle] = track.album?.title
+        info[MPMediaItemPropertyPlaybackDuration] = NSNumber(value: duration > 0 ? duration : Double(track.duration ?? 0))
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = NSNumber(value: position)
+        info[MPNowPlayingInfoPropertyPlaybackRate] = NSNumber(value: isPlaying ? 1.0 : 0.0)
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+
+        loadArtwork(for: track)
+    }
+
+    private var artworkTrackId: String?
+
+    private func loadArtwork(for track: Track) {
+        guard artworkTrackId != track.id, let url = MusicyAPI.shared.absoluteURL(track.artworkUrl) else { return }
+        artworkTrackId = track.id
+        Task {
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                guard self.currentTrack?.id == track.id else { return }
+                var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            }
+        }
     }
 }
