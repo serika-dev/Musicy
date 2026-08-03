@@ -12,6 +12,20 @@ struct Track: Codable, Identifiable {
     let artist: Artist?
     let album: Album?
     let featuredArtists: [Artist]?
+
+    init(id: String, title: String, duration: Int? = nil, coverImageUrl: String? = nil, filePath: String? = nil, format: String? = nil, genre: String? = nil, playCount: Int? = nil, artist: Artist? = nil, album: Album? = nil, featuredArtists: [Artist]? = nil) {
+        self.id = id
+        self.title = title
+        self.duration = duration
+        self.coverImageUrl = coverImageUrl
+        self.filePath = filePath
+        self.format = format
+        self.genre = genre
+        self.playCount = playCount
+        self.artist = artist
+        self.album = album
+        self.featuredArtists = featuredArtists
+    }
 }
 
 struct Artist: Codable, Identifiable {
