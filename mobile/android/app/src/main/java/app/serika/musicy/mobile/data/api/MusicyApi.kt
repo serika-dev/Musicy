@@ -8,7 +8,7 @@ interface MusicyApi {
     @POST("api/auth/register")
     suspend fun register(@Body body: RegisterRequest): Response<AuthResponse>
 
-    @POST("api/auth/mobile/login")
+    @POST("api/mobile/login")
     suspend fun login(@Body body: LoginRequest): AuthResponse
 
     @GET("api/settings/public")

@@ -4,7 +4,18 @@ import { prisma } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    let body: { email?: string; password?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { message: "Invalid JSON body" },
+        { status: 400 },
+      );
+    }
+
+    const email = body.email?.trim() ?? "";
+    const password = body.password?.trim() ?? "";
 
     if (!email || !password) {
       return NextResponse.json(
@@ -33,7 +44,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Reuse or create a dedicated mobile API key for this account.
     let apiKey = await prisma.apiKey.findFirst({
       where: { userId: user.id, name: "Mobile App" },
     });

@@ -57,7 +57,7 @@ final class MusicyAPI: ObservableObject {
 
     func login(email: String, password: String) async throws -> AuthResponse {
         let body = try JSONEncoder().encode(LoginRequest(email: email, password: password))
-        return try await decode(AuthResponse.self, path: "api/auth/mobile/login", method: "POST", body: body)
+        return try await decode(AuthResponse.self, path: "api/mobile/login", method: "POST", body: body)
     }
 
     func register(email: String, password: String, username: String, displayName: String) async throws -> AuthResponse {

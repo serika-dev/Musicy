@@ -223,6 +223,11 @@ private struct AuthSetupPage: View {
     }
 
     private func submit() async {
+        let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let password = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        let username = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard !email.isEmpty, !password.isEmpty else {
             error = "Email and password are required"
             return

@@ -12,8 +12,8 @@ android {
         applicationId = "app.serika.musicy.mobile"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
+        versionName = "1.1.0"
     }
 
     buildTypes {

@@ -282,6 +282,11 @@ private fun AuthPage(
     val focusManager = LocalFocusManager.current
 
     fun submit() {
+        val email = email.trim()
+        val password = password.trim()
+        val username = username.trim()
+        val displayName = displayName.trim()
+
         if (email.isBlank() || password.isBlank()) {
             error = "Email and password are required"
             return
