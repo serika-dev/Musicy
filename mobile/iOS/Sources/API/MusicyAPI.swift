@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 enum APIError: Error {
     case invalidURL
@@ -6,7 +7,7 @@ enum APIError: Error {
     case server(Int)
 }
 
-class MusicyAPI {
+final class MusicyAPI: ObservableObject {
     static let shared = MusicyAPI()
 
     @Published var baseURL: String = UserDefaults.standard.string(forKey: "musicy_base_url") ?? "" {
