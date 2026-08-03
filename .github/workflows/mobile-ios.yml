@@ -28,7 +28,7 @@ jobs:
         working-directory: mobile/iOS
         run: |
           xcodebuild -scheme Musicy \
-            -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
             -derivedDataPath DerivedData \
             clean build
 
