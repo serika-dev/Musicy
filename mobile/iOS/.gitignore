@@ -1,0 +1,17 @@
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+Build/
+*.xcuserstate
+*.xcuserdata
+
+# macOS
+.DS_Store
+
+# CocoaPods / SPM
+Pods/
+Package.resolved
+
+# Generated
+Musicy.app/

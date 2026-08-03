@@ -115,11 +115,13 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 📱 Mobile App
+## 📱 Mobile Apps
 
-Musicy supports native Android apps via Capacitor.
+Musicy now ships first-class native mobile apps in `mobile/android` and `mobile/iOS`. Both are fully native (Kotlin + Jetpack Compose and SwiftUI), support custom server endpoints for self-hosted instances, and include Android Auto / CarPlay browse support.
 
-### Build for Android
+See [`mobile/README.md`](mobile/README.md) for build instructions and CI details.
+
+The existing Capacitor wrapper in `android/` is still available for web-embedding workflows:
 
 ```bash
 # Sync Capacitor with Android

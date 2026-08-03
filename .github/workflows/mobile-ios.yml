@@ -1,0 +1,39 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'mobile/iOS/**'
+      - '.github/workflows/mobile-ios.yml'
+  pull_request:
+    paths:
+      - 'mobile/iOS/**'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: mobile/iOS
+        run: xcodegen generate
+
+      - name: Build iOS app
+        working-directory: mobile/iOS
+        run: |
+          xcodebuild -scheme Musicy \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -derivedDataPath DerivedData \
+            clean build
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: musicy-ios-debug
+          path: DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app
