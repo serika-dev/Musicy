@@ -48,10 +48,33 @@ data class PlaybackUiState(
     val hasPrevious: Boolean = false
 )
 
-/** The playhead, emitted on its own so only the scrubber and lyrics redraw. */
-data class PlaybackPosition(val positionMs: Long = 0L, val durationMs: Long = 0L) {
+/**
+ * The playhead, emitted on its own so only the scrubber and lyrics redraw.
+ *
+ * The session only reports position every quarter-second, which is too coarse
+ * for lyrics to land on the beat. [currentMs] extrapolates from the last report
+ * using the wall clock and the playback speed, so a frame-driven reader can ask
+ * "where are we *right now*" and get an answer good to the millisecond.
+ */
+data class PlaybackPosition(
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+    val isPlaying: Boolean = false,
+    val speed: Float = 1f,
+    /** [android.os.SystemClock.elapsedRealtime] when this was captured. */
+    val capturedRealtimeMs: Long = 0L
+) {
     val progress: Float
         get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+
+    /** Position extrapolated to now; equals [positionMs] while paused. */
+    fun currentMs(): Long {
+        if (!isPlaying || capturedRealtimeMs <= 0L) return positionMs
+        val sinceReport = android.os.SystemClock.elapsedRealtime() - capturedRealtimeMs
+        val elapsed = (sinceReport.toFloat() * speed).toLong()
+        val projected = positionMs + elapsed
+        return if (durationMs > 0) projected.coerceIn(0L, durationMs) else projected.coerceAtLeast(0L)
+    }
 }
 
 /**
@@ -135,7 +158,10 @@ class PlayerConnection(
         val player = controller ?: return
         _position.value = PlaybackPosition(
             positionMs = player.currentPosition.coerceAtLeast(0L),
-            durationMs = player.duration.takeIf { it > 0 } ?: 0L
+            durationMs = player.duration.takeIf { it > 0 } ?: 0L,
+            isPlaying = player.isPlaying,
+            speed = player.playbackParameters.speed,
+            capturedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         )
     }
 

@@ -21,6 +21,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,11 +42,36 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import app.serika.musicy.mobile.data.model.Track
+import app.serika.musicy.mobile.player.PlaybackPosition
 import app.serika.musicy.mobile.ui.theme.LikeRed
 import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
 import app.serika.musicy.mobile.ui.theme.Outline
 import app.serika.musicy.mobile.ui.theme.Primary
 import app.serika.musicy.mobile.ui.theme.SurfaceVariant
+
+/**
+ * A playhead value that advances every frame while playing, extrapolated from
+ * the last session report. Lyrics read this so the active line lands on the
+ * beat instead of stepping a quarter-second at a time.
+ *
+ * Only the returned [State] changes each frame — read it from inside a
+ * `derivedStateOf` so the frame updates don't recompose anything until the
+ * value you actually derive from it (like the active line index) changes.
+ */
+@Composable
+fun rememberSmoothPosition(position: PlaybackPosition): State<Long> {
+    val out = remember { mutableLongStateOf(position.positionMs) }
+    LaunchedEffect(position) {
+        if (!position.isPlaying) {
+            out.longValue = position.positionMs
+            return@LaunchedEffect
+        }
+        while (true) {
+            withFrameMillis { out.longValue = position.currentMs() }
+        }
+    }
+    return out
+}
 
 /** mm:ss, or h:mm:ss for anything over an hour. */
 fun formatDuration(seconds: Int?): String {

@@ -1,5 +1,6 @@
 package app.serika.musicy.mobile.ui.screens
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,6 +54,15 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
     val refreshing by vm.homeRefreshing.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
+    // Crossfade on the load phase, not on the value, so a pull-refresh (which
+    // keeps the phase at Success) updates in place without resetting scroll,
+    // while the first skeleton→content swap fades smoothly.
+    val homePhase = when (home) {
+        is Async.Loading -> 0
+        is Async.Failure -> 1
+        is Async.Success -> 2
+    }
+    Crossfade(targetState = homePhase, label = "home") { _ ->
     when (val state = home) {
         is Async.Loading -> HomeSkeleton()
         is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadHome(force = true) })
@@ -228,6 +238,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
             }
             }
         }
+    }
     }
 
     TrackActionsHost(vm = vm, nav = nav, selected = actionTrack, onDismiss = { actionTrack = null })

@@ -1,5 +1,6 @@
 package app.serika.musicy.mobile.ui.screens
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -59,6 +60,12 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     var showCreate by remember { mutableStateOf(false) }
 
+    val libraryPhase = when (library) {
+        is Async.Loading -> 0
+        is Async.Failure -> 1
+        is Async.Success -> 2
+    }
+    Crossfade(targetState = libraryPhase, label = "library") { _ ->
     when (val state = library) {
         is Async.Loading -> ListSkeleton()
         is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadLibrary(force = true) })
@@ -199,6 +206,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
             }
             }
         }
+    }
     }
 
     if (showCreate) {

@@ -19,6 +19,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.serika.musicy.mobile.data.model.Track
+import app.serika.musicy.mobile.player.PlaybackPosition
+import app.serika.musicy.mobile.ui.components.rememberSmoothPosition
 import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
 import app.serika.musicy.mobile.ui.theme.Primary
 import app.serika.musicy.mobile.ui.viewmodel.Async
@@ -38,13 +40,16 @@ data class LyricLine(val timeMs: Long, val text: String)
 fun LyricsPanel(
     vm: MusicyViewModel,
     track: Track,
-    positionMs: Long,
+    position: PlaybackPosition,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
     /** When true the lyric list fills the space it is given instead of a fixed
      *  box — used by the fullscreen big-player view. */
     fillHeight: Boolean = false
 ) {
+    // Frame-accurate playhead: the active line lands on the beat instead of
+    // stepping with the quarter-second session reports.
+    val smoothPosition = rememberSmoothPosition(position)
     val settings by vm.settings.collectAsState()
     val lyrics by loadAsync(track.id) { vm.repo.lyrics(track.id) }
     val data = lyrics.valueOrNull
@@ -94,7 +99,7 @@ fun LyricsPanel(
             useSynced -> SyncedLyrics(
                 lines = synced,
                 romanizedByTime = romanizedByTime,
-                positionMs = positionMs,
+                positionProvider = { smoothPosition.value },
                 showBoth = settings.showRomanizationAlongside,
                 animate = !settings.reducedMotion,
                 fillHeight = fillHeight,
@@ -124,7 +129,7 @@ fun LyricsPanel(
 private fun SyncedLyrics(
     lines: List<LyricLine>,
     romanizedByTime: Map<Long, String>,
-    positionMs: Long,
+    positionProvider: () -> Long,
     showBoth: Boolean,
     animate: Boolean,
     fillHeight: Boolean,
@@ -132,10 +137,11 @@ private fun SyncedLyrics(
 ) {
     val listState = rememberLazyListState()
 
-    // derivedStateOf keeps the whole list from recomposing on every position
-    // tick — only a change of *which* line is active matters here.
+    // derivedStateOf keeps the whole list from recomposing on every frame — the
+    // provider is read each frame, but only a change of *which* line is active
+    // triggers a recomposition here.
     val activeIndex by remember(lines) {
-        derivedStateOf { lines.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0) }
+        derivedStateOf { lines.indexOfLast { it.timeMs <= positionProvider() }.coerceAtLeast(0) }
     }
 
     // Auto-scroll pauses while the user is dragging, so following along by hand

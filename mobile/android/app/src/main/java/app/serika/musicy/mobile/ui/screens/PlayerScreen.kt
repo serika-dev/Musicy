@@ -599,7 +599,7 @@ private fun FullscreenLyrics(vm: MusicyViewModel, onClose: () -> Unit) {
             LyricsPanel(
                 vm = vm,
                 track = track,
-                positionMs = position.positionMs,
+                position = position,
                 onSeek = onSeek,
                 fillHeight = true
             )

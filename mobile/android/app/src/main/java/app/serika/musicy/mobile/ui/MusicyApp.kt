@@ -1,5 +1,12 @@
 package app.serika.musicy.mobile.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -42,6 +49,8 @@ import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
 import app.serika.musicy.mobile.ui.theme.Primary
 import app.serika.musicy.mobile.ui.theme.SurfaceVariant
 import app.serika.musicy.mobile.ui.viewmodel.MusicyViewModel
+import coil.imageLoader
+import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 
 private sealed class Tab(val route: String, val label: String, val icon: ImageVector) {
@@ -100,6 +109,17 @@ private fun MainScaffold(config: ServerConfig) {
         toast?.let {
             snackbarHost.showSnackbar(it)
             vm.consumeToast()
+        }
+    }
+
+    // Warm the next couple of covers into the image cache so skipping forward
+    // shows art immediately instead of a placeholder that fills in a beat late.
+    val context = LocalContext.current
+    LaunchedEffect(playback.currentIndex, playback.queue.size) {
+        playback.queue.drop(playback.currentIndex + 1).take(2).forEach { track ->
+            vm.repo.resolveUrl(track.artworkUrl)?.let { url ->
+                context.imageLoader.enqueue(ImageRequest.Builder(context).data(url).build())
+            }
         }
     }
 
@@ -230,10 +250,18 @@ private fun MainScaffold(config: ServerConfig) {
             }
         }
     ) { padding ->
+        // Reduced motion collapses everything to a quick fade; otherwise a
+        // gentle fade-and-scale on push and a slide-up for the player give the
+        // app the same considered feel as the web UI.
+        val motion = if (settings.reducedMotion) 90 else 300
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(padding),
+            enterTransition = { fadeIn(tween(motion)) + scaleIn(tween(motion), initialScale = 0.98f) },
+            exitTransition = { fadeOut(tween(motion)) },
+            popEnterTransition = { fadeIn(tween(motion)) },
+            popExitTransition = { fadeOut(tween(motion)) + scaleOut(tween(motion), targetScale = 0.98f) }
         ) {
             composable(Routes.HOME) {
                 HomeScreen(vm, nav, profile?.label ?: config.userName ?: "there")
@@ -242,7 +270,13 @@ private fun MainScaffold(config: ServerConfig) {
             composable(Routes.LIBRARY) { LibraryScreen(vm, nav) }
             composable(Routes.PROFILE) { ProfileScreen(vm, nav) }
             composable(Routes.SETTINGS) { SettingsScreen(vm, nav) }
-            composable(Routes.PLAYER) { PlayerScreen(vm, nav) }
+            composable(
+                Routes.PLAYER,
+                // The player rises from the bottom and drops back down, the way
+                // a now-playing sheet should.
+                enterTransition = { slideInVertically(tween(motion)) { it } + fadeIn(tween(motion)) },
+                popExitTransition = { slideOutVertically(tween(motion)) { it } + fadeOut(tween(motion)) }
+            ) { PlayerScreen(vm, nav) }
             composable(Routes.LIKED) { LikedSongsScreen(vm, nav) }
             composable(Routes.DOWNLOADS) { DownloadsScreen(vm, nav) }
 
