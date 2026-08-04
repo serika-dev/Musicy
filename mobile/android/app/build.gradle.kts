@@ -12,8 +12,8 @@ android {
         applicationId = "app.serika.musicy.mobile"
         minSdk = 26
         targetSdk = 34
-        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 3
-        versionName = "1.2.0"
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 4
+        versionName = "1.3.0"
     }
 
     buildTypes {
@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
+    // Pulls the dominant colour out of album art for the player tint.
+    implementation(libs.androidx.palette)
     implementation(libs.kotlinx.coroutines.android)
     // Bridges suspend functions to the ListenableFuture API Media3's library
     // session callbacks are built around.

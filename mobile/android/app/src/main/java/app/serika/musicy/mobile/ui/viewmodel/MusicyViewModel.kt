@@ -1,10 +1,13 @@
 package app.serika.musicy.mobile.ui.viewmodel
 
 import android.app.Application
+import android.content.Intent
+import android.media.audiofx.AudioEffect
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.serika.musicy.mobile.data.MusicyRepository
 import app.serika.musicy.mobile.data.model.*
+import app.serika.musicy.mobile.player.AudioEngineState
 import app.serika.musicy.mobile.player.MusicyLibrary
 import app.serika.musicy.mobile.player.PlayerConnection
 import app.serika.musicy.mobile.player.SyncHolder
@@ -14,8 +17,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -90,6 +95,10 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _thisDeviceId = MutableStateFlow("")
     val thisDeviceId: StateFlow<String> = _thisDeviceId.asStateFlow()
+
+    /** Recent searches, so the search tab is useful before you type. */
+    val recentSearches: StateFlow<List<String>> = repo.searchHistoryStore.recent
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private var searchJob: Job? = null
     private var syncMirrorJob: Job? = null
@@ -226,6 +235,28 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     fun clearSearch() {
         searchJob?.cancel()
         _search.value = null
+    }
+
+    /** Called when a result is actually opened — that is what "recent" means. */
+    fun rememberSearch(query: String) {
+        viewModelScope.launch { repo.searchHistoryStore.add(query) }
+    }
+
+    fun forgetSearch(query: String) {
+        viewModelScope.launch { repo.searchHistoryStore.remove(query) }
+    }
+
+    fun clearSearchHistory() {
+        viewModelScope.launch { repo.searchHistoryStore.clear() }
+        showToast("Recent searches cleared")
+    }
+
+    /** Pull-to-refresh equivalent for whichever tab the user is looking at. */
+    fun refreshAll() {
+        loadHome(force = true)
+        loadLibrary(force = true)
+        refreshProfile()
+        player.refreshLibrary()
     }
 
     // -- actions ------------------------------------------------------------
@@ -368,6 +399,24 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     fun setDefaultVolume(value: Float) = account {
         setDefaultVolume(value)
         player.setVolume(value)
+    }
+
+    /**
+     * Hands the phone's own equaliser the session Musicy is playing on.
+     *
+     * Most Android skins (Samsung's very much included) ship one; there is no
+     * point shipping a worse copy inside the app.
+     */
+    fun openEqualizer() {
+        val app = getApplication<Application>()
+        val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, AudioEngineState.audioSessionId.value)
+            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, app.packageName)
+            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val launched = runCatching { app.startActivity(intent) }.isSuccess
+        if (!launched) showToast("No equaliser app on this phone")
     }
 
     fun resetSettings() {

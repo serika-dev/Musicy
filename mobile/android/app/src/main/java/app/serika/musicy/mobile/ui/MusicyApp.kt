@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -129,6 +130,15 @@ private fun MainScaffold(config: ServerConfig) {
                         }
                     },
                     actions = {
+                        // The app caches aggressively; this is how you tell it
+                        // to go and look again.
+                        IconButton(onClick = rememberHapticClick(haptics) { vm.refreshAll() }) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = OnSurfaceVariant
+                            )
+                        }
                         Row(
                             modifier = Modifier
                                 .padding(end = 12.dp)
@@ -175,9 +185,13 @@ private fun MainScaffold(config: ServerConfig) {
                         onNext = rememberHapticClick(haptics) {
                             if (vm.isRemoteControlling) vm.sendRemoteCommand("next") else vm.player.next()
                         },
+                        onPrevious = rememberHapticClick(haptics) {
+                            if (vm.isRemoteControlling) vm.sendRemoteCommand("previous") else vm.player.previous()
+                        },
                         onToggleLike = rememberHapticClick(haptics) {
                             playback.currentTrack?.let { vm.toggleLike(it) }
-                        }
+                        },
+                        animate = !settings.reducedMotion
                     )
                     Spacer(Modifier.height(6.dp))
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {

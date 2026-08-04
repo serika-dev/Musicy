@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,6 +61,7 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
 
     val results by vm.search.collectAsState()
     val home by vm.home.collectAsState()
+    val recents by vm.recentSearches.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -85,7 +88,10 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+            keyboardActions = KeyboardActions(onSearch = {
+                keyboard?.hide()
+                vm.rememberSearch(query)
+            }),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Primary,
                 unfocusedBorderColor = Outline,
@@ -99,9 +105,17 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
         }
 
         when {
-            query.isBlank() -> BrowseCategories(vm, nav, home)
+            query.isBlank() -> BrowseCategories(
+                vm = vm,
+                nav = nav,
+                home = home,
+                recents = recents,
+                onRecent = { query = it; vm.search(it) },
+                onForget = { vm.forgetSearch(it) },
+                onClearHistory = { vm.clearSearchHistory() }
+            )
 
-            results is Async.Loading -> ScreenLoader()
+            results is Async.Loading -> TrackListSkeleton()
 
             results is Async.Failure -> ErrorBox((results as Async.Failure).message, onRetry = { vm.search(query) })
 
@@ -125,7 +139,10 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
                                     currentTrackId = playback.currentTrack?.id,
                                     isPlaying = playback.isPlaying,
                                     resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
-                                    onPlay = { index -> vm.play(tracks, index) },
+                                    onPlay = { index ->
+                                        vm.rememberSearch(query)
+                                        vm.play(tracks, index)
+                                    },
                                     onToggleLike = { vm.toggleLike(it) },
                                     onMore = { actionTrack = it }
                                 )
@@ -191,10 +208,14 @@ private fun LazyRowFilters(selected: SearchFilter, onSelect: (SearchFilter) -> U
 private fun BrowseCategories(
     vm: MusicyViewModel,
     nav: Nav,
-    home: Async<app.serika.musicy.mobile.ui.viewmodel.HomeState>
+    home: Async<app.serika.musicy.mobile.ui.viewmodel.HomeState>,
+    recents: List<String>,
+    onRecent: (String) -> Unit,
+    onForget: (String) -> Unit,
+    onClearHistory: () -> Unit
 ) {
     val genres = home.valueOrNull?.genres.orEmpty()
-    if (genres.isEmpty()) {
+    if (genres.isEmpty() && recents.isEmpty()) {
         EmptyState(
             title = "Search Musicy",
             message = "Find songs, albums, artists and playlists across the library.",
@@ -209,6 +230,54 @@ private fun BrowseCategories(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (recents.isNotEmpty()) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Recent searches",
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onClearHistory) { Text("Clear") }
+                    }
+                    recents.forEach { entry ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onRecent(entry) }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = null,
+                                tint = OnSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                entry,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { onForget(entry) }, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Remove \"$entry\" from recent searches",
+                                    tint = OnSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+        }
+
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
             Text(
                 "Browse all",

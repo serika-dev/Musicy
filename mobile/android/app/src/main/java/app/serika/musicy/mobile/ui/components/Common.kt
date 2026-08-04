@@ -1,7 +1,10 @@
 package app.serika.musicy.mobile.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +51,15 @@ fun formatDuration(seconds: Int?): String {
 }
 
 fun formatDurationMs(ms: Long): String = formatDuration((ms / 1000).toInt())
+
+/**
+ * Scrolls a title that is too long to fit instead of cutting it off with an
+ * ellipsis. Honours the reduced-motion preference, where a permanently moving
+ * label is exactly the thing the user asked us not to do.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+fun Modifier.marquee(enabled: Boolean = true): Modifier =
+    if (enabled) this.basicMarquee(iterations = Int.MAX_VALUE, delayMillis = 1_500) else this
 
 /** Cover art with a violet-tinted placeholder when a URL is missing. */
 @Composable
@@ -124,6 +136,7 @@ fun SectionHeader(
  * The square (or circular, for artists) tile used in every carousel — the
  * mobile counterpart of the web app's `media-card`.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaCard(
     title: String,
@@ -140,7 +153,9 @@ fun MediaCard(
         modifier = modifier
             .width(width)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            // Holding a card starts it, so the small play badge is a shortcut
+            // rather than the only way in.
+            .combinedClickable(onClick = onClick, onLongClick = onPlay)
             .padding(6.dp)
     ) {
         Box {
@@ -193,6 +208,7 @@ fun MediaCard(
 }
 
 /** One row in a track list. Shows a violet title while it is the active song. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
     track: Track,
@@ -210,7 +226,9 @@ fun TrackRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            // Long-press opens the same menu as the overflow button: reaching
+            // for a 36dp target is not how anyone actually uses a track list.
+            .combinedClickable(onClick = onClick, onLongClick = onMore)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

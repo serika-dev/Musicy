@@ -21,7 +21,15 @@ and the same multi-device playback hand-off.
   playlists, daily mixes, liked songs, recently played, followed artists and
   "see all" index pages for each.
 - **Player** — artwork, scrubbing, queue editing, synced lyrics (LRCLib, the
-  same source the web player uses) and device switching.
+  same source the web player uses) and device switching. The Android player
+  tints itself to the cover art, scrolls long titles, swipes sideways to
+  change track and down to dismiss, and previews what is up next.
+- **Sleep timer** — 5 to 90 minutes or "end of this track", counted down in
+  the playback service so it keeps running with the app closed.
+- **Recent searches** — the last dozen queries, kept on the device and
+  cleared on sign-out.
+- **System equaliser** — Settings hands your phone's own equaliser the audio
+  session Musicy is playing on, rather than shipping a worse copy.
 - **Musicy Connect** — the phone joins the same device bus as the browser, so
   playback can be claimed here or handed to another device, and remote
   transport commands work in both directions.

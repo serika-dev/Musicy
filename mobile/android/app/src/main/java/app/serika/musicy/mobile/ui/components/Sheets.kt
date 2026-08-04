@@ -2,7 +2,9 @@ package app.serika.musicy.mobile.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -11,15 +13,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -270,6 +276,137 @@ private fun DeviceRow(
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
         }
         if (selected) Icon(Icons.Default.Cast, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+    }
+}
+
+/** The overflow menu on the full player. */
+@Composable
+fun PlayerMenuSheet(
+    sleepLabel: String,
+    speedLabel: String,
+    onDismiss: () -> Unit,
+    onSleepTimer: () -> Unit,
+    onTune: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onOpenAlbum: (() -> Unit)?,
+    onOpenArtist: (() -> Unit)?,
+    onEqualizer: () -> Unit,
+    onShare: (() -> Unit)? = null
+) {
+    MusicySheet(onDismiss = onDismiss) {
+        SheetTitle("Now playing")
+        SheetAction("Sleep timer · $sleepLabel", Icons.Default.Bedtime, { onSleepTimer(); onDismiss() })
+        SheetAction("Speed & volume · $speedLabel", Icons.Default.Speed, { onTune(); onDismiss() })
+        SheetAction("Equaliser", Icons.Default.GraphicEq, { onEqualizer(); onDismiss() })
+        SheetAction("Add to playlist", Icons.Default.PlaylistAdd, { onAddToPlaylist(); onDismiss() })
+        if (onOpenAlbum != null) SheetAction("Go to album", Icons.Default.Album, { onOpenAlbum(); onDismiss() })
+        if (onOpenArtist != null) SheetAction("Go to artist", Icons.Default.Person, { onOpenArtist(); onDismiss() })
+        if (onShare != null) SheetAction("Share", Icons.Default.Share, { onShare(); onDismiss() })
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * Sets or clears the sleep timer.
+ *
+ * "End of track" is deliberately separate from the minute presets: falling
+ * asleep mid-song is the thing the feature exists to prevent.
+ */
+@Composable
+fun SleepTimerSheet(
+    remainingMs: Long?,
+    endOfTrack: Boolean,
+    onDismiss: () -> Unit,
+    onSelectMinutes: (Int) -> Unit,
+    onEndOfTrack: () -> Unit,
+    onCancel: () -> Unit
+) {
+    MusicySheet(onDismiss = onDismiss) {
+        SheetTitle("Sleep timer")
+        Text(
+            text = when {
+                remainingMs != null -> "Stopping in ${formatDurationMs(remainingMs)}"
+                endOfTrack -> "Stopping at the end of this song"
+                else -> "Musicy will pause on its own once the time is up."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (remainingMs != null || endOfTrack) Primary else OnSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+        Spacer(Modifier.height(14.dp))
+        // Scrollable rather than wrapped: a preset that falls off the edge on a
+        // narrow phone is a preset the user cannot pick.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(5, 10, 15, 30, 45, 60, 90).forEach { minutes ->
+                MusicyChip(
+                    label = "$minutes min",
+                    selected = false,
+                    onClick = { onSelectMinutes(minutes); onDismiss() }
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        SheetAction("End of this track", Icons.Default.Bedtime, { onEndOfTrack(); onDismiss() })
+        if (remainingMs != null || endOfTrack) {
+            SheetAction("Turn off timer", Icons.Default.Close, { onCancel(); onDismiss() }, tint = LikeRed)
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** Playback speed and output volume, without leaving the player. */
+@Composable
+fun PlaybackTuneSheet(
+    speed: Float,
+    volume: Float,
+    onDismiss: () -> Unit,
+    onSpeed: (Float) -> Unit,
+    onVolume: (Float) -> Unit
+) {
+    MusicySheet(onDismiss = onDismiss) {
+        SheetTitle("Speed & volume")
+        Text(
+            "Playback speed",
+            style = MaterialTheme.typography.labelMedium,
+            color = OnSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(0.75f, 1f, 1.25f, 1.5f, 2f).forEach { value ->
+                MusicyChip(
+                    label = if (value == 1f) "Normal" else "${value}x",
+                    selected = speed == value,
+                    onClick = { onSpeed(value) }
+                )
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "Volume · ${(volume * 100).toInt()}%",
+            style = MaterialTheme.typography.labelMedium,
+            color = OnSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+        Slider(
+            value = volume,
+            onValueChange = onVolume,
+            modifier = Modifier.padding(horizontal = 20.dp),
+            colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
+        )
+        Spacer(Modifier.height(24.dp))
     }
 }
 

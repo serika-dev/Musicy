@@ -298,6 +298,29 @@ class PlayerConnection(
         )
     }
 
+    /**
+     * Arms the sleep timer. The countdown lives in the service, so it keeps
+     * running with the app closed.
+     */
+    fun setSleepTimer(minutes: Int) = sendSleep {
+        putInt(MusicyPlaybackService.ARG_SLEEP_MINUTES, minutes)
+    }
+
+    /** Stops once the current song finishes rather than mid-track. */
+    fun sleepAtEndOfTrack() = sendSleep {
+        putBoolean(MusicyPlaybackService.ARG_SLEEP_END_OF_TRACK, true)
+    }
+
+    fun cancelSleepTimer() = sendSleep { putInt(MusicyPlaybackService.ARG_SLEEP_MINUTES, 0) }
+
+    private fun sendSleep(build: Bundle.() -> Unit) {
+        val args = Bundle().apply(build)
+        controller?.sendCustomCommand(
+            SessionCommand(MusicyPlaybackService.COMMAND_SLEEP_TIMER, Bundle.EMPTY),
+            args
+        )
+    }
+
     fun refreshLibrary() {
         controller?.sendCustomCommand(
             SessionCommand(MusicyPlaybackService.COMMAND_REFRESH_LIBRARY, Bundle.EMPTY),

@@ -59,7 +59,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
     var showCreate by remember { mutableStateOf(false) }
 
     when (val state = library) {
-        is Async.Loading -> ScreenLoader()
+        is Async.Loading -> ListSkeleton()
         is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadLibrary(force = true) })
         is Async.Success -> {
             val data = state.value

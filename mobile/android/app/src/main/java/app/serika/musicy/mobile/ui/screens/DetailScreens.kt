@@ -148,7 +148,7 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
 
     DetailScaffold(titleWhenScrolled = album.valueOrNull?.title ?: "Album", nav = nav) { padding ->
         when (val state = album) {
-            is Async.Loading -> ScreenLoader(Modifier.padding(padding))
+            is Async.Loading -> DetailSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data: Album = state.value
@@ -229,7 +229,7 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
 
     DetailScaffold(titleWhenScrolled = artist.valueOrNull?.name ?: "Artist", nav = nav) { padding ->
         when (val state = artist) {
-            is Async.Loading -> ScreenLoader(Modifier.padding(padding))
+            is Async.Loading -> DetailSkeleton(circular = true, modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data: Artist = state.value
@@ -336,7 +336,7 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
 
     DetailScaffold(titleWhenScrolled = playlist.valueOrNull?.name ?: "Playlist", nav = nav) { padding ->
         when (val state = playlist) {
-            is Async.Loading -> ScreenLoader(Modifier.padding(padding))
+            is Async.Loading -> DetailSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data: Playlist = state.value
@@ -403,7 +403,7 @@ fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
 
     DetailScaffold(titleWhenScrolled = mix.valueOrNull?.name ?: "Daily Mix", nav = nav) { padding ->
         when (val state = mix) {
-            is Async.Loading -> ScreenLoader(Modifier.padding(padding))
+            is Async.Loading -> DetailSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data: DailyMix = state.value
@@ -454,7 +454,7 @@ fun GenreScreen(vm: MusicyViewModel, nav: Nav, genre: String) {
 
     DetailScaffold(titleWhenScrolled = genre, nav = nav) { padding ->
         when (val state = tracks) {
-            is Async.Loading -> ScreenLoader(Modifier.padding(padding))
+            is Async.Loading -> TrackListSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val list = state.value
@@ -548,7 +548,7 @@ fun LikedSongsScreen(vm: MusicyViewModel, nav: Nav) {
                     onShuffle = { vm.shuffle(tracks, MusicyLibrary.NODE_LIKED) }
                 )
             }
-            if (library is Async.Loading) item { ScreenLoader() }
+            if (library is Async.Loading) item { TrackListSkeleton() }
             if (tracks.isEmpty() && library !is Async.Loading) {
                 item {
                     EmptyState(
@@ -614,7 +614,7 @@ fun CollectionScreen(vm: MusicyViewModel, nav: Nav, kind: String) {
 
     DetailScaffold(titleWhenScrolled = title, nav = nav) { padding ->
         when (val state = content) {
-            is Async.Loading -> ScreenLoader(Modifier.padding(padding))
+            is Async.Loading -> ListSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data = state.value

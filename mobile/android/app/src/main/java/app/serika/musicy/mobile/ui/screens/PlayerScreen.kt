@@ -1,12 +1,15 @@
 package app.serika.musicy.mobile.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Repeat
@@ -27,10 +31,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.serika.musicy.mobile.player.RepeatMode
+import app.serika.musicy.mobile.player.SleepTimerState
 import app.serika.musicy.mobile.ui.Nav
 import app.serika.musicy.mobile.ui.components.*
 import app.serika.musicy.mobile.ui.theme.LikeRed
@@ -41,6 +47,11 @@ import app.serika.musicy.mobile.ui.viewmodel.MusicyViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+/** Distance a drag on the artwork has to cover to count, in pixels. */
+private const val ARTWORK_SWIPE_THRESHOLD = 120f
 
 @Composable
 fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
@@ -54,16 +65,24 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     val activeDeviceId by vm.syncActiveDeviceId.collectAsState()
     val thisDeviceId by vm.thisDeviceId.collectAsState()
     val syncConnected by vm.syncConnected.collectAsState()
+    val sleepRemaining by SleepTimerState.remainingMs.collectAsState()
+    val sleepEndOfTrack by SleepTimerState.endOfTrack.collectAsState()
+    val library by vm.library.collectAsState()
 
     var showQueue by remember { mutableStateOf(false) }
     var showDevices by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showSleep by remember { mutableStateOf(false) }
+    var showTune by remember { mutableStateOf(false) }
+    var showPlaylistPicker by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableStateOf<Float?>(null) }
     var downloading by remember { mutableStateOf(false) }
 
     val track = state.currentTrack
     val scope = rememberCoroutineScope()
     val haptics = settings.hapticFeedback
+    val animate = !settings.reducedMotion
 
     if (track == null) {
         EmptyState(
@@ -77,6 +96,10 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
 
     val isDownloaded = remember(track.id, downloading) { vm.repo.isDownloaded(track.id) }
     val remote = vm.isRemoteControlling
+    val artworkUrl = vm.repo.resolveUrl(track.artworkUrl)
+    // The whole screen takes its colour from the cover, the way the web
+    // player's now-playing view does.
+    val accent by rememberArtworkColor(artworkUrl, fallback = Primary)
 
     val onTogglePlay = rememberHapticClick(haptics) {
         if (remote) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause()
@@ -92,12 +115,21 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     val onRewind = rememberHapticClick(haptics) { vm.player.seekBy(-settings.seekStepSeconds) }
     val onForward = rememberHapticClick(haptics) { vm.player.seekBy(settings.seekStepSeconds) }
 
+    // Artwork drag: sideways changes track, downwards dismisses the player.
+    var dragX by remember { mutableFloatStateOf(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val artOffset by animateFloatAsState(targetValue = dragX / 2.5f, label = "artworkDrag")
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Primary.copy(alpha = 0.30f), MaterialTheme.colorScheme.background)
+                    listOf(
+                        accent.copy(alpha = 0.75f),
+                        accent.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.background
+                    )
                 )
             )
             .verticalScroll(rememberScrollState())
@@ -128,17 +160,44 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                     tint = if (syncConnected) Primary else OnSurfaceVariant
                 )
             }
+            IconButton(onClick = { showMenu = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+            }
         }
 
         Spacer(Modifier.height(12.dp))
 
         Artwork(
-            url = vm.repo.resolveUrl(track.artworkUrl),
+            url = artworkUrl,
             contentDescription = track.title,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                .nudge(artOffset)
+                .pointerInput(track.id, remote) {
+                    detectDragGestures(
+                        onDragEnd = {
+                            val vertical = abs(dragY) > abs(dragX)
+                            when {
+                                vertical && dragY > ARTWORK_SWIPE_THRESHOLD -> nav.back()
+                                !vertical && dragX <= -ARTWORK_SWIPE_THRESHOLD -> onNext()
+                                !vertical && dragX >= ARTWORK_SWIPE_THRESHOLD -> onPrevious()
+                            }
+                            dragX = 0f
+                            dragY = 0f
+                        },
+                        onDragCancel = {
+                            dragX = 0f
+                            dragY = 0f
+                        },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            dragX += amount.x
+                            dragY += amount.y
+                        }
+                    )
+                }
         )
 
         Spacer(Modifier.height(24.dp))
@@ -148,15 +207,15 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                 Text(
                     track.title,
                     style = MaterialTheme.typography.headlineMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1,
+                    modifier = Modifier.marquee(animate)
                 )
                 Text(
                     track.artistLine,
                     style = MaterialTheme.typography.bodyLarge,
                     color = OnSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.marquee(animate)
                 )
             }
             IconButton(onClick = rememberHapticClick(haptics) { vm.toggleLike(track) }) {
@@ -217,7 +276,8 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                 color = OnSurfaceVariant
             )
             Text(
-                formatDurationMs(position.durationMs),
+                // Counting down reads better when you are watching the clock.
+                "-" + formatDurationMs((position.durationMs * (1f - sliderValue)).toLong()),
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurfaceVariant
             )
@@ -273,6 +333,27 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             }
         }
 
+        // Only shown while armed — a permanent "sleep timer: off" row is noise.
+        val sleepLeft = sleepRemaining
+        if (sleepLeft != null || sleepEndOfTrack) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                MusicyChip(
+                    label = if (sleepLeft != null) {
+                        "Sleeping in ${formatDurationMs(sleepLeft)}"
+                    } else {
+                        "Sleeping after this track"
+                    },
+                    selected = true,
+                    onClick = { showSleep = true }
+                )
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -281,6 +362,11 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                 Icon(Icons.Default.Lyrics, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(if (showLyrics) "Hide lyrics" else "Lyrics")
+            }
+            TextButton(onClick = { showSleep = true }) {
+                Icon(Icons.Default.Bedtime, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Sleep")
             }
             TextButton(onClick = { showQueue = true }) {
                 Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -298,6 +384,46 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                     if (remote) vm.sendRemoteCommand("seek", target / 1000.0) else vm.player.seekTo(target)
                 }
             )
+        }
+
+        // A peek at what is coming, so the queue sheet is an option rather than
+        // the only way to know what is next.
+        val upNext = state.queue.drop(state.currentIndex + 1).take(3)
+        if (upNext.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text("Up next", style = MaterialTheme.typography.labelLarge, color = OnSurfaceVariant)
+            upNext.forEachIndexed { offset, next ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Artwork(
+                        url = vm.repo.resolveUrl(next.artworkUrl),
+                        contentDescription = next.title,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.size(38.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            next.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            next.artistLine,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    TextButton(onClick = { vm.player.skipTo(state.currentIndex + 1 + offset) }) {
+                        Text("Play")
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(32.dp))
@@ -324,5 +450,73 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             onPlayHere = { vm.claimPlaybackHere() },
             onTransfer = { vm.transferPlaybackTo(it) }
         )
+    }
+
+    if (showMenu) {
+        PlayerMenuSheet(
+            sleepLabel = sleepRemaining?.let { formatDurationMs(it) }
+                ?: if (sleepEndOfTrack) "end of track" else "off",
+            speedLabel = if (settings.playbackSpeed == 1f) "normal" else "${settings.playbackSpeed}x",
+            onDismiss = { showMenu = false },
+            onSleepTimer = { showSleep = true },
+            onTune = { showTune = true },
+            onAddToPlaylist = { showPlaylistPicker = true },
+            onOpenAlbum = track.album?.id?.takeIf { it.isNotBlank() }?.let { id -> { nav.album(id) } },
+            onOpenArtist = track.artist?.id?.takeIf { it.isNotBlank() }?.let { id -> { nav.artist(id) } },
+            onEqualizer = { vm.openEqualizer() }
+        )
+    }
+
+    if (showSleep) {
+        SleepTimerSheet(
+            remainingMs = sleepRemaining,
+            endOfTrack = sleepEndOfTrack,
+            onDismiss = { showSleep = false },
+            onSelectMinutes = {
+                vm.player.setSleepTimer(it)
+                vm.showToast("Pausing in $it minutes")
+            },
+            onEndOfTrack = {
+                vm.player.sleepAtEndOfTrack()
+                vm.showToast("Pausing after this track")
+            },
+            onCancel = {
+                vm.player.cancelSleepTimer()
+                vm.showToast("Sleep timer off")
+            }
+        )
+    }
+
+    if (showTune) {
+        PlaybackTuneSheet(
+            speed = settings.playbackSpeed,
+            volume = settings.defaultVolume,
+            onDismiss = { showTune = false },
+            onSpeed = { vm.setPlaybackSpeed(it) },
+            onVolume = { vm.setDefaultVolume(it) }
+        )
+    }
+
+    if (showPlaylistPicker) {
+        AddToPlaylistSheet(
+            playlists = library.valueOrNull?.playlists.orEmpty(),
+            resolveArtwork = { vm.repo.resolveUrl(it.coverImageUrl) },
+            onDismiss = { showPlaylistPicker = false },
+            onSelect = { vm.addToPlaylist(it.id, track.id) },
+            onCreate = { name ->
+                vm.createPlaylist(name) { created ->
+                    if (created != null) vm.addToPlaylist(created.id, track.id)
+                }
+                showPlaylistPicker = false
+            }
+        )
+    }
+}
+
+/** Horizontal drag feedback that stays out of the layout pass. */
+private fun Modifier.nudge(value: Float): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, placeable.height) {
+        placeable.placeRelative(value.roundToInt(), 0)
     }
 }

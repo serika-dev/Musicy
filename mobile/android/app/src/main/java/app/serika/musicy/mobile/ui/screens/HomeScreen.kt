@@ -53,7 +53,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
     when (val state = home) {
-        is Async.Loading -> ScreenLoader()
+        is Async.Loading -> HomeSkeleton()
         is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadHome(force = true) })
         is Async.Success -> {
             val data = state.value

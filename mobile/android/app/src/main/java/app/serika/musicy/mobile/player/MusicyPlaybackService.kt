@@ -22,12 +22,15 @@ import app.serika.musicy.mobile.MainActivity
 import app.serika.musicy.mobile.R
 import app.serika.musicy.mobile.data.MusicyRepository
 import app.serika.musicy.mobile.data.model.Track
+import app.serika.musicy.mobile.data.preferences.SavedQueue
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.guava.future
@@ -76,6 +79,10 @@ class MusicyPlaybackService : MediaLibraryService() {
 
         player.addListener(PlaybackListener())
 
+        // Published so Settings can hand the phone's system equaliser the right
+        // session to attach to.
+        AudioEngineState.audioSessionId.value = player.audioSessionId
+
         val sessionActivity = PendingIntent.getActivity(
             this,
             0,
@@ -98,6 +105,7 @@ class MusicyPlaybackService : MediaLibraryService() {
         )
 
         PlaybackBridge.attach(repo, library, serviceScope) { player }
+        restoreQueue()
 
         // Keep the engine in step with the user's preferences.
         serviceScope.launch {
@@ -167,14 +175,94 @@ class MusicyPlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             startScrobble(mediaItem?.mediaId)
             maybeExtendQueue()
+            if (sleepAtEndOfTrack) {
+                // The user asked to stop after *this* song, and it just ended.
+                sleepAtEndOfTrack = false
+                SleepTimerState.endOfTrack.value = false
+                player.pause()
+            }
+            persistQueue()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) resumeScrobble() else pauseScrobble()
+            persistQueue()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) flushScrobble()
+        }
+    }
+
+    // -- sleep timer --------------------------------------------------------
+
+    private var sleepJob: Job? = null
+    private var sleepAtEndOfTrack = false
+
+    private fun startSleepTimer(millis: Long) {
+        cancelSleepTimer()
+        if (millis <= 0) return
+        sleepJob = serviceScope.launch {
+            var remaining = millis
+            while (remaining > 0) {
+                SleepTimerState.remainingMs.value = remaining
+                delay(1_000)
+                remaining -= 1_000
+            }
+            SleepTimerState.remainingMs.value = null
+            player.pause()
+        }
+    }
+
+    private fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        sleepJob = null
+        sleepAtEndOfTrack = false
+        SleepTimerState.remainingMs.value = null
+        SleepTimerState.endOfTrack.value = false
+    }
+
+    // -- resume across launches ---------------------------------------------
+
+    private var lastPersistMs = 0L
+
+    /**
+     * Snapshots the queue so the next launch can offer to pick up where the
+     * user left off. Throttled — this runs on ordinary playback events.
+     */
+    private fun persistQueue() {
+        val now = System.currentTimeMillis()
+        if (now - lastPersistMs < 5_000) return
+        lastPersistMs = now
+
+        val tracks = buildList {
+            for (i in 0 until player.mediaItemCount) {
+                MediaItems.toTrack(player.getMediaItemAt(i))?.let { add(it) }
+            }
+        }
+        if (tracks.isEmpty()) return
+        val snapshot = SavedQueue(
+            tracks = tracks,
+            index = player.currentMediaItemIndex.coerceAtLeast(0),
+            positionMs = player.currentPosition.coerceAtLeast(0L)
+        )
+        serviceScope.launch { repo.playbackStateStore.save(snapshot) }
+    }
+
+    /**
+     * Reloads the previous queue, paused and seeked to where it stopped. The
+     * app never resumes audio on its own — the user still has to press play.
+     */
+    private fun restoreQueue() {
+        serviceScope.launch {
+            if (!repo.settings.value.resumeOnLaunch) return@launch
+            if (player.mediaItemCount > 0) return@launch
+            val saved = repo.playbackStateStore.load() ?: return@launch
+            val items = saved.tracks.map { MediaItems.fromTrack(it, repo) }
+            if (items.isEmpty()) return@launch
+            player.setMediaItems(items, saved.index, saved.positionMs)
+            player.prepare()
+            player.playWhenReady = false
         }
     }
 
@@ -210,6 +298,7 @@ class MusicyPlaybackService : MediaLibraryService() {
                 .buildUpon()
                 .add(SessionCommand(COMMAND_TOGGLE_LIKE, Bundle.EMPTY))
                 .add(SessionCommand(COMMAND_REFRESH_LIBRARY, Bundle.EMPTY))
+                .add(SessionCommand(COMMAND_SLEEP_TIMER, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(available)
@@ -230,6 +319,20 @@ class MusicyPlaybackService : MediaLibraryService() {
                     withContext(Dispatchers.IO) { repo.toggleLike(trackId) }
                     SessionResult(SessionResult.RESULT_SUCCESS)
                 }
+            }
+            COMMAND_SLEEP_TIMER -> {
+                val minutes = args.getInt(ARG_SLEEP_MINUTES, 0)
+                val endOfTrack = args.getBoolean(ARG_SLEEP_END_OF_TRACK, false)
+                when {
+                    endOfTrack -> {
+                        cancelSleepTimer()
+                        sleepAtEndOfTrack = true
+                        SleepTimerState.endOfTrack.value = true
+                    }
+                    minutes > 0 -> startSleepTimer(minutes * 60_000L)
+                    else -> cancelSleepTimer()
+                }
+                Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             COMMAND_REFRESH_LIBRARY -> {
                 library.clearCaches()
@@ -455,7 +558,10 @@ class MusicyPlaybackService : MediaLibraryService() {
         const val SESSION_ID = "musicy_session"
         const val COMMAND_TOGGLE_LIKE = "app.serika.musicy.TOGGLE_LIKE"
         const val COMMAND_REFRESH_LIBRARY = "app.serika.musicy.REFRESH_LIBRARY"
+        const val COMMAND_SLEEP_TIMER = "app.serika.musicy.SLEEP_TIMER"
         const val ARG_TRACK_ID = "trackId"
+        const val ARG_SLEEP_MINUTES = "sleepMinutes"
+        const val ARG_SLEEP_END_OF_TRACK = "sleepEndOfTrack"
 
         // Legacy MediaBrowser keys Android Auto still reads for error actions.
         private const val ERROR_RESOLUTION_ACTION_LABEL = "android.media.extras.ERROR_RESOLUTION_ACTION_LABEL"
@@ -547,6 +653,25 @@ private object PlaybackBridge {
         syncClient = null
         SyncHolder.client = null
     }
+}
+
+/**
+ * The armed sleep timer, readable by the UI.
+ *
+ * Like the sync client this belongs to the service, so the countdown keeps
+ * running with the app closed.
+ */
+object SleepTimerState {
+    val remainingMs = MutableStateFlow<Long?>(null)
+    val endOfTrack = MutableStateFlow(false)
+}
+
+/**
+ * The ExoPlayer audio session id, so the UI can open the device's own
+ * equaliser against the stream Musicy is actually playing.
+ */
+object AudioEngineState {
+    val audioSessionId = MutableStateFlow(0)
 }
 
 /** Process-wide handle so the UI can read sync state owned by the service. */

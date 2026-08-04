@@ -7,6 +7,8 @@ import app.serika.musicy.mobile.data.downloads.DownloadStore
 import app.serika.musicy.mobile.data.model.*
 import app.serika.musicy.mobile.data.preferences.AppSettings
 import app.serika.musicy.mobile.data.preferences.AppSettingsStore
+import app.serika.musicy.mobile.data.preferences.PlaybackStateStore
+import app.serika.musicy.mobile.data.preferences.SearchHistoryStore
 import app.serika.musicy.mobile.data.preferences.ServerConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +35,8 @@ class MusicyRepository private constructor(context: Context) {
     val serverConfigStore = ServerConfigStore(appContext)
     val settingsStore = AppSettingsStore(appContext)
     val downloadStore = DownloadStore(appContext)
+    val playbackStateStore = PlaybackStateStore(appContext)
+    val searchHistoryStore = SearchHistoryStore(appContext)
 
     private val _config = MutableStateFlow(ServerConfig())
     val config: StateFlow<ServerConfig> = _config.asStateFlow()
@@ -82,6 +86,10 @@ class MusicyRepository private constructor(context: Context) {
 
     suspend fun signOut() {
         serverConfigStore.clear()
+        playbackStateStore.clear()
+        // The next person to sign in on this phone should not inherit the last
+        // account's searches.
+        searchHistoryStore.clear()
         _likedTrackIds.value = emptySet()
         likedLoaded = false
     }

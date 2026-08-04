@@ -17,10 +17,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.serika.musicy.mobile.data.api.ApiClient
+import app.serika.musicy.mobile.player.SleepTimerState
 import app.serika.musicy.mobile.ui.Nav
 import app.serika.musicy.mobile.ui.components.BackButton
 import app.serika.musicy.mobile.ui.components.MusicyChip
 import app.serika.musicy.mobile.ui.components.MusicyDivider
+import app.serika.musicy.mobile.ui.components.SleepTimerSheet
+import app.serika.musicy.mobile.ui.components.formatDurationMs
 import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
 import app.serika.musicy.mobile.ui.theme.Primary
 import app.serika.musicy.mobile.ui.viewmodel.MusicyViewModel
@@ -37,12 +40,16 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
     val thisDeviceId by vm.thisDeviceId.collectAsState()
     val connected by vm.syncConnected.collectAsState()
     val downloads by vm.repo.downloads.collectAsState(initial = emptyList())
+    val recents by vm.recentSearches.collectAsState()
+    val sleepRemaining by SleepTimerState.remainingMs.collectAsState()
+    val sleepEndOfTrack by SleepTimerState.endOfTrack.collectAsState()
     val context = LocalContext.current
 
     var editingName by remember { mutableStateOf(false) }
     var draftName by remember(settings.deviceName) { mutableStateOf(settings.deviceName) }
     var showAutoHelp by remember { mutableStateOf(false) }
     var showReset by remember { mutableStateOf(false) }
+    var showSleep by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -216,6 +223,19 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
                     onChange = vm::setDefaultVolume
                 )
             }
+            item {
+                SettingsRow(
+                    "Equaliser",
+                    "Open your phone's own equaliser for Musicy's audio."
+                ) { vm.openEqualizer() }
+            }
+            item {
+                SettingsRow(
+                    "Sleep timer",
+                    sleepRemaining?.let { "Pausing in ${formatDurationMs(it)}" }
+                        ?: if (sleepEndOfTrack) "Pausing after this track" else "Off"
+                ) { showSleep = true }
+            }
 
             // -- Lyrics ---------------------------------------------------------
             item { MusicyDivider(Modifier.padding(vertical = 8.dp)) }
@@ -294,6 +314,12 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
                     vm::setHapticFeedback
                 )
             }
+            item {
+                SettingsRow(
+                    "Clear recent searches",
+                    if (recents.isEmpty()) "Nothing saved" else "${recents.size} saved on this phone"
+                ) { vm.clearSearchHistory() }
+            }
 
             // -- Storage --------------------------------------------------------
             item { MusicyDivider(Modifier.padding(vertical = 8.dp)) }
@@ -334,6 +360,26 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
                 }
             }
         }
+    }
+
+    if (showSleep) {
+        SleepTimerSheet(
+            remainingMs = sleepRemaining,
+            endOfTrack = sleepEndOfTrack,
+            onDismiss = { showSleep = false },
+            onSelectMinutes = {
+                vm.player.setSleepTimer(it)
+                vm.showToast("Pausing in $it minutes")
+            },
+            onEndOfTrack = {
+                vm.player.sleepAtEndOfTrack()
+                vm.showToast("Pausing after this track")
+            },
+            onCancel = {
+                vm.player.cancelSleepTimer()
+                vm.showToast("Sleep timer off")
+            }
+        )
     }
 
     if (showAutoHelp) {
