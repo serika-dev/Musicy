@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -154,15 +155,15 @@ private fun SyncedLyrics(
         derivedStateOf { lines.indexOfLast { it.timeMs <= positionProvider() } }
     }
 
-    // Auto-scroll pauses while the user is dragging, so following along by hand
-    // doesn't fight the animation.
-    val userScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
-    var lastAuto by remember { mutableIntStateOf(-2) }
+    // Only a real finger-drag should pause the auto-scroll. Keying the effect
+    // on isScrollInProgress instead was self-defeating: our own programmatic
+    // scroll flips that flag, which cancelled the scroll the instant it began,
+    // so the lyrics never moved.
+    val userDragging by listState.interactionSource.collectIsDraggedAsState()
 
     // Keep the active line pinned to the middle of the viewport, smoothly.
-    LaunchedEffect(activeIndex, userScrolling) {
-        if (userScrolling || activeIndex < 0 || activeIndex == lastAuto) return@LaunchedEffect
-        lastAuto = activeIndex
+    LaunchedEffect(activeIndex) {
+        if (activeIndex < 0 || userDragging) return@LaunchedEffect
         if (animate) listState.centerItemAnimated(activeIndex) else listState.centerItemInstant(activeIndex)
     }
 
