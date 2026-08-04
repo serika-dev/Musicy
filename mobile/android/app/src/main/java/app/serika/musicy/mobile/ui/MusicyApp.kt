@@ -202,10 +202,18 @@ private fun MainScaffold(config: ServerConfig) {
                                 label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
                                 selected = selected,
                                 onClick = {
+                                    // Land on the tab's own root every time. The
+                                    // previous saveState/restoreState pair brought
+                                    // back whatever detail screen you had drilled
+                                    // into, so tapping Home showed an album instead
+                                    // of Home. Popping to the start destination and
+                                    // not restoring clears anything stacked on top.
                                     navController.navigate(tab.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = false
+                                        }
                                         launchSingleTop = true
-                                        restoreState = true
+                                        restoreState = false
                                     }
                                 },
                                 colors = NavigationBarItemDefaults.colors(

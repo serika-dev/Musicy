@@ -1,6 +1,5 @@
 package app.serika.musicy.mobile.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -71,7 +70,7 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
 
     var showQueue by remember { mutableStateOf(false) }
     var showDevices by remember { mutableStateOf(false) }
-    var showLyrics by remember { mutableStateOf(false) }
+    var lyricsFullscreen by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
     var showTune by remember { mutableStateOf(false) }
@@ -100,6 +99,13 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     // The whole screen takes its colour from the cover, the way the web
     // player's now-playing view does.
     val accent by rememberArtworkColor(artworkUrl, fallback = Primary)
+
+    // The big-player lyrics view takes over the whole screen, so it is its own
+    // layout rather than a section wedged into this one.
+    if (lyricsFullscreen) {
+        FullscreenLyrics(vm = vm, onClose = { lyricsFullscreen = false })
+        return
+    }
 
     val onTogglePlay = rememberHapticClick(haptics) {
         if (remote) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause()
@@ -269,15 +275,16 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                 inactiveTrackColor = Outline
             )
         )
+        val elapsedMs = (position.durationMs * sliderValue).toLong()
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
-                formatDurationMs((position.durationMs * sliderValue).toLong()),
+                formatDurationMs(elapsedMs),
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurfaceVariant
             )
             Text(
                 // Counting down reads better when you are watching the clock.
-                "-" + formatDurationMs((position.durationMs * (1f - sliderValue)).toLong()),
+                "-" + formatDurationMs(position.durationMs - elapsedMs),
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurfaceVariant
             )
@@ -358,10 +365,10 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            TextButton(onClick = { showLyrics = !showLyrics }) {
+            TextButton(onClick = { lyricsFullscreen = true }) {
                 Icon(Icons.Default.Lyrics, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (showLyrics) "Hide lyrics" else "Lyrics")
+                Text("Lyrics")
             }
             TextButton(onClick = { showSleep = true }) {
                 Icon(Icons.Default.Bedtime, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -373,17 +380,6 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                 Spacer(Modifier.width(6.dp))
                 Text("Queue · ${state.queue.size}")
             }
-        }
-
-        AnimatedVisibility(visible = showLyrics) {
-            LyricsPanel(
-                vm = vm,
-                track = track,
-                positionMs = position.positionMs,
-                onSeek = { target ->
-                    if (remote) vm.sendRemoteCommand("seek", target / 1000.0) else vm.player.seekTo(target)
-                }
-            )
         }
 
         // A peek at what is coming, so the queue sheet is an option rather than
@@ -518,5 +514,118 @@ private fun Modifier.nudge(value: Float): Modifier = layout { measurable, constr
     val placeable = measurable.measure(constraints)
     layout(placeable.width, placeable.height) {
         placeable.placeRelative(value.roundToInt(), 0)
+    }
+}
+
+/**
+ * The big-player lyrics view: cover art shrinks to a header line and the lyrics
+ * fill the screen, matching the web app's expanded player. Transport stays at
+ * the bottom so you can still control playback while reading along.
+ */
+@Composable
+private fun FullscreenLyrics(vm: MusicyViewModel, onClose: () -> Unit) {
+    val state by vm.player.state.collectAsState()
+    val position by vm.player.position.collectAsState()
+    val settings by vm.settings.collectAsState()
+    val track = state.currentTrack
+
+    if (track == null) {
+        onClose()
+        return
+    }
+
+    val remote = vm.isRemoteControlling
+    val haptics = settings.hapticFeedback
+    val accent by rememberArtworkColor(vm.repo.resolveUrl(track.artworkUrl), fallback = Primary)
+
+    val onTogglePlay = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("toggle") else vm.player.togglePlayPause()
+    }
+    val onNext = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("next") else vm.player.next()
+    }
+    val onPrevious = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("previous") else vm.player.previous()
+    }
+    val onSeek: (Long) -> Unit = { target ->
+        if (remote) vm.sendRemoteCommand("seek", target / 1000.0) else vm.player.seekTo(target)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        accent.copy(alpha = 0.85f),
+                        accent.copy(alpha = 0.35f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Artwork(
+                url = vm.repo.resolveUrl(track.artworkUrl),
+                contentDescription = track.title,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(44.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    track.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    modifier = Modifier.marquee(!settings.reducedMotion)
+                )
+                Text(
+                    track.artistLine,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.ExpandMore, contentDescription = "Close lyrics")
+            }
+        }
+
+        // The lyrics take all the space left between the header and the
+        // controls.
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            LyricsPanel(
+                vm = vm,
+                track = track,
+                positionMs = position.positionMs,
+                onSeek = onSeek,
+                fillHeight = true
+            )
+        }
+
+        Slider(
+            value = position.progress,
+            onValueChange = { fraction -> onSeek((position.durationMs * fraction).toLong()) },
+            colors = SliderDefaults.colors(
+                thumbColor = Primary,
+                activeTrackColor = Primary,
+                inactiveTrackColor = Outline
+            )
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Default.SkipPrevious, contentDescription = "Previous track", modifier = Modifier.size(34.dp))
+            }
+            PlayPauseButton(isPlaying = state.isPlaying, onClick = onTogglePlay, size = 60.dp)
+            IconButton(enabled = state.hasNext || remote, onClick = onNext) {
+                Icon(Icons.Default.SkipNext, contentDescription = "Next track", modifier = Modifier.size(34.dp))
+            }
+        }
     }
 }

@@ -54,6 +54,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
     val library by vm.library.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
+    val refreshing by vm.libraryRefreshing.collectAsState()
     var tab by remember { mutableStateOf(LibraryTab.PLAYLISTS) }
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     var showCreate by remember { mutableStateOf(false) }
@@ -63,6 +64,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
         is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadLibrary(force = true) })
         is Async.Success -> {
             val data = state.value
+            MusicyPullToRefresh(isRefreshing = refreshing, onRefresh = { vm.refreshLibrary() }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
@@ -194,6 +196,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
                         }
                     }
                 }
+            }
             }
         }
     }

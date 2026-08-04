@@ -17,3 +17,8 @@ Thumbs.db
 # Signing
 *.jks
 *.keystore
+# ...except the shared debug/release key that keeps sideloaded APKs
+# updatable in place. It is deliberately not a secret: this is a
+# self-hosted app, not a Play Store upload, so the whole point is that
+# every build is signed identically.
+!app/musicy.keystore

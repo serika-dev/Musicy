@@ -112,11 +112,13 @@ class PlayerConnection(
         )
 
         // The session only pushes events on change, so the scrubber needs its
-        // own tick. This updates the position flow alone — nothing else.
+        // own tick. 250ms keeps the playhead and the lyric highlight moving
+        // smoothly; it only touches the position flow, so nothing heavier than
+        // the scrubber and the active-line calc recomposes.
         scope.launch {
             while (isActive) {
                 if (controller?.isPlaying == true) refreshPosition()
-                delay(500)
+                delay(250)
             }
         }
     }

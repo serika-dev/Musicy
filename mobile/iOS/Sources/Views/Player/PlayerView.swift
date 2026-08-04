@@ -10,7 +10,7 @@ struct PlayerView: View {
     @State private var scrub: Double?
     @State private var showQueue = false
     @State private var showDevices = false
-    @State private var showLyrics = false
+    @State private var showLyricsFull = false
     @State private var showSleep = false
     @State private var artworkDrag: CGFloat = 0
 
@@ -29,6 +29,11 @@ struct PlayerView: View {
         .sheet(isPresented: $showQueue) { QueueView() }
         .sheet(isPresented: $showDevices) { DevicesView() }
         .sheet(isPresented: $showSleep) { SleepTimerView() }
+        .fullScreenCover(isPresented: $showLyricsFull) {
+            if let track = player.currentTrack {
+                FullscreenLyricsView(track: track)
+            }
+        }
     }
 
     private func content(_ track: Track) -> some View {
@@ -84,8 +89,8 @@ struct PlayerView: View {
                 }
 
                 HStack(spacing: 24) {
-                    Button { showLyrics.toggle() } label: {
-                        Label(showLyrics ? "Hide lyrics" : "Lyrics", systemImage: "quote.bubble")
+                    Button { showLyricsFull = true } label: {
+                        Label("Lyrics", systemImage: "quote.bubble")
                     }
                     Button { showSleep = true } label: {
                         Label("Sleep", systemImage: "moon.zzz")
@@ -95,10 +100,6 @@ struct PlayerView: View {
                     }
                 }
                 .font(.footnote)
-
-                if showLyrics {
-                    LyricsPanel(track: track, position: clock.position)
-                }
 
                 upNext
             }
@@ -263,6 +264,8 @@ struct PlayerView: View {
 private struct LyricsPanel: View {
     let track: Track
     let position: Double
+    /// When true the list fills the space it is given, for the fullscreen view.
+    var fillHeight: Bool = false
 
     @ObservedObject private var settings = SettingsStore.shared
     @State private var lyrics: LyricsResponse?
@@ -368,8 +371,9 @@ private struct LyricsPanel: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, fillHeight ? 120 : 0)
             }
-            .frame(height: 300)
+            .frame(maxWidth: .infinity, maxHeight: fillHeight ? .infinity : 300)
             .onChange(of: activeIndex) { _, newValue in
                 if settings.reducedMotion {
                     proxy.scrollTo(newValue, anchor: .center)
@@ -396,7 +400,7 @@ private struct LyricsPanel: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(height: 300)
+        .frame(maxWidth: .infinity, maxHeight: fillHeight ? .infinity : 300)
     }
 
     /// Parses `[mm:ss.xx] text` lines out of an LRC payload.
@@ -421,6 +425,79 @@ private struct LyricsPanel: View {
             result.append((time: minutes * 60 + seconds + fraction, text: text))
         }
         return result.sorted { $0.time < $1.time }
+    }
+}
+
+/**
+ The big-player lyrics view: cover shrinks to a header line and the lyrics fill
+ the screen, matching the web app's expanded player. Transport stays at the
+ bottom so playback is still controllable while reading along.
+ */
+struct FullscreenLyricsView: View {
+    let track: Track
+
+    @ObservedObject private var player = AudioPlayer.shared
+    @ObservedObject private var clock = AudioPlayer.shared.clock
+    @ObservedObject private var sync = SyncClient.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Artwork(url: track.artworkUrl, cornerRadius: 8)
+                    .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.title).font(.headline).lineLimit(1)
+                    Text(track.artistLine).font(.caption).foregroundColor(.secondary).lineLimit(1)
+                }
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.down").font(.title3)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+
+            LyricsPanel(track: track, position: clock.position, fillHeight: true)
+                .frame(maxHeight: .infinity)
+
+            HStack(spacing: 40) {
+                Button {
+                    sync.isRemoteControlling ? sync.sendCommand("previous") : player.previous()
+                } label: {
+                    Image(systemName: "backward.fill").font(.title2)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    sync.isRemoteControlling ? sync.sendCommand("toggle") : player.toggle()
+                } label: {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title)
+                        .foregroundColor(.white)
+                        .frame(width: 60, height: 60)
+                        .background(Color.accentColor)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                Button {
+                    sync.isRemoteControlling ? sync.sendCommand("next") : player.next()
+                } label: {
+                    Image(systemName: "forward.fill").font(.title2)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.bottom, 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            LinearGradient(
+                colors: [Color.accentColor.opacity(0.35), Color("Background")],
+                startPoint: .top,
+                endPoint: .center
+            )
+            .ignoresSafeArea()
+        )
     }
 }
 

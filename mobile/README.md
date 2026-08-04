@@ -24,6 +24,10 @@ and the same multi-device playback hand-off.
   same source the web player uses) and device switching. The Android player
   tints itself to the cover art, scrolls long titles, swipes sideways to
   change track and down to dismiss, and previews what is up next.
+- **Fullscreen lyrics** — a big-player lyrics view on both platforms that takes
+  over the screen, centres the active line and keeps transport at the bottom.
+- **Pull to refresh** — Home and Library reload in place without flashing the
+  loading skeletons.
 - **Sleep timer** — 5 to 90 minutes or "end of this track", counted down in
   the playback service so it keeps running with the app closed.
 - **Recent searches** — the last dozen queries, kept on the device and
@@ -55,6 +59,20 @@ cd mobile/android
 ```
 
 If the Gradle wrapper is missing, install Gradle 8.7 and run `gradle wrapper` first.
+
+### Signing and installable updates
+
+Every build — debug and release — is signed with the committed key at
+`app/musicy.keystore` (password `musicy123`, alias `musicy`). This is
+deliberate: it is a self-hosted app, not a Play Store upload, and a stable key
+is what lets a freshly-downloaded APK install *over* the previous one. The
+default per-machine debug key changes between builds, which is what made
+Android reject updates with a signature-mismatch error.
+
+One-time step when moving from an older build: because past APKs were signed
+with a throwaway key, the first install of a stably-signed APK will still be
+refused as an update. Uninstall the old app once, install the new APK, and
+every update after that lands in place.
 
 ### Architecture
 

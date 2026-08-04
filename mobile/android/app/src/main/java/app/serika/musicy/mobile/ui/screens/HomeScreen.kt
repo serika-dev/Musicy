@@ -50,6 +50,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
     val home by vm.home.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
+    val refreshing by vm.homeRefreshing.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
     when (val state = home) {
@@ -59,6 +60,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
             val data = state.value
             val feed = data.feed
 
+            MusicyPullToRefresh(isRefreshing = refreshing, onRefresh = { vm.refreshHome() }) {
             LazyColumn(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -223,6 +225,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
                         onSeeAll = { nav.collection(CollectionKind.PLAYLISTS) }
                     )
                 }
+            }
             }
         }
     }

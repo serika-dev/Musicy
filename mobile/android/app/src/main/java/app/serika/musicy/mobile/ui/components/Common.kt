@@ -28,12 +28,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import app.serika.musicy.mobile.data.model.Track
 import app.serika.musicy.mobile.ui.theme.LikeRed
 import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
@@ -89,7 +91,12 @@ fun Artwork(
             )
         } else {
             AsyncImage(
-                model = url,
+                // Crossfade so a cover fades in instead of popping, which reads
+                // as much smoother on a carousel that is still loading.
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(url)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

@@ -40,7 +40,10 @@ fun LyricsPanel(
     track: Track,
     positionMs: Long,
     onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** When true the lyric list fills the space it is given instead of a fixed
+     *  box — used by the fullscreen big-player view. */
+    fillHeight: Boolean = false
 ) {
     val settings by vm.settings.collectAsState()
     val lyrics by loadAsync(track.id) { vm.repo.lyrics(track.id) }
@@ -73,7 +76,7 @@ fun LyricsPanel(
         if (!useSynced) emptyMap() else parseLrc(romanized).associate { it.timeMs to it.text }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth()) {
         when {
             lyrics is Async.Loading -> Box(
                 modifier = Modifier.fillMaxWidth().padding(24.dp),
@@ -94,13 +97,15 @@ fun LyricsPanel(
                 positionMs = positionMs,
                 showBoth = settings.showRomanizationAlongside,
                 animate = !settings.reducedMotion,
+                fillHeight = fillHeight,
                 onSeek = onSeek
             )
 
             else -> PlainLyrics(
                 original = data.plainLyrics ?: data.syncedLyrics.orEmpty(),
                 romanized = romanized,
-                showBoth = settings.showRomanizationAlongside
+                showBoth = settings.showRomanizationAlongside,
+                fillHeight = fillHeight
             )
         }
 
@@ -122,6 +127,7 @@ private fun SyncedLyrics(
     positionMs: Long,
     showBoth: Boolean,
     animate: Boolean,
+    fillHeight: Boolean,
     onSeek: (Long) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -146,7 +152,10 @@ private fun SyncedLyrics(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxWidth().height(340.dp),
+        modifier = if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(340.dp),
+        // Fullscreen pads top and bottom so the active line can settle near the
+        // middle of the screen, the way the web big player centres it.
+        contentPadding = if (fillHeight) PaddingValues(vertical = 120.dp) else PaddingValues(0.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         items(lines.size, key = { "${it}_${lines[it].timeMs}" }) { index ->
@@ -158,7 +167,7 @@ private fun SyncedLyrics(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSeek(line.timeMs) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = if (fillHeight) 10.dp else 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -166,8 +175,18 @@ private fun SyncedLyrics(
                         romanizedText != null && !showBoth -> romanizedText
                         else -> line.text.ifBlank { "♪" }
                     },
-                    fontSize = if (active) 22.sp else 19.sp,
-                    lineHeight = if (active) 30.sp else 26.sp,
+                    fontSize = when {
+                        active && fillHeight -> 27.sp
+                        active -> 22.sp
+                        fillHeight -> 22.sp
+                        else -> 19.sp
+                    },
+                    lineHeight = when {
+                        active && fillHeight -> 36.sp
+                        active -> 30.sp
+                        fillHeight -> 30.sp
+                        else -> 26.sp
+                    },
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                     color = if (active) Color.White else OnSurfaceVariant.copy(alpha = 0.45f),
                     textAlign = TextAlign.Center
@@ -188,18 +207,17 @@ private fun SyncedLyrics(
 }
 
 @Composable
-private fun PlainLyrics(original: String, romanized: String?, showBoth: Boolean) {
+private fun PlainLyrics(original: String, romanized: String?, showBoth: Boolean, fillHeight: Boolean = false) {
     val body = romanized?.takeIf { it.isNotBlank() && it != original }
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(340.dp)
-            .verticalScroll(rememberScrollState()),
+        modifier = (if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(340.dp))
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = if (fillHeight) 24.dp else 0.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = if (body != null && !showBoth) body else original,
-            style = MaterialTheme.typography.bodyLarge,
+            style = if (fillHeight) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.85f),
             textAlign = TextAlign.Center
         )

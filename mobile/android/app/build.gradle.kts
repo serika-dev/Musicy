@@ -16,9 +16,27 @@ android {
         versionName = "1.3.0"
     }
 
+    signingConfigs {
+        // A single committed key signs every build — debug and release alike —
+        // so a freshly-downloaded APK installs over the previous one instead of
+        // being rejected for a signature mismatch. The default debug keystore
+        // is regenerated per machine/CI runner, which is exactly what made
+        // "update" fail before. Not a secret: this is a self-hosted app.
+        create("stable") {
+            storeFile = file("musicy.keystore")
+            storePassword = "musicy123"
+            keyAlias = "musicy"
+            keyPassword = "musicy123"
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("stable")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

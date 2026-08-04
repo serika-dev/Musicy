@@ -72,6 +72,15 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     private val _library = MutableStateFlow<Async<LibraryState>>(Async.Loading)
     val library: StateFlow<Async<LibraryState>> = _library.asStateFlow()
 
+    // Pull-to-refresh spinners. Kept apart from the Async state so a refresh
+    // reloads in place — the current content stays on screen instead of being
+    // replaced by a skeleton the moment you pull.
+    private val _homeRefreshing = MutableStateFlow(false)
+    val homeRefreshing: StateFlow<Boolean> = _homeRefreshing.asStateFlow()
+
+    private val _libraryRefreshing = MutableStateFlow(false)
+    val libraryRefreshing: StateFlow<Boolean> = _libraryRefreshing.asStateFlow()
+
     private val _search = MutableStateFlow<Async<SearchResponse>?>(null)
     val search: StateFlow<Async<SearchResponse>?> = _search.asStateFlow()
 
@@ -147,33 +156,52 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
 
     // -- loading ------------------------------------------------------------
 
+    /**
+     * Fetches the whole home surface in one fan-out. Fired together rather than
+     * one after another: six serial round-trips made the home screen feel
+     * broken on a slow connection.
+     */
+    private suspend fun fetchHome(): HomeState = withContext(Dispatchers.IO) {
+        coroutineScope {
+            val feed = async { runCatching { repo.feed() }.getOrNull() }
+            val mixes = async { runCatching { repo.dailyMixes() }.getOrDefault(emptyList()) }
+            val genres = async { runCatching { repo.genres() }.getOrDefault(emptyList()) }
+            val albums = async { runCatching { repo.albums(limit = 20).albums }.getOrDefault(emptyList()) }
+            val artists = async { runCatching { repo.artists(limit = 20).artists }.getOrDefault(emptyList()) }
+            val playlists = async { runCatching { repo.playlists(limit = 20) }.getOrDefault(emptyList()) }
+            HomeState(
+                feed = feed.await(),
+                dailyMixes = mixes.await(),
+                genres = genres.await(),
+                albums = albums.await(),
+                artists = artists.await(),
+                playlists = playlists.await()
+            )
+        }
+    }
+
+    private suspend fun fetchLibrary(): LibraryState = withContext(Dispatchers.IO) {
+        coroutineScope {
+            val liked = async { runCatching { repo.likedSongs() }.getOrDefault(emptyList()) }
+            val playlists = async { runCatching { repo.playlists(limit = 50) }.getOrDefault(emptyList()) }
+            val followed = async { repo.followedArtists() }
+            val recent = async { repo.recentlyPlayed() }
+            val albums = async { runCatching { repo.albums(limit = 30).albums }.getOrDefault(emptyList()) }
+            LibraryState(
+                likedSongs = liked.await(),
+                playlists = playlists.await(),
+                followedArtists = followed.await(),
+                recentlyPlayed = recent.await(),
+                albums = albums.await()
+            )
+        }
+    }
+
     fun loadHome(force: Boolean = false) {
         if (!force && _home.value is Async.Success) return
         viewModelScope.launch {
             _home.value = Async.Loading
-            _home.value = runCatching {
-                withContext(Dispatchers.IO) {
-                    // Fired together rather than one after another: six serial
-                    // round-trips made the home screen feel broken on a slow
-                    // connection.
-                    coroutineScope {
-                        val feed = async { runCatching { repo.feed() }.getOrNull() }
-                        val mixes = async { runCatching { repo.dailyMixes() }.getOrDefault(emptyList()) }
-                        val genres = async { runCatching { repo.genres() }.getOrDefault(emptyList()) }
-                        val albums = async { runCatching { repo.albums(limit = 20).albums }.getOrDefault(emptyList()) }
-                        val artists = async { runCatching { repo.artists(limit = 20).artists }.getOrDefault(emptyList()) }
-                        val playlists = async { runCatching { repo.playlists(limit = 20) }.getOrDefault(emptyList()) }
-                        HomeState(
-                            feed = feed.await(),
-                            dailyMixes = mixes.await(),
-                            genres = genres.await(),
-                            albums = albums.await(),
-                            artists = artists.await(),
-                            playlists = playlists.await()
-                        )
-                    }
-                }
-            }.fold(
+            _home.value = runCatching { fetchHome() }.fold(
                 onSuccess = { Async.Success(it) },
                 onFailure = { Async.Failure(it.friendlyMessage()) }
             )
@@ -184,27 +212,31 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         if (!force && _library.value is Async.Success) return
         viewModelScope.launch {
             _library.value = Async.Loading
-            _library.value = runCatching {
-                withContext(Dispatchers.IO) {
-                    coroutineScope {
-                        val liked = async { runCatching { repo.likedSongs() }.getOrDefault(emptyList()) }
-                        val playlists = async { runCatching { repo.playlists(limit = 50) }.getOrDefault(emptyList()) }
-                        val followed = async { repo.followedArtists() }
-                        val recent = async { repo.recentlyPlayed() }
-                        val albums = async { runCatching { repo.albums(limit = 30).albums }.getOrDefault(emptyList()) }
-                        LibraryState(
-                            likedSongs = liked.await(),
-                            playlists = playlists.await(),
-                            followedArtists = followed.await(),
-                            recentlyPlayed = recent.await(),
-                            albums = albums.await()
-                        )
-                    }
-                }
-            }.fold(
+            _library.value = runCatching { fetchLibrary() }.fold(
                 onSuccess = { Async.Success(it) },
                 onFailure = { Async.Failure(it.friendlyMessage()) }
             )
+        }
+    }
+
+    /** Pull-to-refresh: reload home without tearing down what is on screen. */
+    fun refreshHome() {
+        if (_homeRefreshing.value) return
+        viewModelScope.launch {
+            _homeRefreshing.value = true
+            // Keep the old value on failure; a pull that briefly drops signal
+            // shouldn't wipe the page.
+            runCatching { fetchHome() }.onSuccess { _home.value = Async.Success(it) }
+            _homeRefreshing.value = false
+        }
+    }
+
+    fun refreshLibrary() {
+        if (_libraryRefreshing.value) return
+        viewModelScope.launch {
+            _libraryRefreshing.value = true
+            runCatching { fetchLibrary() }.onSuccess { _library.value = Async.Success(it) }
+            _libraryRefreshing.value = false
         }
     }
 
