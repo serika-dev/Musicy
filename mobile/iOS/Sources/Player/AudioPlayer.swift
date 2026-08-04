@@ -43,6 +43,11 @@ final class AudioPlayer: ObservableObject {
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off
 
+    /// Seconds left on the sleep timer, or nil when it is not armed.
+    @Published private(set) var sleepRemaining: TimeInterval?
+    /// True when playback should stop once the current song finishes.
+    @Published private(set) var sleepAtEndOfTrack = false
+
     /// Called whenever transport state changes, so the sync client can
     /// broadcast without this type knowing anything about the network.
     var onStateChanged: (() -> Void)?
@@ -53,6 +58,7 @@ final class AudioPlayer: ObservableObject {
     private var rate: Float = 1
     private var listenStartedAt: Date?
     private var listenAccumulated: TimeInterval = 0
+    private var sleepTimer: Timer?
 
     private init() {
         configureSession()
@@ -242,6 +248,44 @@ final class AudioPlayer: ObservableObject {
         seek(to: max(0, position + seconds))
     }
 
+    // MARK: - Sleep timer
+
+    /// Counts down on the main run loop and pauses when it reaches zero.
+    func setSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+        guard minutes > 0 else { return }
+        var remaining = TimeInterval(minutes * 60)
+        sleepRemaining = remaining
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            remaining -= 1
+            if remaining <= 0 {
+                timer.invalidate()
+                self.sleepTimer = nil
+                self.sleepRemaining = nil
+                self.player.pause()
+            } else {
+                self.sleepRemaining = remaining
+            }
+        }
+    }
+
+    /// Stops once the current song finishes rather than cutting it off.
+    func sleepAfterCurrentTrack() {
+        cancelSleepTimer()
+        sleepAtEndOfTrack = true
+    }
+
+    func cancelSleepTimer() {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        sleepRemaining = nil
+        sleepAtEndOfTrack = false
+    }
+
     func toggleShuffle() {
         shuffle.toggle()
         guard !queue.isEmpty, let current = currentTrack else { return }
@@ -266,6 +310,7 @@ final class AudioPlayer: ObservableObject {
         player.pause()
         player.replaceCurrentItem(with: nil)
         flushListen()
+        cancelSleepTimer()
         queue = []
         currentTrack = nil
         currentIndex = 0
@@ -299,6 +344,12 @@ final class AudioPlayer: ObservableObject {
 
     private func handleTrackFinished() {
         flushListen()
+        if sleepAtEndOfTrack {
+            // The user asked to stop after *this* song, and it just ended.
+            sleepAtEndOfTrack = false
+            player.pause()
+            return
+        }
         if repeatMode == .one {
             seek(to: 0)
             player.play()

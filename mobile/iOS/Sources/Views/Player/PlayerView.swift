@@ -11,6 +11,8 @@ struct PlayerView: View {
     @State private var showQueue = false
     @State private var showDevices = false
     @State private var showLyrics = false
+    @State private var showSleep = false
+    @State private var artworkDrag: CGFloat = 0
 
     var body: some View {
         Group {
@@ -26,6 +28,7 @@ struct PlayerView: View {
         }
         .sheet(isPresented: $showQueue) { QueueView() }
         .sheet(isPresented: $showDevices) { DevicesView() }
+        .sheet(isPresented: $showSleep) { SleepTimerView() }
     }
 
     private func content(_ track: Track) -> some View {
@@ -33,10 +36,28 @@ struct PlayerView: View {
             VStack(spacing: 18) {
                 header
 
+                // Sideways changes track, downwards closes the player — the
+                // gestures people already expect from a now-playing screen.
                 Artwork(url: track.artworkUrl, cornerRadius: 18)
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .shadow(radius: 20)
+                    .offset(x: artworkDrag / 2.5)
+                    .animation(.interactiveSpring(), value: artworkDrag)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { artworkDrag = $0.translation.width }
+                            .onEnded { value in
+                                artworkDrag = 0
+                                if abs(value.translation.height) > abs(value.translation.width) {
+                                    if value.translation.height > 120 { dismiss() }
+                                } else if value.translation.width <= -100 {
+                                    sync.isRemoteControlling ? sync.sendCommand("next") : player.next()
+                                } else if value.translation.width >= 100 {
+                                    sync.isRemoteControlling ? sync.sendCommand("previous") : player.previous()
+                                }
+                            }
+                    )
 
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -56,9 +77,18 @@ struct PlayerView: View {
 
                 transport
 
+                if let remaining = player.sleepRemaining {
+                    sleepChip("Sleeping in \(formatDuration(remaining))")
+                } else if player.sleepAtEndOfTrack {
+                    sleepChip("Sleeping after this track")
+                }
+
                 HStack(spacing: 24) {
                     Button { showLyrics.toggle() } label: {
                         Label(showLyrics ? "Hide lyrics" : "Lyrics", systemImage: "quote.bubble")
+                    }
+                    Button { showSleep = true } label: {
+                        Label("Sleep", systemImage: "moon.zzz")
                     }
                     Button { showQueue = true } label: {
                         Label("Queue · \(player.queue.count)", systemImage: "list.bullet")
@@ -69,6 +99,8 @@ struct PlayerView: View {
                 if showLyrics {
                     LyricsPanel(track: track, position: clock.position)
                 }
+
+                upNext
             }
             .padding(20)
             .padding(.bottom, 40)
@@ -104,6 +136,44 @@ struct PlayerView: View {
                     .foregroundColor(sync.isConnected ? .accentColor : .secondary)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func sleepChip(_ label: String) -> some View {
+        Button { showSleep = true } label: {
+            Text(label)
+                .font(.caption.bold())
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Color.accentColor)
+                .foregroundColor(.white)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A peek at the next few tracks, so the queue sheet is optional.
+    @ViewBuilder
+    private var upNext: some View {
+        let following = Array(player.queue.dropFirst(player.currentIndex + 1).prefix(3))
+        if !following.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Up next").font(.caption.bold()).foregroundColor(.secondary)
+                ForEach(Array(following.enumerated()), id: \.offset) { offset, next in
+                    HStack(spacing: 10) {
+                        Artwork(url: next.artworkUrl, cornerRadius: 6)
+                            .frame(width: 38, height: 38)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(next.title).font(.subheadline).lineLimit(1)
+                            Text(next.artistLine).font(.caption).foregroundColor(.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                        Button("Play") { player.skip(to: player.currentIndex + 1 + offset) }
+                            .font(.caption)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -351,5 +421,67 @@ private struct LyricsPanel: View {
             result.append((time: minutes * 60 + seconds + fraction, text: text))
         }
         return result.sorted { $0.time < $1.time }
+    }
+}
+
+/**
+ Sets or clears the sleep timer.
+
+ "End of this track" is deliberately separate from the minute presets: falling
+ asleep mid-song is the thing the feature exists to prevent.
+ */
+struct SleepTimerView: View {
+    @ObservedObject private var player = AudioPlayer.shared
+    @Environment(\.dismiss) private var dismiss
+
+    private let presets = [5, 10, 15, 30, 45, 60, 90]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text(statusLine)
+                        .font(.subheadline)
+                        .foregroundColor(player.sleepRemaining != nil || player.sleepAtEndOfTrack ? .accentColor : .secondary)
+                }
+                Section("Pause after") {
+                    ForEach(presets, id: \.self) { minutes in
+                        Button("\(minutes) minutes") {
+                            player.setSleepTimer(minutes: minutes)
+                            dismiss()
+                        }
+                    }
+                    Button("End of this track") {
+                        player.sleepAfterCurrentTrack()
+                        dismiss()
+                    }
+                }
+                if player.sleepRemaining != nil || player.sleepAtEndOfTrack {
+                    Section {
+                        Button("Turn off timer", role: .destructive) {
+                            player.cancelSleepTimer()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Sleep timer")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var statusLine: String {
+        if let remaining = player.sleepRemaining {
+            return "Stopping in \(formatDuration(remaining))"
+        }
+        if player.sleepAtEndOfTrack {
+            return "Stopping at the end of this song"
+        }
+        return "Musicy will pause on its own once the time is up."
     }
 }

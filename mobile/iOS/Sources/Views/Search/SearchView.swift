@@ -19,6 +19,7 @@ struct SearchView: View {
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var actionTrack: Track?
+    @State private var recents: [String] = SearchHistory.load()
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 12)]
 
@@ -27,6 +28,7 @@ struct SearchView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     if query.isEmpty {
+                        recentSearches
                         browseAll
                     } else if isSearching {
                         ProgressView().frame(maxWidth: .infinity).padding(40)
@@ -48,6 +50,7 @@ struct SearchView: View {
             .navigationTitle("Search")
             .searchable(text: $query, prompt: "Songs, albums, artists, playlists")
             .onChange(of: query) { _, newValue in scheduleSearch(newValue) }
+            .onSubmit(of: .search) { recents = SearchHistory.add(query) }
             .safeAreaInset(edge: .top) {
                 if !query.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -80,6 +83,40 @@ struct SearchView: View {
     }
 
     /// The genre grid the web app shows on an empty search.
+    /// The last few queries, so the tab is useful before you type anything.
+    @ViewBuilder
+    private var recentSearches: some View {
+        if !recents.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Recent searches").font(.title2.bold())
+                    Spacer()
+                    Button("Clear") { recents = SearchHistory.clear() }
+                        .font(.subheadline)
+                }
+                .padding(.horizontal)
+
+                ForEach(recents, id: \.self) { entry in
+                    HStack(spacing: 12) {
+                        Image(systemName: "clock.arrow.circlepath").foregroundColor(.secondary)
+                        Text(entry).lineLimit(1)
+                        Spacer()
+                        Button {
+                            recents = SearchHistory.remove(entry)
+                        } label: {
+                            Image(systemName: "xmark").font(.caption).foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                    .onTapGesture { query = entry }
+                }
+            }
+        }
+    }
+
     private var browseAll: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Browse all").font(.title2.bold()).padding(.horizontal)

@@ -130,6 +130,9 @@ final class LibraryStore: ObservableObject {
     func signOut() {
         AudioPlayer.shared.stop()
         MusicyAPI.shared.signOut()
+        // The next person to sign in on this device should not inherit the
+        // last account's searches.
+        SearchHistory.clear()
         feed = nil
         dailyMixes = []
         genres = []
