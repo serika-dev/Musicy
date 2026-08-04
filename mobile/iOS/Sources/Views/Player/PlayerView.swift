@@ -339,46 +339,58 @@ private struct LyricsPanel: View {
     }
 
     private func syncedView(_ lines: [(time: Double, text: String)]) -> some View {
-        let activeIndex = lines.lastIndex(where: { $0.time <= position }) ?? 0
+        // -1 until the first line is reached, so nothing is highlighted during
+        // an intro — matching the web player. (No `?? 0`, which lit line one.)
+        let activeIndex = lines.lastIndex(where: { $0.time <= position }) ?? -1
         let map = romanizedByTime
         return ScrollViewReader { proxy in
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                         let romanizedText = map[line.time].flatMap { $0 == line.text ? nil : $0 }
+                        let isActive = index == activeIndex
+                        let shown = romanizedText != nil && !settings.showRomanizationAlongside
+                            ? romanizedText!
+                            : line.text
                         Button {
                             AudioPlayer.shared.seek(to: line.time)
                         } label: {
                             VStack(spacing: 3) {
-                                Text(
-                                    romanizedText != nil && !settings.showRomanizationAlongside
-                                        ? romanizedText!
-                                        : (line.text.isEmpty ? "♪" : line.text)
-                                )
-                                .font(index == activeIndex ? .title3.bold() : .headline)
-                                .foregroundColor(index == activeIndex ? .primary : .secondary.opacity(0.55))
-                                if let romanizedText, settings.showRomanizationAlongside {
+                                // A blank instrumental line stays blank — nothing
+                                // sung, nothing shown.
+                                if !shown.isEmpty {
+                                    Text(shown)
+                                        .font(.system(size: fillHeight ? 27 : 21, weight: isActive ? .bold : .semibold))
+                                        .foregroundColor(isActive ? .white : .white.opacity(0.32))
+                                        .shadow(color: .white.opacity(isActive ? 0.6 : 0), radius: 16)
+                                }
+                                if let romanizedText, settings.showRomanizationAlongside, !line.text.isEmpty {
                                     Text(romanizedText)
                                         .font(.subheadline.italic())
-                                        .foregroundColor(.secondary.opacity(index == activeIndex ? 0.9 : 0.4))
+                                        .foregroundColor(.white.opacity(isActive ? 0.7 : 0.3))
                                 }
                             }
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
+                            // The web app's transition-all: the active line grows
+                            // and brightens, everything eased over ~0.45s.
+                            .scaleEffect(isActive ? 1.06 : 1.0)
                         }
                         .buttonStyle(.plain)
                         .id(index)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, fillHeight ? 120 : 0)
+                .padding(.vertical, fillHeight ? 160 : 40)
+                .animation(settings.reducedMotion ? nil : .easeInOut(duration: 0.45), value: activeIndex)
             }
             .frame(maxWidth: .infinity, maxHeight: fillHeight ? .infinity : 300)
             .onChange(of: activeIndex) { _, newValue in
+                guard newValue >= 0 else { return }
                 if settings.reducedMotion {
                     proxy.scrollTo(newValue, anchor: .center)
                 } else {
-                    withAnimation { proxy.scrollTo(newValue, anchor: .center) }
+                    withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo(newValue, anchor: .center) }
                 }
             }
         }

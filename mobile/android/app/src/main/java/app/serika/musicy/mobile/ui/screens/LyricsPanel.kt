@@ -1,18 +1,27 @@
 package app.serika.musicy.mobile.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -137,31 +146,32 @@ private fun SyncedLyrics(
 ) {
     val listState = rememberLazyListState()
 
-    // derivedStateOf keeps the whole list from recomposing on every frame — the
-    // provider is read each frame, but only a change of *which* line is active
-    // triggers a recomposition here.
+    // -1 until the first line's timestamp is reached — before anything is sung,
+    // and while the playhead sits before line zero, nothing is highlighted, the
+    // way the web player leaves it blank. (The old coerceAtLeast(0) lit up the
+    // first line during the intro.)
     val activeIndex by remember(lines) {
-        derivedStateOf { lines.indexOfLast { it.timeMs <= positionProvider() }.coerceAtLeast(0) }
+        derivedStateOf { lines.indexOfLast { it.timeMs <= positionProvider() } }
     }
 
     // Auto-scroll pauses while the user is dragging, so following along by hand
     // doesn't fight the animation.
     val userScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
-    var lastAuto by remember { mutableIntStateOf(-1) }
+    var lastAuto by remember { mutableIntStateOf(-2) }
 
+    // Keep the active line pinned to the middle of the viewport, smoothly.
     LaunchedEffect(activeIndex, userScrolling) {
-        if (userScrolling || activeIndex == lastAuto) return@LaunchedEffect
+        if (userScrolling || activeIndex < 0 || activeIndex == lastAuto) return@LaunchedEffect
         lastAuto = activeIndex
-        val target = (activeIndex - 2).coerceAtLeast(0)
-        if (animate) listState.animateScrollToItem(target) else listState.scrollToItem(target)
+        if (animate) listState.centerItemAnimated(activeIndex) else listState.centerItemInstant(activeIndex)
     }
 
     LazyColumn(
         state = listState,
         modifier = if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth().height(340.dp),
-        // Fullscreen pads top and bottom so the active line can settle near the
-        // middle of the screen, the way the web big player centres it.
-        contentPadding = if (fillHeight) PaddingValues(vertical = 120.dp) else PaddingValues(0.dp),
+        // Generous top/bottom padding so the first and last lines can still sit
+        // dead-centre when they are active.
+        contentPadding = if (fillHeight) PaddingValues(vertical = 160.dp) else PaddingValues(vertical = 120.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         items(lines.size, key = { "${it}_${lines[it].timeMs}" }) { index ->
@@ -169,42 +179,61 @@ private fun SyncedLyrics(
             val active = index == activeIndex
             val romanizedText = romanizedByTime[line.timeMs]?.takeIf { it.isNotBlank() && it != line.text }
 
+            // The web app's `transition-all duration-500`: the active line grows
+            // slightly, brightens to full white and picks up a soft glow, while
+            // the rest fade back. Everything animates rather than snapping.
+            val spec = tween<Float>(durationMillis = if (animate) 450 else 0)
+            val scale by animateFloatAsState(if (active) 1.06f else 1f, spec, label = "lyricScale")
+            val glow by animateFloatAsState(if (active) 0.8f else 0f, spec, label = "lyricGlow")
+            val color by animateColorAsState(
+                targetValue = if (active) Color.White else OnSurfaceVariant.copy(alpha = 0.32f),
+                animationSpec = tween(durationMillis = if (animate) 450 else 0),
+                label = "lyricColor"
+            )
+            val baseSp = if (fillHeight) 28f else 21f
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clickable { onSeek(line.timeMs) }
-                    .padding(horizontal = 16.dp, vertical = if (fillHeight) 10.dp else 8.dp),
+                    .padding(horizontal = 20.dp, vertical = if (fillHeight) 12.dp else 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = when {
-                        romanizedText != null && !showBoth -> romanizedText
-                        else -> line.text.ifBlank { "♪" }
-                    },
-                    fontSize = when {
-                        active && fillHeight -> 27.sp
-                        active -> 22.sp
-                        fillHeight -> 22.sp
-                        else -> 19.sp
-                    },
-                    lineHeight = when {
-                        active && fillHeight -> 36.sp
-                        active -> 30.sp
-                        fillHeight -> 30.sp
-                        else -> 26.sp
-                    },
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                    color = if (active) Color.White else OnSurfaceVariant.copy(alpha = 0.45f),
-                    textAlign = TextAlign.Center
-                )
-                if (romanizedText != null && showBoth) {
+                // A blank LRC line (an instrumental marker) stays blank — nothing
+                // is being sung, so nothing shows.
+                val text = when {
+                    romanizedText != null && !showBoth -> romanizedText
+                    else -> line.text
+                }
+                if (text.isNotBlank()) {
+                    Text(
+                        text = text,
+                        fontSize = baseSp.sp,
+                        lineHeight = (baseSp * 1.3f).sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                        color = color,
+                        textAlign = TextAlign.Center,
+                        style = if (glow > 0f) {
+                            LocalTextStyle.current.copy(
+                                shadow = Shadow(
+                                    color = Color.White.copy(alpha = glow),
+                                    blurRadius = 32f
+                                )
+                            )
+                        } else {
+                            LocalTextStyle.current
+                        }
+                    )
+                }
+                if (romanizedText != null && showBoth && line.text.isNotBlank()) {
                     Text(
                         text = romanizedText,
-                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = (baseSp * 0.6f).sp,
                         fontStyle = FontStyle.Italic,
-                        color = if (active) Color.White.copy(alpha = 0.75f) else OnSurfaceVariant.copy(alpha = 0.35f),
+                        color = if (active) Color.White.copy(alpha = 0.7f) else OnSurfaceVariant.copy(alpha = 0.3f),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
@@ -238,6 +267,38 @@ private fun PlainLyrics(original: String, romanized: String?, showBoth: Boolean,
             )
         }
     }
+}
+
+/**
+ * Scrolls so item [index] sits in the middle of the viewport.
+ *
+ * Item heights vary (a one-word line and a long line are not the same size),
+ * so we cannot centre with a fixed offset — we measure where the item actually
+ * landed and glide the difference.
+ */
+private suspend fun LazyListState.centerItemAnimated(index: Int) {
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (item == null) {
+        // Off-screen after a seek: jump close, then nudge to exact centre.
+        animateScrollToItem(index)
+        centerItemInstant(index)
+        return
+    }
+    val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    val itemCenter = item.offset + item.size / 2f
+    animateScrollBy(itemCenter - viewportCenter)
+}
+
+private suspend fun LazyListState.centerItemInstant(index: Int) {
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: run {
+        scrollToItem(index)
+        return
+    }
+    val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    val itemCenter = item.offset + item.size / 2f
+    scrollBy(itemCenter - viewportCenter)
 }
 
 /** Parses `[mm:ss.xx] text` lines out of an LRC payload. */
