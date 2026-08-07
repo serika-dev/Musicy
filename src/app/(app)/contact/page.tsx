@@ -8,10 +8,10 @@ export const metadata = {
 const CHANNELS = [
   {
     icon: Mail,
-    title: "General Inquiries",
-    description: "Questions about Serika, partnerships, or anything else.",
-    label: "hello@serika.app",
-    href: "mailto:hello@serika.app",
+    title: "Support",
+    description: "Questions about Serika, account help, partnerships, or anything else.",
+    label: "support@serika.dev",
+    href: "mailto:support@serika.dev",
   },
   {
     icon: Bug,
@@ -32,8 +32,8 @@ const CHANNELS = [
     icon: MessageCircle,
     title: "Community",
     description: "Join the conversation and connect with other listeners.",
-    label: "Discord",
-    href: "https://discord.gg/serika",
+    label: "Serikacord",
+    href: "https://serika.cc/serika",
     external: true,
   },
 ];
