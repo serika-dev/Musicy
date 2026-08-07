@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
@@ -101,7 +103,10 @@ fun TrackActionsSheet(
     onAddToPlaylist: () -> Unit,
     onOpenAlbum: (() -> Unit)?,
     onOpenArtist: (() -> Unit)?,
-    onRemove: (() -> Unit)? = null
+    onRemove: (() -> Unit)? = null,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
+    onToggleDownload: (() -> Unit)? = null
 ) {
     MusicySheet(onDismiss = onDismiss) {
         Row(
@@ -138,6 +143,18 @@ fun TrackActionsSheet(
         SheetAction("Play next", Icons.Default.QueueMusic, { onPlayNext(); onDismiss() })
         SheetAction("Add to queue", Icons.Default.Add, { onAddToQueue(); onDismiss() })
         SheetAction("Add to playlist", Icons.Default.PlaylistAdd, { onAddToPlaylist(); onDismiss() })
+        if (onToggleDownload != null) {
+            SheetAction(
+                label = when {
+                    isDownloading -> "Downloading…"
+                    isDownloaded -> "Remove download"
+                    else -> "Download"
+                },
+                icon = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                tint = if (isDownloaded) Primary else MaterialTheme.colorScheme.onSurface,
+                onClick = { if (!isDownloading) { onToggleDownload(); onDismiss() } }
+            )
+        }
         if (onOpenAlbum != null) SheetAction("Go to album", Icons.Default.Album, { onOpenAlbum(); onDismiss() })
         if (onOpenArtist != null) SheetAction("Go to artist", Icons.Default.Person, { onOpenArtist(); onDismiss() })
         if (onRemove != null) {

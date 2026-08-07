@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
@@ -112,6 +113,32 @@ private fun DetailHero(
     }
 }
 
+/**
+ * Round icon button that saves a whole collection offline. Reflects live state:
+ * a spinner while any of its tracks are downloading, a filled "done" glyph once
+ * every track is offline, otherwise the download glyph.
+ */
+@Composable
+private fun DownloadAllButton(vm: MusicyViewModel, tracks: List<Track>) {
+    if (tracks.isEmpty()) return
+    val downloadedIds by vm.downloadedIds.collectAsState()
+    val downloadingIds by vm.downloadingIds.collectAsState()
+    val ids = tracks.map { it.id }
+    val busy = ids.any { it in downloadingIds }
+    val allDone = ids.all { it in downloadedIds }
+    FilledTonalIconButton(
+        onClick = { if (!busy) vm.downloadAll(tracks) },
+        enabled = !busy && !allDone,
+        modifier = Modifier.size(56.dp)
+    ) {
+        when {
+            busy -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            allDone -> Icon(Icons.Default.DownloadDone, contentDescription = "Downloaded", tint = Primary)
+            else -> Icon(Icons.Default.Download, contentDescription = "Download all")
+        }
+    }
+}
+
 /** Wraps a detail page with a back-arrow app bar. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -167,7 +194,8 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
                             artworkUrl = vm.repo.resolveUrl(data.coverImageUrl),
                             isPlaying = playback.isPlaying && tracks.any { it.id == playback.currentTrack?.id },
                             onPlay = { vm.play(tracks, 0, contextId) },
-                            onShuffle = { vm.shuffle(tracks, contextId) }
+                            onShuffle = { vm.shuffle(tracks, contextId) },
+                            trailing = { DownloadAllButton(vm, tracks) }
                         )
                     }
                     if (tracks.isEmpty()) {
@@ -418,7 +446,8 @@ fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
                             artworkUrl = vm.repo.resolveUrl(data.coverImageUrl ?: tracks.firstOrNull()?.artworkUrl),
                             isPlaying = playback.isPlaying && tracks.any { it.id == playback.currentTrack?.id },
                             onPlay = { vm.play(tracks, 0, contextId) },
-                            onShuffle = { vm.shuffle(tracks, contextId) }
+                            onShuffle = { vm.shuffle(tracks, contextId) },
+                            trailing = { DownloadAllButton(vm, tracks) }
                         )
                     }
                     trackItems(
@@ -545,7 +574,8 @@ fun LikedSongsScreen(vm: MusicyViewModel, nav: Nav) {
                     accent = LikeRed,
                     isPlaying = playback.isPlaying && tracks.any { it.id == playback.currentTrack?.id },
                     onPlay = { vm.play(tracks, 0, MusicyLibrary.NODE_LIKED) },
-                    onShuffle = { vm.shuffle(tracks, MusicyLibrary.NODE_LIKED) }
+                    onShuffle = { vm.shuffle(tracks, MusicyLibrary.NODE_LIKED) },
+                    trailing = { DownloadAllButton(vm, tracks) }
                 )
             }
             if (library is Async.Loading) item { TrackListSkeleton() }

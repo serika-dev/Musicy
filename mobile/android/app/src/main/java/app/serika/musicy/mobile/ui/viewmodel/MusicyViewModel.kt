@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,6 +66,15 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     val config: StateFlow<ServerConfig> = repo.config
     val likedTrackIds: StateFlow<Set<String>> = repo.likedTrackIds
     val settings = repo.settings
+
+    /** Reactive set of track ids available offline, so any list/menu stays in sync. */
+    val downloadedIds: StateFlow<Set<String>> = repo.downloads
+        .map { list -> list.map { it.track.id }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Track ids with a download currently in flight, for spinners/disabled state. */
+    private val _downloadingIds = MutableStateFlow<Set<String>>(emptySet())
+    val downloadingIds: StateFlow<Set<String>> = _downloadingIds.asStateFlow()
 
     private val _home = MutableStateFlow<Async<HomeState>>(Async.Loading)
     val home: StateFlow<Async<HomeState>> = _home.asStateFlow()
@@ -333,6 +343,56 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _library.value = Async.Success(current.value.copy(likedSongs = songs))
             }
+        }
+    }
+
+    /**
+     * Save a single track for offline playback. No-op if it is already saved or
+     * a download is already in flight for it. Emits a toast on completion.
+     */
+    fun downloadTrack(track: Track) {
+        if (track.id in downloadedIds.value || track.id in _downloadingIds.value) return
+        _downloadingIds.value = _downloadingIds.value + track.id
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { repo.download(track) }
+            _downloadingIds.value = _downloadingIds.value - track.id
+            showToast(if (result.isSuccess) "Saved for offline" else "Download failed")
+        }
+    }
+
+    /** Remove a downloaded track from offline storage. */
+    fun removeDownload(track: Track) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repo.removeDownload(track.id) }
+            showToast("Removed download")
+        }
+    }
+
+    /** Convenience toggle for menus/rows. */
+    fun toggleDownload(track: Track) {
+        if (track.id in downloadedIds.value) removeDownload(track) else downloadTrack(track)
+    }
+
+    /**
+     * Download every track that isn't already offline (albums, playlists, liked
+     * songs). Runs sequentially to stay friendly to the connection and storage.
+     */
+    fun downloadAll(tracks: List<Track>) {
+        val pending = tracks.filter { it.id !in downloadedIds.value && it.id !in _downloadingIds.value }
+        if (pending.isEmpty()) {
+            showToast("Already downloaded")
+            return
+        }
+        _downloadingIds.value = _downloadingIds.value + pending.map { it.id }
+        showToast("Downloading ${pending.size} track${if (pending.size == 1) "" else "s"}…")
+        viewModelScope.launch {
+            var ok = 0
+            for (track in pending) {
+                val result = withContext(Dispatchers.IO) { repo.download(track) }
+                _downloadingIds.value = _downloadingIds.value - track.id
+                if (result.isSuccess) ok++
+            }
+            showToast("Saved $ok of ${pending.size} for offline")
         }
     }
 

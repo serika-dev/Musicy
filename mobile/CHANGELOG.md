@@ -10,6 +10,21 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.4.0]
+
+### Added
+- **Downloads that actually work everywhere.** A **Download / Remove download**
+  action is now in the track overflow menu, and **Download all** on albums,
+  playlists and Liked Songs — each with live spinner → "done" state.
+  - Android: reactive `downloadedIds`/`downloadingIds` in the view model drive
+    every download control, so saving from one place updates them all at once.
+  - iOS: a brand-new offline subsystem (`DownloadStore`) — previously the phone
+    could only stream. Files land in Application Support with a JSON index, the
+    player prefers a local copy when present (true offline playback), and the
+    now-playing screen gets a download toggle.
+
+---
+
 ## [1.3.0]
 
 ### Added

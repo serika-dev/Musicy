@@ -76,10 +76,10 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     var showTune by remember { mutableStateOf(false) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableStateOf<Float?>(null) }
-    var downloading by remember { mutableStateOf(false) }
+    val downloadedIds by vm.downloadedIds.collectAsState()
+    val downloadingIds by vm.downloadingIds.collectAsState()
 
     val track = state.currentTrack
-    val scope = rememberCoroutineScope()
     val haptics = settings.hapticFeedback
     val animate = !settings.reducedMotion
 
@@ -93,7 +93,8 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
         return
     }
 
-    val isDownloaded = remember(track.id, downloading) { vm.repo.isDownloaded(track.id) }
+    val isDownloaded = track.id in downloadedIds
+    val downloading = track.id in downloadingIds
     val remote = vm.isRemoteControlling
     val artworkUrl = vm.repo.resolveUrl(track.artworkUrl)
     // The whole screen takes its colour from the cover, the way the web
@@ -233,14 +234,7 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             }
             IconButton(
                 enabled = !downloading && !isDownloaded,
-                onClick = {
-                    downloading = true
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { vm.repo.download(track) }
-                        downloading = false
-                        vm.showToast(if (result.isSuccess) "Saved for offline" else "Download failed")
-                    }
-                }
+                onClick = { vm.downloadTrack(track) }
             ) {
                 if (downloading) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Primary)

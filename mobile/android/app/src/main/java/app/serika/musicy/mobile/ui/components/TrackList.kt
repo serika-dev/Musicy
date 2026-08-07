@@ -67,6 +67,8 @@ fun TrackActionsHost(
 ) {
     val liked by vm.likedTrackIds.collectAsState()
     val library by vm.library.collectAsState()
+    val downloadedIds by vm.downloadedIds.collectAsState()
+    val downloadingIds by vm.downloadingIds.collectAsState()
     var pendingPlaylistTrack by remember { mutableStateOf<Track?>(null) }
 
     val track = selected
@@ -87,7 +89,10 @@ fun TrackActionsHost(
             },
             onOpenAlbum = track.album?.id?.takeIf { it.isNotBlank() }?.let { id -> { nav.album(id) } },
             onOpenArtist = track.artist?.id?.takeIf { it.isNotBlank() }?.let { id -> { nav.artist(id) } },
-            onRemove = onRemoveFromPlaylist?.let { remove -> { remove(track) } }
+            onRemove = onRemoveFromPlaylist?.let { remove -> { remove(track) } },
+            isDownloaded = track.id in downloadedIds,
+            isDownloading = track.id in downloadingIds,
+            onToggleDownload = { vm.toggleDownload(track) }
         )
     }
 

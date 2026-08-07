@@ -5,6 +5,7 @@ struct PlayerView: View {
     @ObservedObject private var clock = AudioPlayer.shared.clock
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var sync = SyncClient.shared
+    @ObservedObject private var downloads = DownloadStore.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var scrub: Double?
@@ -70,6 +71,7 @@ struct PlayerView: View {
                         Text(track.artistLine).font(.subheadline).foregroundColor(.secondary).lineLimit(1)
                     }
                     Spacer()
+                    downloadButton(track)
                     Button { store.toggleLike(track) } label: {
                         Image(systemName: store.isLiked(track.id) ? "heart.fill" : "heart")
                             .font(.title3)
@@ -114,6 +116,25 @@ struct PlayerView: View {
             )
             .ignoresSafeArea()
         )
+    }
+
+    @ViewBuilder
+    private func downloadButton(_ track: Track) -> some View {
+        let isDownloaded = downloads.downloadedIds.contains(track.id)
+        let isDownloading = downloads.downloadingIds.contains(track.id)
+        Button {
+            Task { await downloads.toggle(track) }
+        } label: {
+            if isDownloading {
+                ProgressView().scaleEffect(0.7).frame(width: 22, height: 22)
+            } else {
+                Image(systemName: isDownloaded ? "arrow.down.circle.fill" : "arrow.down.circle")
+                    .font(.title3)
+                    .foregroundColor(isDownloaded ? .accentColor : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isDownloading)
     }
 
     private var header: some View {

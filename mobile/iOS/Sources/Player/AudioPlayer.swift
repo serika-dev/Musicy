@@ -325,7 +325,9 @@ final class AudioPlayer: ObservableObject {
         guard queue.indices.contains(currentIndex) else { return }
         flushListen()
         let track = queue[currentIndex]
-        guard let url = MusicyAPI.shared.absoluteURL(track.filePath) else { return }
+        // Prefer a downloaded copy so offline (and just-faster) playback works.
+        guard let url = DownloadStore.shared.localURL(track.id)
+            ?? MusicyAPI.shared.absoluteURL(track.filePath) else { return }
 
         let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
