@@ -28,11 +28,12 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      # Both APKs are signed with the committed stable key, so either one can be
-      # sideloaded and updated in place. Release is the one to hand out.
-      - name: Build APKs
+      # APKs (for sideloading) + AAB (for the Play Store). All signed with the
+      # committed stable key, so the release APK updates in place. The repo is
+      # open source, so the keystore living in-tree is intentional.
+      - name: Build APKs and Play bundle
         working-directory: mobile/android
-        run: gradle --no-daemon assembleRelease assembleDebug
+        run: gradle --no-daemon assembleRelease assembleDebug bundleRelease
 
       - uses: actions/upload-artifact@v4
         with:
@@ -40,6 +41,7 @@ jobs:
           path: |
             mobile/android/app/build/outputs/apk/release/app-release.apk
             mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
   ios:
@@ -85,8 +87,12 @@ jobs:
       - name: Package assets
         run: |
           mkdir -p dist
-          cp android-artifacts/release/app-release.apk "dist/Musicy-${{ inputs.version }}.apk"
-          cp android-artifacts/debug/app-debug.apk "dist/Musicy-${{ inputs.version }}-debug.apk"
+          # upload-artifact@v4 strips the least-common-ancestor dir; with the AAB
+          # added, that root is .../outputs, so APKs sit under apk/ in the artifact.
+          # Resolve by name to stay robust to that layout shifting.
+          find android-artifacts -name app-release.apk -exec cp {} "dist/Musicy-${{ inputs.version }}.apk" \;
+          find android-artifacts -name app-debug.apk   -exec cp {} "dist/Musicy-${{ inputs.version }}-debug.apk" \;
+          find android-artifacts -name app-release.aab -exec cp {} "dist/Musicy-${{ inputs.version }}.aab" \;
           ( cd ios-app && zip -qr "../dist/Musicy-${{ inputs.version }}-iOS-simulator.zip" "Musicy.app" )
           ls -lh dist
 
@@ -96,9 +102,17 @@ jobs:
         run: |
           NOTES="${{ inputs.notes }}"
           [ -z "$NOTES" ] && NOTES="Musicy Mobile ${{ inputs.version }}."
-          gh release create "${{ inputs.version }}" \
-            --repo "${{ github.repository }}" \
-            --target "${{ github.sha }}" \
-            --title "Musicy Mobile ${{ inputs.version }}" \
-            --notes "$NOTES" \
-            dist/*.apk dist/*.zip
+          # Idempotent: create the release if it's new, otherwise (re-run of the
+          # same version) just (re)upload the assets to the existing one.
+          if gh release view "${{ inputs.version }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "${{ inputs.version }}" \
+              --repo "${{ github.repository }}" --clobber \
+              dist/*.apk dist/*.aab dist/*.zip
+          else
+            gh release create "${{ inputs.version }}" \
+              --repo "${{ github.repository }}" \
+              --target "${{ github.sha }}" \
+              --title "Musicy Mobile ${{ inputs.version }}" \
+              --notes "$NOTES" \
+              dist/*.apk dist/*.aab dist/*.zip
+          fi
