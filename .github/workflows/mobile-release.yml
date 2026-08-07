@@ -10,6 +10,9 @@ on:
         description: 'Release notes'
         required: false
 
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -62,3 +65,40 @@ jobs:
           name: musicy-ios-${{ inputs.version }}
           path: mobile/iOS/DerivedData/Build/Products/Debug-iphonesimulator/Musicy.app
           if-no-files-found: error
+
+  # Publish a real GitHub Release with the built binaries attached, so they are
+  # not buried as run-only artifacts. Runs once both platforms build cleanly.
+  release:
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: musicy-android-${{ inputs.version }}
+          path: android-artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: musicy-ios-${{ inputs.version }}
+          path: ios-app/Musicy.app
+
+      - name: Package assets
+        run: |
+          mkdir -p dist
+          cp android-artifacts/release/app-release.apk "dist/Musicy-${{ inputs.version }}.apk"
+          cp android-artifacts/debug/app-debug.apk "dist/Musicy-${{ inputs.version }}-debug.apk"
+          ( cd ios-app && zip -qr "../dist/Musicy-${{ inputs.version }}-iOS-simulator.zip" "Musicy.app" )
+          ls -lh dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="${{ inputs.notes }}"
+          [ -z "$NOTES" ] && NOTES="Musicy Mobile ${{ inputs.version }}."
+          gh release create "${{ inputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Musicy Mobile ${{ inputs.version }}" \
+            --notes "$NOTES" \
+            dist/*.apk dist/*.zip
