@@ -152,6 +152,10 @@ export function SiteFooter({ className }: SiteFooterProps) {
             <Link href="/terms" className="hover:text-zinc-300 transition-colors">
               Terms of Service
             </Link>
+            <span>•</span>
+            <Link href="/licenses" className="hover:text-zinc-300 transition-colors">
+              Licenses
+            </Link>
           </div>
 
           <div className="flex items-center gap-4">
