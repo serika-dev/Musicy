@@ -68,7 +68,8 @@ export async function downloadTrackNatively(
 ): Promise<NativeDownloadResult | null> {
   if (!isNativeDownloadsAvailable()) return null;
 
-  const sourceUrl = absoluteUrl(track.filePath);
+  // Use the server-side proxy to avoid CORS issues with B2/R2
+  const sourceUrl = absoluteUrl(`/api/tracks/${track.id}/download`);
   if (!sourceUrl) return null;
 
   try {

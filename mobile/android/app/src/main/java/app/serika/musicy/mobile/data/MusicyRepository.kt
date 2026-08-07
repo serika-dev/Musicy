@@ -76,8 +76,10 @@ class MusicyRepository private constructor(context: Context) {
     val downloads get() = downloadStore.downloads
 
     suspend fun download(track: Track): Result<Unit> {
-        val url = resolveUrl(track.filePath) ?: return Result.failure(IllegalStateException("Track has no file"))
-        return downloadStore.download(track, ApiClient.okHttp(_config.value), url).map { }
+        val config = _config.value
+        val base = ApiClient.normalizedBaseUrl(config)
+        val url = "$base/api/tracks/${track.id}/download"
+        return downloadStore.download(track, ApiClient.okHttp(config), url).map { }
     }
 
     suspend fun removeDownload(trackId: String) = downloadStore.remove(trackId)

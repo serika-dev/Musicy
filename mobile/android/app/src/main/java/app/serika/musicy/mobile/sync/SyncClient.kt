@@ -72,6 +72,9 @@ class SyncClient(
     private var streamJob: Job? = null
     private var deviceName: String = "Android device"
 
+    /** Saved before a stream drop so we can detect a reconnect-while-active. */
+    private var wasActiveBeforeReconnect = false
+
     val isThisDeviceActive: Boolean
         get() = _activeDeviceId.value != null && _activeDeviceId.value == _deviceId.value
 
@@ -99,6 +102,7 @@ class SyncClient(
                     Log.w(TAG, "sync stream dropped: ${e.message}")
                 } finally {
                     _connected.value = false
+                    wasActiveBeforeReconnect = isThisDeviceActive
                 }
                 ensureActive()
                 // Exponential backoff with jitter, capped, mirroring the web client.
@@ -163,6 +167,10 @@ class SyncClient(
                     val parsed = json.decodeFromString<DeviceListEvent>(payload)
                     _devices.value = parsed.payload.devices
                     parsed.payload.devices.firstOrNull { it.isActive }?.let { _activeDeviceId.value = it.id }
+                    if (wasActiveBeforeReconnect && _activeDeviceId.value == _deviceId.value) {
+                        wasActiveBeforeReconnect = false
+                        onCommand?.invoke(SyncCommandPayload(action = "claim"))
+                    }
                 }
                 "state" -> {
                     val parsed = json.decodeFromString<SyncStateEvent>(payload)

@@ -34,8 +34,8 @@ export function useTrackDownload(track: Track | null) {
     setProgress(10);
 
     try {
-      // 1. Fetch the audio file
-      const response = await fetch(track.filePath);
+      // 1. Fetch the audio file through our server-side proxy to avoid CORS
+      const response = await fetch(`/api/tracks/${track.id}/download`);
       if (!response.ok) throw new Error("Failed to fetch track audio");
 
       const reader = response.body?.getReader();

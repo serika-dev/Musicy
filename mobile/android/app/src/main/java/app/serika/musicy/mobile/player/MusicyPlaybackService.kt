@@ -603,7 +603,26 @@ private object PlaybackBridge {
                     "setVolume" -> command.volume?.let { p.volume = it.toFloat().coerceIn(0f, 1f) }
                     "claim" -> {
                         client.claim()
-                        p.play()
+                        val state = client.remoteState.value
+                        val track = state?.currentTrack
+                        if (track != null) {
+                            val currentId = MediaItems.toTrack(p.currentMediaItem)?.id
+                            if (currentId != track.id) {
+                                val queue = state.queue
+                                if (queue.isNotEmpty()) {
+                                    val items = queue.mapNotNull { runCatching { MediaItems.fromTrack(it, repo) }.getOrNull() }
+                                    val startIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+                                    p.setMediaItems(items, startIndex, (state.currentTime * 1000).toLong())
+                                } else {
+                                    p.setMediaItem(MediaItems.fromTrack(track, repo))
+                                    p.seekTo((state.currentTime * 1000).toLong())
+                                }
+                                p.prepare()
+                            } else {
+                                p.seekTo((state.currentTime * 1000).toLong())
+                            }
+                        }
+                        if (state?.isPlaying != false) p.play()
                     }
                     "playTrack" -> command.trackId?.let { id ->
                         val track: Track? = withContext(Dispatchers.IO) { library.trackFor(id) }

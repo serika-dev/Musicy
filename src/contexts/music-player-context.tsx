@@ -848,8 +848,18 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     };
     // Immediate + interval while playing
     broadcast();
-    const interval = window.setInterval(broadcast, 2000);
-    return () => window.clearInterval(interval);
+    const interval = window.setInterval(broadcast, 1500);
+    // Broadcast immediately when tab becomes visible again (e.g. after
+    // background suspension) so other devices get fresh state without
+    // waiting up to 1.5s for the next interval tick.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") broadcast();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [
     isActiveDevice,
     deviceId,
@@ -903,6 +913,24 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const transferPlayback = useCallback(
     (toDeviceId: string) => {
       if (!deviceId) return;
+      // Send one final state broadcast so the target device has the latest
+      // position before it claims playback. Without this, the target might
+      // use a stale currentTime from up to 2s ago.
+      if (isActiveDevice) {
+        syncPublish({
+          type: "state",
+          payload: {
+            trackId: currentTrackRef.current?.id ?? null,
+            currentTrack: currentTrackRef.current,
+            isPlaying,
+            currentTime,
+            duration,
+            queue,
+            currentIndex,
+            activeDeviceId: deviceId,
+          },
+        });
+      }
       // Directly tell the target device to claim playback
       syncPublish({
         type: "command",
@@ -910,7 +938,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         payload: { action: "claim" },
       });
     },
-    [deviceId, syncPublish],
+    [deviceId, syncPublish, isActiveDevice, isPlaying, currentTime, duration, queue, currentIndex],
   );
 
   // React to a dedicated "transfer" command (handled above could be extended)

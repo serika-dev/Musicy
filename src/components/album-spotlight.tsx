@@ -115,16 +115,28 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
 
       {/* Main Content Layout - Fixed Container Height with Scaling Text */}
       <div className="relative z-10 h-full flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8 p-6 sm:p-10 lg:p-14 overflow-hidden">
-        
+
+        {/* Album Cover — on mobile it sits at the top, on desktop at the right */}
+        <div className="order-first md:order-last flex-shrink-0 relative group">
+          <div className="w-32 h-32 sm:w-48 sm:h-48 md:w-48 md:h-48 lg:w-76 lg:h-76 rounded-2xl overflow-hidden shadow-2xl border border-white/10 transition-transform duration-500 group-hover:scale-[1.03]">
+            <img
+              src={coverUrl}
+              alt={currentAlbum.title}
+              onLoad={handleImageLoad}
+              className={`w-full h-full object-cover transition-all duration-500 ${focalPosition}`}
+            />
+          </div>
+        </div>
+
         {/* Left Copy Column */}
         <div className="flex-1 min-w-0 space-y-4 sm:space-y-5 text-center md:text-left overflow-hidden">
-          
+
           {/* Title & Artist */}
           <div className="space-y-1.5 sm:space-y-2">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-foreground line-clamp-2 drop-shadow-md leading-tight min-w-0 break-words">
               {currentAlbum.title}
             </h1>
-            
+
             <p className="text-base sm:text-xl font-bold text-muted-foreground truncate">
               <Link
                 href={`/artists/${currentAlbum.artist.id}`}
@@ -141,7 +153,7 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 sm:gap-4 pt-1 sm:pt-3 shrink-0">
+          <div className="flex items-center justify-center md:justify-start gap-3 sm:gap-4 pt-1 sm:pt-3 shrink-0">
             <Button
               size="lg"
               className="rounded-full px-7 sm:px-9 h-12 sm:h-14 text-sm sm:text-base font-extrabold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/25 transition-transform active:scale-95 inline-flex items-center justify-center gap-2 shrink-0"
@@ -174,18 +186,6 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
             </Button>
           </div>
 
-        </div>
-
-        {/* Right Artwork Showcase */}
-        <div className="flex-shrink-0 relative group">
-          <div className="w-48 h-48 sm:w-60 sm:h-60 lg:w-76 lg:h-76 rounded-2xl overflow-hidden shadow-2xl border border-white/10 transition-transform duration-500 group-hover:scale-[1.03]">
-            <img
-              src={coverUrl}
-              alt={currentAlbum.title}
-              onLoad={handleImageLoad}
-              className={`w-full h-full object-cover transition-all duration-500 ${focalPosition}`}
-            />
-          </div>
         </div>
 
       </div>
