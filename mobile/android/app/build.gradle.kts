@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "app.serika.musicy.mobile"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "app.serika.musicy.mobile"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 4
         versionName = "1.4.0"
     }
@@ -41,6 +41,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Ship native debug symbols (Media3/ExoPlayer bundles .so files) so
+            // Play can symbolicate native crashes/ANRs. Addresses the Play
+            // Console "no debug symbols" warning.
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
     compileOptions {
