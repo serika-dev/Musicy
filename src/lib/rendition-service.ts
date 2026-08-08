@@ -23,15 +23,16 @@ const CONTENT_TYPES: Record<string, string> = {
 /**
  * Decide which tiers to build for a source of the given effective bitrate.
  *
- * - Lossless (FLAC) is ALWAYS produced, even from a lossy source, per product
- *   decision (re-wraps the decoded audio; no quality gain but requested).
+ * - Lossless (FLAC) is only produced when the source is already lossless
+ *   (FLAC/WAV/ALAC/PCM). Lossy sources (MP3/AAC) skip the FLAC tier.
  * - Lossy MP3 tiers are skipped when their target bitrate is >= the source
  *   bitrate to avoid pointless upscaling (e.g. a 128k MP3 source only yields
  *   the "low" tier). If the source bitrate is unknown, all tiers are built.
  */
-export function selectSpecs(sourceBitrateKbps: number | null): RenditionSpec[] {
+export function selectSpecs(sourceBitrateKbps: number | null, sourceCodec: string | null = null): RenditionSpec[] {
+  const isLosslessSource = !sourceCodec || ['flac', 'alac', 'pcm_s16le', 'pcm_s24le', 'pcm_f32le', 'wav', 'aiff'].includes(sourceCodec.toLowerCase());
   return RENDITION_SPECS.filter((spec) => {
-    if (spec.format === "FLAC") return true;
+    if (spec.format === "FLAC") return isLosslessSource;
     if (sourceBitrateKbps == null) return true;
     // Keep a tier if it's meaningfully below the source (allow small margin).
     return (spec.bitRateKbps ?? 0) < sourceBitrateKbps;
@@ -77,7 +78,7 @@ export async function ensureRenditions(trackId: string): Promise<void> {
 
     // 2. Probe the original to decide tiers.
     const srcMeta = await probe(srcPath);
-    const specs = selectSpecs(srcMeta.bitRateKbps);
+    const specs = selectSpecs(srcMeta.bitRateKbps, srcMeta.codec);
 
     // 3. Transcode + upload + persist each tier.
     for (const spec of specs) {

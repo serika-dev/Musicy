@@ -64,20 +64,30 @@ export async function POST(request: NextRequest) {
       await prisma.track.update({ where: { id: targetTrackId }, data: updateData })
     }
 
-    // Merge featured artists
-    const sourceFeatured = await prisma.track.findUnique({
-      where: { id: sourceTrackId },
-      select: { featuredArtists: { select: { id: true } } },
-    })
-    if (sourceFeatured?.featuredArtists?.length) {
-      await prisma.track.update({
+    // Merge featured artists (skip any already connected to target)
+    const [sourceFeatured, targetFeatured] = await Promise.all([
+      prisma.track.findUnique({
+        where: { id: sourceTrackId },
+        select: { featuredArtists: { select: { id: true } } },
+      }),
+      prisma.track.findUnique({
         where: { id: targetTrackId },
-        data: {
-          featuredArtists: {
-            connect: sourceFeatured.featuredArtists.map(fa => ({ id: fa.id })),
+        select: { featuredArtists: { select: { id: true } } },
+      }),
+    ])
+    if (sourceFeatured?.featuredArtists?.length) {
+      const targetIds = new Set(targetFeatured?.featuredArtists?.map(f => f.id) || [])
+      const toConnect = sourceFeatured.featuredArtists.filter(fa => !targetIds.has(fa.id))
+      if (toConnect.length > 0) {
+        await prisma.track.update({
+          where: { id: targetTrackId },
+          data: {
+            featuredArtists: {
+              connect: toConnect.map(fa => ({ id: fa.id })),
+            },
           },
-        },
-      })
+        }).catch(() => {})
+      }
     }
 
     // Move playlist entries
@@ -126,17 +136,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Move listening history
+    // Move listening history (no unique constraints, safe to updateMany)
     await prisma.listeningHistory.updateMany({
       where: { trackId: sourceTrackId },
       data: { trackId: targetTrackId },
-    })
+    }).catch(() => {})
 
-    // Move comments
+    // Move comments (no unique constraints, safe to updateMany)
     await prisma.comment.updateMany({
       where: { trackId: sourceTrackId },
       data: { trackId: targetTrackId },
-    })
+    }).catch(() => {})
 
     // Move daily mix tracks
     const dailyMixEntries = await prisma.dailyMixTrack.findMany({
@@ -183,6 +193,9 @@ export async function POST(request: NextRequest) {
         await prisma.trackRendition.delete({ where: { id: r.id } })
       }
     }
+
+    // Disconnect source from any featured-artist M2M join tables before delete
+    await prisma.$executeRaw`DELETE FROM "_TrackFeatures" WHERE "A" = ${sourceTrackId}`.catch(() => {})
 
     // Delete the source track
     await prisma.track.delete({ where: { id: sourceTrackId } })

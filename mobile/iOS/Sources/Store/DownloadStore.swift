@@ -95,7 +95,7 @@ final class DownloadStore: ObservableObject {
         if isDownloaded(id) || isDownloading(id) { return true }
         guard let remote = MusicyAPI.shared.absoluteURL(track.filePath) else { return false }
 
-        await MainActor.run { self.downloadingIds.insert(id) }
+        _ = await MainActor.run { self.downloadingIds.insert(id) }
         defer { Task { @MainActor in self.downloadingIds.remove(id) } }
 
         var request = URLRequest(url: remote)

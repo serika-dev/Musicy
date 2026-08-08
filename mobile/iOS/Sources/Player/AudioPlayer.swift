@@ -26,6 +26,7 @@ final class PlaybackClock: ObservableObject {
 ///
 /// Everything runs on the main queue: `AVPlayer` callbacks are hopped there so
 /// the `@Published` values are always safe for SwiftUI to read.
+@MainActor
 final class AudioPlayer: ObservableObject {
     static let shared = AudioPlayer()
 

@@ -166,26 +166,32 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
         let playAll = CPListItem(text: "Play all", detailText: "\(tracks.count) tracks")
         playAll.handler = { [weak self] _, completion in
-            AudioPlayer.shared.play(tracks: tracks)
-            self?.showNowPlaying()
-            completion()
+            Task { @MainActor in
+                AudioPlayer.shared.play(tracks: tracks)
+                self?.showNowPlaying()
+                completion()
+            }
         }
         items.append(playAll)
 
         let shuffle = CPListItem(text: "Shuffle", detailText: "Random order")
         shuffle.handler = { [weak self] _, completion in
-            AudioPlayer.shared.play(tracks: tracks.shuffled())
-            self?.showNowPlaying()
-            completion()
+            Task { @MainActor in
+                AudioPlayer.shared.play(tracks: tracks.shuffled())
+                self?.showNowPlaying()
+                completion()
+            }
         }
         items.append(shuffle)
 
         for (index, track) in tracks.enumerated() {
             let item = CPListItem(text: track.title, detailText: track.artistLine)
             item.handler = { [weak self] _, completion in
-                AudioPlayer.shared.play(tracks: tracks, startAt: index)
-                self?.showNowPlaying()
-                completion()
+                Task { @MainActor in
+                    AudioPlayer.shared.play(tracks: tracks, startAt: index)
+                    self?.showNowPlaying()
+                    completion()
+                }
             }
             items.append(item)
         }

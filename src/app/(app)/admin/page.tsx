@@ -2944,6 +2944,9 @@ export default function AdminPage() {
               <UserIcon className="w-5 h-5 text-purple-400" />
               {(editingArtist?.isCollab === true || (editingArtist?.isCollab === null && editingArtist?.name?.includes(' & '))) ? 'Edit Collaboration' : 'Edit Artist Profile'}
             </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Update artist metadata, images, and verification status.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
@@ -3044,6 +3047,9 @@ export default function AdminPage() {
               <Users className="w-5 h-5 text-purple-400" />
               Edit Collaboration
             </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Manage collaboration members and metadata.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 py-3">
@@ -3267,6 +3273,9 @@ export default function AdminPage() {
               <Music className="w-5 h-5 text-purple-400" />
               Edit Track Metadata
             </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Update track details, artist, album, and visibility.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
@@ -3373,6 +3382,9 @@ export default function AdminPage() {
               <AlbumIcon className="w-5 h-5 text-purple-400" />
               Edit Album Details
             </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Update album metadata, artist, release date, and visibility.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
@@ -3483,6 +3495,9 @@ export default function AdminPage() {
               <Disc className="w-5 h-5 text-amber-400" />
               Merge Duplicate Albums
             </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Review and merge albums with duplicate titles. Tracks are moved to the oldest album.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
@@ -3760,6 +3775,9 @@ export default function AdminPage() {
               <FileText className="w-5 h-5 text-purple-400" />
               Lyrics Editor: {selectedTrackForLyrics?.title}
             </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Edit plain and synced lyrics, including romanized versions.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">

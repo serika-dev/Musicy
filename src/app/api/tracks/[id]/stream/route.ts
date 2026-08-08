@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getAuthSession } from "@/lib/mobile-auth";
 import { getSystemSetting } from "@/lib/settings";
+import { after } from "next/server";
+import { spawn } from "node:child_process";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,33 +22,73 @@ function normalizeQuality(raw: string | null): Quality {
   return "high";
 }
 
+const QUALITY_BITRATE: Record<Quality, number | null> = {
+  lossless: null,
+  high: 320,
+  medium: 192,
+  low: 128,
+};
+
 /**
  * Resolve the requested quality against available renditions.
  * Fallback chain: exact → next lower tier → next higher tier → original.
+ * Returns { url, isOriginal } where isOriginal=true if no rendition matched.
  */
-function resolveUrl(
+function resolveRendition(
   requested: Quality,
   renditions: { quality: string; filePath: string }[],
   originalFilePath: string,
-): string {
+): { url: string; isOriginal: boolean } {
   const byQuality = new Map(renditions.map((r) => [r.quality, r.filePath]));
   const idx = QUALITY_ORDER.indexOf(requested);
 
-  // exact
   const exact = byQuality.get(requested);
-  if (exact) return exact;
-  // lower tiers (toward "low")
+  if (exact) return { url: exact, isOriginal: false };
   for (let i = idx + 1; i < QUALITY_ORDER.length; i++) {
     const url = byQuality.get(QUALITY_ORDER[i]);
-    if (url) return url;
+    if (url) return { url, isOriginal: false };
   }
-  // higher tiers (toward "lossless")
   for (let i = idx - 1; i >= 0; i--) {
     const url = byQuality.get(QUALITY_ORDER[i]);
-    if (url) return url;
+    if (url) return { url, isOriginal: false };
   }
-  // nothing transcoded yet — serve the original
-  return originalFilePath;
+  return { url: originalFilePath, isOriginal: true };
+}
+
+/**
+ * Transcode on-the-fly from the source URL to MP3 at the given bitrate.
+ * Streams ffmpeg stdout directly to the HTTP response (progressive playback).
+ */
+function transcodeStream(sourceUrl: string, bitrateKbps: number): ReadableStream {
+  const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
+
+  const child = spawn(ffmpegBin, [
+    "-hide_banner", "-loglevel", "error",
+    "-re",
+    "-i", sourceUrl,
+    "-c:a", "libmp3lame",
+    "-b:a", `${bitrateKbps}k`,
+    "-map", "0:a:0",
+    "-map_metadata", "0",
+    "-vn",
+    "-f", "mp3",
+    "pipe:1",
+  ]);
+
+  return new ReadableStream({
+    start(controller) {
+      child.stdout.on("data", (chunk: Buffer) => {
+        controller.enqueue(new Uint8Array(chunk));
+      });
+      child.stdout.on("end", () => { try { controller.close(); } catch {} });
+      child.stdout.on("error", (err) => { try { controller.error(err); } catch {} });
+      child.on("error", (err) => { try { controller.error(err); } catch {} });
+      child.on("close", () => { try { controller.close(); } catch {} });
+    },
+    cancel() {
+      child.kill("SIGTERM");
+    },
+  });
 }
 
 export async function GET(
@@ -64,6 +106,7 @@ export async function GET(
       id: true,
       isPublic: true,
       filePath: true,
+      renditionStatus: true,
       renditions: { select: { quality: true, filePath: true } },
     },
   });
@@ -72,8 +115,6 @@ export async function GET(
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
   }
 
-  // Visibility: public tracks stream to anyone (or gated by system setting);
-  // private tracks require any form of auth.
   if (!track.isPublic) {
     const session = await getServerSession(authOptions);
     const apiKeyUser = await validateApiKey(req);
@@ -94,16 +135,80 @@ export async function GET(
     }
   }
 
-  const target = resolveUrl(requested, track.renditions, track.filePath);
+  const { url: targetUrl, isOriginal } = resolveRendition(
+    requested,
+    track.renditions,
+    track.filePath,
+  );
 
-  // 302 redirect so B2 serves the bytes directly (native HTTP range/seek).
-  return NextResponse.redirect(target, {
-    status: 302,
-    headers: {
-      "Cache-Control": "private, max-age=0, must-revalidate",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+  // If we have a matching rendition, 302 redirect to it.
+  if (!isOriginal) {
+    return NextResponse.redirect(targetUrl, {
+      status: 302,
+      headers: {
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  // Serving the original file. If user wants lossless, that's correct.
+  if (requested === "lossless") {
+    return NextResponse.redirect(targetUrl, {
+      status: 302,
+      headers: {
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  // User wants lower quality but no rendition exists.
+  // Trigger async rendition generation for future plays.
+  if (track.renditionStatus !== "processing") {
+    after(async () => {
+      try {
+        const { ensureRenditions } = await import("@/lib/rendition-service");
+        await ensureRenditions(track.id);
+      } catch (err) {
+        console.error(`[stream] async rendition gen failed for ${track.id}:`, err);
+      }
+    });
+  }
+
+  // Transcode on-the-fly for the requested quality.
+  const bitrate = QUALITY_BITRATE[requested];
+  if (!bitrate) {
+    return NextResponse.redirect(targetUrl, {
+      status: 302,
+      headers: {
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  try {
+    const stream = transcodeStream(track.filePath, bitrate);
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+        "X-Transcoded-On-The-Fly": "true",
+        "X-Requested-Quality": requested,
+      },
+    });
+  } catch (err) {
+    console.error(`[stream] on-the-fly transcoding failed for ${track.id}:`, err);
+    return NextResponse.redirect(targetUrl, {
+      status: 302,
+      headers: {
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
 }
 
 export async function HEAD(
