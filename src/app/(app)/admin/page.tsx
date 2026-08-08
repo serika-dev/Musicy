@@ -500,6 +500,11 @@ export default function AdminPage() {
   const [mergeDuplicates, setMergeDuplicates] = useState<any[]>([]);
   const [isMerging, setIsMerging] = useState(false);
 
+  // Rendition backfill state
+  const [renditionStats, setRenditionStats] = useState<any>(null);
+  const [renditionLoading, setRenditionLoading] = useState(false);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+
   // Upload form data
   const [uploadFormData, setUploadFormData] = useState({
     audioFile: null as File | null,
@@ -608,6 +613,26 @@ export default function AdminPage() {
       loadArtists();
       loadAlbums();
     }
+  }, [activeTab]);
+
+  // Load rendition stats when overview tab is active
+  useEffect(() => {
+    if (activeTab !== "overview") return;
+    const loadRenditionStats = async () => {
+      setRenditionLoading(true);
+      try {
+        const res = await fetch("/api/admin/renditions");
+        if (res.ok) {
+          const data = await res.json();
+          setRenditionStats(data);
+        }
+      } catch (e) {
+        console.error("Error loading rendition stats:", e);
+      } finally {
+        setRenditionLoading(false);
+      }
+    };
+    loadRenditionStats();
   }, [activeTab]);
 
   // Load system settings on mount
@@ -1430,6 +1455,108 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Rendition Backfill */}
+          <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
+            <CardHeader className="border-b border-zinc-800 pb-4">
+              <CardTitle className="text-lg font-extrabold text-white flex items-center gap-2">
+                <FileMusic className="w-5 h-5 text-purple-400" />
+                Multi-Quality Audio Renditions
+              </CardTitle>
+              <CardDescription className="text-zinc-400 text-xs">Transcoded streaming tiers (lossless FLAC + 320/192/128 kbps MP3)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              {renditionStats ? (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30">
+                      <span className="text-zinc-400 block mb-1 font-semibold">Ready</span>
+                      <span className="font-bold text-emerald-400 text-lg">{renditionStats.coverage?.ready ?? 0}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30">
+                      <span className="text-zinc-400 block mb-1 font-semibold">Pending</span>
+                      <span className="font-bold text-amber-400 text-lg">{renditionStats.coverage?.pending ?? 0}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-rose-500/30">
+                      <span className="text-zinc-400 block mb-1 font-semibold">Failed</span>
+                      <span className="font-bold text-rose-400 text-lg">{renditionStats.coverage?.failed ?? 0}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-700">
+                      <span className="text-zinc-400 block mb-1 font-semibold">No Renditions</span>
+                      <span className="font-bold text-white text-lg">{renditionStats.coverage?.none ?? 0}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                    <div className="text-xs text-zinc-400">
+                      <span className="font-semibold">Total tracks:</span> <span className="font-bold text-white">{renditionStats.total}</span>
+                      <span className="mx-2">·</span>
+                      <span className="font-semibold">Renditions:</span> <span className="font-bold text-white">{renditionStats.totalRenditions}</span>
+                    </div>
+                    {renditionStats.byQuality && Object.keys(renditionStats.byQuality).length > 0 && (
+                      <div className="flex gap-2">
+                        {Object.entries(renditionStats.byQuality).map(([q, n]) => (
+                          <Badge key={q} className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold">{q}: {n as number}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      size="sm"
+                      disabled={backfillRunning || (renditionStats.coverage?.none ?? 0) + (renditionStats.coverage?.failed ?? 0) + (renditionStats.coverage?.pending ?? 0) === 0}
+                      onClick={async () => {
+                        setBackfillRunning(true);
+                        try {
+                          const res = await fetch("/api/admin/renditions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+                          if (res.ok) {
+                            const data = await res.json();
+                            toast.success(data.message);
+                          } else {
+                            toast.error("Failed to start backfill");
+                          }
+                        } catch {
+                          toast.error("Network error");
+                        } finally {
+                          setBackfillRunning(false);
+                        }
+                      }}
+                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-1.5"
+                    >
+                      {backfillRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      Backfill Missing
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={backfillRunning}
+                      onClick={async () => {
+                        setBackfillRunning(true);
+                        try {
+                          const res = await fetch("/api/admin/renditions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) });
+                          if (res.ok) {
+                            const data = await res.json();
+                            toast.success(data.message);
+                          } else {
+                            toast.error("Failed to start full regeneration");
+                          }
+                        } catch {
+                          toast.error("Network error");
+                        } finally {
+                          setBackfillRunning(false);
+                        }
+                      }}
+                      className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-1.5"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Regenerate All
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-zinc-500 py-2">Loading rendition stats…</div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* 👥 USERS MANAGEMENT TAB (25 per page) */}
