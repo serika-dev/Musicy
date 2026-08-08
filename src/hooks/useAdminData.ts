@@ -106,9 +106,9 @@ export function useAdminUsers(search?: string, limit = 50, offset = 0) {
   })
 }
 
-export function useAdminTracks(search?: string, limit = 50, offset = 0) {
+export function useAdminTracks(search?: string, limit = 50, offset = 0, renditionFilter?: 'all' | 'ready' | 'missing' | 'failed' | 'processing') {
   return useQuery({
-    queryKey: ['admin', 'tracks', { search, limit, offset }],
+    queryKey: ['admin', 'tracks', { search, limit, offset, renditionFilter }],
     queryFn: async () => {
       const params = new URLSearchParams({
         limit: limit.toString(),
@@ -117,6 +117,10 @@ export function useAdminTracks(search?: string, limit = 50, offset = 0) {
       
       if (search) {
         params.append('search', search)
+      }
+
+      if (renditionFilter && renditionFilter !== 'all') {
+        params.append('renditionFilter', renditionFilter)
       }
       
       const response = await fetch(`/api/admin/tracks?${params}`)

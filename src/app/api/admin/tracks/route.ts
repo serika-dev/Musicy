@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number(searchParams.get('limit')) || 50, 100)
     const offset = Math.max(Number(searchParams.get('offset')) || 0, 0)
     const search = searchParams.get('search')
+    const renditionFilter = searchParams.get('renditionFilter')
 
     let whereClause: any = {}
 
@@ -35,6 +36,32 @@ export async function GET(request: NextRequest) {
         { album: { title: { contains: search, mode: 'insensitive' } } },
         { genre: { contains: search, mode: 'insensitive' } },
       ]
+    }
+
+    if (renditionFilter === 'ready') {
+      whereClause.renditionStatus = 'ready'
+    } else if (renditionFilter === 'missing') {
+      whereClause.OR = [
+        ...(whereClause.OR || []),
+      ]
+      // Override: tracks that do NOT have renditionStatus 'ready'
+      delete whereClause.OR
+      const searchCondition = whereClause
+      whereClause = {
+        AND: [
+          searchCondition,
+          { OR: [
+            { renditionStatus: null },
+            { renditionStatus: 'pending' },
+            { renditionStatus: 'failed' },
+            { renditionStatus: 'processing' },
+          ] },
+        ],
+      }
+    } else if (renditionFilter === 'failed') {
+      whereClause.renditionStatus = 'failed'
+    } else if (renditionFilter === 'processing') {
+      whereClause.renditionStatus = { in: ['processing', 'pending'] }
     }
 
     const [tracksRaw, total] = await Promise.all([
@@ -58,6 +85,7 @@ export async function GET(request: NextRequest) {
           lrcId: true,
           plainLyrics: true,
           syncedLyrics: true,
+          renditionStatus: true,
           artist: {
             select: {
               id: true,
@@ -87,6 +115,7 @@ export async function GET(request: NextRequest) {
       ...track,
       fileSize: track.fileSize.toString(),
       hasLyrics: !!(track.plainLyrics || track.syncedLyrics),
+      hasRenditions: track.renditionStatus === 'ready',
     }))
 
     return NextResponse.json({

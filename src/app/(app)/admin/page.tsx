@@ -299,6 +299,7 @@ export default function AdminPage() {
   // Search states
   const [searchUsers, setSearchUsers] = useState("");
   const [searchTracks, setSearchTracks] = useState("");
+  const [trackRenditionFilter, setTrackRenditionFilter] = useState<'all' | 'ready' | 'missing' | 'failed' | 'processing'>('all');
   const [searchArtists, setSearchArtists] = useState("");
   const [artistFilter, setArtistFilter] = useState<'all' | 'collab' | 'solo'>('all');
   const [searchCollabs, setSearchCollabs] = useState("");
@@ -500,6 +501,16 @@ export default function AdminPage() {
   const [mergeDuplicates, setMergeDuplicates] = useState<any[]>([]);
   const [isMerging, setIsMerging] = useState(false);
 
+  // Artist merge state
+  const [showArtistMergeDialog, setShowArtistMergeDialog] = useState(false);
+  const [artistMergeDuplicates, setArtistMergeDuplicates] = useState<any[]>([]);
+  const [isMergingArtists, setIsMergingArtists] = useState(false);
+
+  // Track merge state
+  const [showTrackMergeDialog, setShowTrackMergeDialog] = useState(false);
+  const [trackMergeDuplicates, setTrackMergeDuplicates] = useState<any[]>([]);
+  const [isMergingTracks, setIsMergingTracks] = useState(false);
+
   // Rendition backfill state
   const [renditionStats, setRenditionStats] = useState<any>(null);
   const [renditionLoading, setRenditionLoading] = useState(false);
@@ -542,6 +553,7 @@ export default function AdminPage() {
     searchTracks,
     ITEMS_PER_PAGE,
     (tracksPage - 1) * ITEMS_PER_PAGE,
+    trackRenditionFilter,
   );
   const { data: artistsData, refetch: refetchArtists } = useAdminArtists(
     searchArtists,
@@ -1088,6 +1100,160 @@ export default function AdminPage() {
     } finally {
       setIsUpdatingAlbum(false);
     }
+  };
+
+  // ===== Artist merge handlers =====
+  const handleScanDuplicateArtists = async () => {
+    setIsMergingArtists(true);
+    try {
+      const res = await fetch('/api/admin/artists/merge');
+      if (res.ok) {
+        const data = await res.json();
+        setArtistMergeDuplicates(data.duplicates || []);
+        setShowArtistMergeDialog(true);
+        if (data.duplicates.length === 0) {
+          toast.success("No duplicate artists found!");
+        } else {
+          toast.info(`Found ${data.totalGroups} artist group(s) with duplicates (${data.totalArtistsToMerge} artists to merge)`);
+        }
+      } else {
+        toast.error("Failed to scan for duplicate artists");
+      }
+    } catch (e) {
+      toast.error("Failed to scan for duplicate artists");
+    } finally {
+      setIsMergingArtists(false);
+    }
+  };
+
+  const handleMergeArtist = async (sourceId: string, targetId: string) => {
+    setIsMergingArtists(true);
+    try {
+      const res = await fetch('/api/admin/artists/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceArtistId: sourceId, targetArtistId: targetId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        // Remove the merged group from the list
+        setArtistMergeDuplicates(prev => prev.filter(g => !g.artists.some((a: any) => a.id === sourceId)));
+        refetchArtists();
+        refetchTracks();
+        refetchAlbums();
+      } else {
+        const err = await res.json();
+        toast.error(`Failed to merge: ${err.message}`);
+      }
+    } catch (e) {
+      toast.error("Failed to merge artists");
+    } finally {
+      setIsMergingArtists(false);
+    }
+  };
+
+  const handleMergeAllArtists = async () => {
+    setIsMergingArtists(true);
+    let merged = 0;
+    for (const group of artistMergeDuplicates) {
+      if (group.artists.length < 2) continue;
+      const targetId = group.artists[0].id;
+      for (let i = 1; i < group.artists.length; i++) {
+        try {
+          const res = await fetch('/api/admin/artists/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceArtistId: group.artists[i].id, targetArtistId: targetId }),
+          });
+          if (res.ok) merged++;
+        } catch (e) {
+          console.error(`Failed to merge artist:`, e);
+        }
+      }
+    }
+    toast.success(`Merged ${merged} artist(s) successfully!`);
+    setArtistMergeDuplicates([]);
+    setShowArtistMergeDialog(false);
+    refetchArtists();
+    refetchTracks();
+    refetchAlbums();
+    setIsMergingArtists(false);
+  };
+
+  // ===== Track merge handlers =====
+  const handleScanDuplicateTracks = async () => {
+    setIsMergingTracks(true);
+    try {
+      const res = await fetch('/api/admin/tracks/merge');
+      if (res.ok) {
+        const data = await res.json();
+        setTrackMergeDuplicates(data.duplicates || []);
+        setShowTrackMergeDialog(true);
+        if (data.duplicates.length === 0) {
+          toast.success("No duplicate tracks found!");
+        } else {
+          toast.info(`Found ${data.totalGroups} track group(s) with duplicates (${data.totalTracksToMerge} tracks to merge)`);
+        }
+      } else {
+        toast.error("Failed to scan for duplicate tracks");
+      }
+    } catch (e) {
+      toast.error("Failed to scan for duplicate tracks");
+    } finally {
+      setIsMergingTracks(false);
+    }
+  };
+
+  const handleMergeTrack = async (sourceId: string, targetId: string) => {
+    setIsMergingTracks(true);
+    try {
+      const res = await fetch('/api/admin/tracks/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceTrackId: sourceId, targetTrackId: targetId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        // Remove the merged group from the list
+        setTrackMergeDuplicates(prev => prev.filter(g => !g.tracks.some((t: any) => t.id === sourceId)));
+        refetchTracks();
+      } else {
+        const err = await res.json();
+        toast.error(`Failed to merge: ${err.message}`);
+      }
+    } catch (e) {
+      toast.error("Failed to merge tracks");
+    } finally {
+      setIsMergingTracks(false);
+    }
+  };
+
+  const handleMergeAllTracks = async () => {
+    setIsMergingTracks(true);
+    let merged = 0;
+    for (const group of trackMergeDuplicates) {
+      if (group.tracks.length < 2) continue;
+      const targetId = group.tracks[0].id;
+      for (let i = 1; i < group.tracks.length; i++) {
+        try {
+          const res = await fetch('/api/admin/tracks/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceTrackId: group.tracks[i].id, targetTrackId: targetId }),
+          });
+          if (res.ok) merged++;
+        } catch (e) {
+          console.error(`Failed to merge track:`, e);
+        }
+      }
+    }
+    toast.success(`Merged ${merged} track(s) successfully!`);
+    setTrackMergeDuplicates([]);
+    setShowTrackMergeDialog(false);
+    refetchTracks();
+    setIsMergingTracks(false);
   };
 
   // ===== Album merge handlers =====
@@ -1769,9 +1935,35 @@ export default function AdminPage() {
               }}
               placeholder="Search tracks by title, artist, genre..."
             />
-            <Button onClick={() => setActiveTab("upload")} className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-2 shrink-0 h-10 px-4">
-              <Plus className="w-4 h-4" /> Add Track
-            </Button>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <Button onClick={() => setActiveTab("upload")} className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-2 shrink-0 h-10 px-4">
+                <Plus className="w-4 h-4" /> Add Track
+              </Button>
+            </div>
+          </div>
+
+          {/* Rendition filter buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-zinc-400 mr-1">Renditions:</span>
+            {([
+              { value: 'all', label: 'All' },
+              { value: 'ready', label: 'Has Renditions' },
+              { value: 'missing', label: 'Missing' },
+              { value: 'processing', label: 'Processing' },
+              { value: 'failed', label: 'Failed' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => { setTrackRenditionFilter(value); setTracksPage(1); }}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                  trackRenditionFilter === value
+                    ? 'bg-purple-600 border-purple-500 text-white shadow-md'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
@@ -1784,6 +1976,7 @@ export default function AdminPage() {
                     <TableHead className="font-bold text-zinc-200">Artist & Album</TableHead>
                     <TableHead className="font-bold text-zinc-200">Format & Quality</TableHead>
                     <TableHead className="font-bold text-zinc-200">Duration</TableHead>
+                    <TableHead className="font-bold text-zinc-200">Renditions</TableHead>
                     <TableHead className="font-bold text-zinc-200">Lyrics Status</TableHead>
                     <TableHead className="font-bold text-zinc-200">Visibility</TableHead>
                     <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
@@ -1821,6 +2014,19 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell className="text-xs text-zinc-300 font-mono font-bold">
                         {formatDuration(track.duration)}
+                      </TableCell>
+                      <TableCell>
+                        {track.renditionStatus === 'ready' ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[10px] font-bold">Ready</Badge>
+                        ) : track.renditionStatus === 'processing' ? (
+                          <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] font-bold">Processing</Badge>
+                        ) : track.renditionStatus === 'pending' ? (
+                          <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[10px] font-bold">Pending</Badge>
+                        ) : track.renditionStatus === 'failed' ? (
+                          <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-[10px] font-bold">Failed</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-zinc-400 border-zinc-700 text-[10px] font-semibold">None</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {track.syncedLyrics ? (
@@ -1904,9 +2110,14 @@ export default function AdminPage() {
                 Collabs
               </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetchArtists()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh List
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={handleScanDuplicateArtists} disabled={isMergingArtists} className="border-cyan-600/40 bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-300 font-semibold gap-2 h-10 px-4">
+                <Users className={cn("h-3.5 w-3.5", isMergingArtists && "animate-spin")} /> Merge Duplicates
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => refetchArtists()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh List
+              </Button>
+            </div>
           </div>
 
           <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
@@ -3197,6 +3408,195 @@ export default function AdminPage() {
 
           <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
             <Button variant="outline" onClick={() => setShowMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🎤 ARTIST MERGE DIALOG */}
+      <Dialog open={showArtistMergeDialog} onOpenChange={setShowArtistMergeDialog}>
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-zinc-800 pb-3">
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
+              <Users className="w-5 h-5 text-cyan-400" />
+              Merge Duplicate Artists
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Found {artistMergeDuplicates.length} group(s) of duplicate artists. The first artist in each group (most tracks) is the merge target. Merging moves all tracks, albums, follows, and collab members to the target, then deletes the duplicate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 max-h-[60vh] overflow-y-auto">
+            {artistMergeDuplicates.length === 0 ? (
+              <div className="text-center py-8 text-zinc-400 text-sm">No duplicate artists found!</div>
+            ) : (
+              artistMergeDuplicates.map((group: any, gi: number) => (
+                <div key={gi} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-300">Group {gi + 1} — {group.artists.length} artists</span>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const targetId = group.artists[0].id;
+                        for (let i = 1; i < group.artists.length; i++) {
+                          handleMergeArtist(group.artists[i].id, targetId);
+                        }
+                      }}
+                      disabled={isMergingArtists}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs h-7 gap-1"
+                    >
+                      <CheckCircle2 className="w-3 h-3" /> Merge All in Group
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {group.artists.map((artist: any, ai: number) => (
+                      <div key={artist.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                        <div className="h-9 w-9 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700 shrink-0">
+                          {artist.imageUrl ? (
+                            <img src={artist.imageUrl} alt={artist.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center">
+                              <UserIcon className="h-4 w-4 text-zinc-500" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-white truncate">{artist.name}</span>
+                            {ai === 0 && (
+                              <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/40 text-[10px] font-bold py-0 px-1.5">TARGET</Badge>
+                            )}
+                            {artist.verified && <CheckCircle2 className="w-3 h-3 text-blue-400 shrink-0" />}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 font-medium">
+                            {artist.tracks} tracks • {artist.albums} albums • {artist.followers} followers
+                            {artist.altNames?.length > 0 && ` • alt: ${artist.altNames.join(", ")}`}
+                          </div>
+                        </div>
+                        {ai > 0 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleMergeArtist(artist.id, group.artists[0].id)}
+                            disabled={isMergingArtists}
+                            className="text-cyan-300 hover:text-cyan-200 hover:bg-cyan-950/50 font-bold text-[10px] h-7 px-2 gap-1 shrink-0"
+                          >
+                            <CheckCircle2 className="w-3 h-3" /> Merge into target
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
+            <Button variant="outline" onClick={() => setShowArtistMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+            {artistMergeDuplicates.length > 0 && (
+              <Button
+                onClick={handleMergeAllArtists}
+                disabled={isMergingArtists}
+                className="bg-cyan-600 hover:bg-cyan-500 font-bold text-white shadow-lg gap-2"
+              >
+                {isMergingArtists ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Merge All ({artistMergeDuplicates.reduce((acc: number, g: any) => acc + g.artists.length - 1, 0)} artists)
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🎵 TRACK MERGE DIALOG */}
+      <Dialog open={showTrackMergeDialog} onOpenChange={setShowTrackMergeDialog}>
+        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-zinc-800 pb-3">
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
+              <Music className="w-5 h-5 text-purple-400" />
+              Merge Duplicate Tracks
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Found {trackMergeDuplicates.length} group(s) of duplicate tracks. The first track in each group (most plays) is the merge target. Merging combines play counts, moves all likes/playlists/history to the target, then deletes the duplicate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 max-h-[60vh] overflow-y-auto">
+            {trackMergeDuplicates.length === 0 ? (
+              <div className="text-center py-8 text-zinc-400 text-sm">No duplicate tracks found!</div>
+            ) : (
+              trackMergeDuplicates.map((group: any, gi: number) => (
+                <div key={gi} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-300">Group {gi + 1} — {group.tracks.length} tracks</span>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const targetId = group.tracks[0].id;
+                        for (let i = 1; i < group.tracks.length; i++) {
+                          handleMergeTrack(group.tracks[i].id, targetId);
+                        }
+                      }}
+                      disabled={isMergingTracks}
+                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs h-7 gap-1"
+                    >
+                      <CheckCircle2 className="w-3 h-3" /> Merge All in Group
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {group.tracks.map((track: any, ti: number) => (
+                      <div key={track.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                        <div className="h-9 w-9 rounded-lg overflow-hidden bg-zinc-800 border border-zinc-700 shrink-0">
+                          {track.album?.coverImageUrl ? (
+                            <img src={track.album.coverImageUrl} alt={track.title} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center">
+                              <Music className="h-4 w-4 text-zinc-500" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-white truncate">{track.title}</span>
+                            {ti === 0 && (
+                              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold py-0 px-1.5">TARGET</Badge>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 font-medium">
+                            {track.artist.name} • {track.format} {track.bitRate ? `${track.bitRate}kbps` : ""} • {track.playCount} plays
+                            {track.album ? ` • ${track.album.title}` : ""}
+                          </div>
+                        </div>
+                        {ti > 0 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleMergeTrack(track.id, group.tracks[0].id)}
+                            disabled={isMergingTracks}
+                            className="text-purple-300 hover:text-purple-200 hover:bg-purple-950/50 font-bold text-[10px] h-7 px-2 gap-1 shrink-0"
+                          >
+                            <CheckCircle2 className="w-3 h-3" /> Merge into target
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
+            <Button variant="outline" onClick={() => setShowTrackMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+            {trackMergeDuplicates.length > 0 && (
+              <Button
+                onClick={handleMergeAllTracks}
+                disabled={isMergingTracks}
+                className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg gap-2"
+              >
+                {isMergingTracks ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Merge All ({trackMergeDuplicates.reduce((acc: number, g: any) => acc + g.tracks.length - 1, 0)} tracks)
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
