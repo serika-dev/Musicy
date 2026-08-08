@@ -10,6 +10,27 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.5.0]
+
+### Fixed
+- **Follow status now works on mobile.** The artist detail API was checking
+  follow state via web session only, so mobile clients (API key auth) always
+  saw `isFollowing: false`. The route now checks both web and mobile auth.
+- **Artist banners now display.** `bannerUrl` was missing from the API
+  response on artist detail, artist list, and followed-artists endpoints.
+  Both Android (`DetailHero`) and iOS (`ArtistDetailView`) now render the
+  banner image with a gradient fade into the background.
+- **iOS followed artists list stays in sync.** `LibraryStore.setFollowing`
+  now adds the artist to `followedArtists` when following (previously only
+  removed on unfollow).
+
+### Added
+- **Admin rendition backfill endpoint** (`POST /api/admin/renditions`) to
+  generate multi-quality audio renditions for all tracks missing them.
+  `GET /api/admin/renditions` returns coverage stats.
+
+---
+
 ## [1.4.0]
 
 ### Added
