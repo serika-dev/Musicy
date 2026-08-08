@@ -1,6 +1,6 @@
 [phases.setup]
 # ffmpeg is required for generating streaming-quality renditions (transcode.ts)
-nixPkgs = ["...", "bun", "ffmpeg"]
+nixPkgs = ["...", "bun", "ffmpeg", "ffprobe"]
 
 [phases.install]
 cmds = ["bun install"]
