@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -53,6 +54,11 @@ class MusicyRepository private constructor(context: Context) {
     init {
         scope.launch { serverConfigStore.config.collect { _config.value = it } }
         scope.launch { settingsStore.settings.collect { _settings.value = it } }
+        // Blocking but one-time and cheap (a single directory listing): callers
+        // that skip the UI entirely (Android Auto, a restored playback service)
+        // must not build a queue before this finishes, or playbackUrl() reads an
+        // empty index and streams tracks that are already downloaded.
+        runBlocking(Dispatchers.IO) { downloadStore.warmUp() }
     }
 
     val api: MusicyApi get() = ApiClient.create(_config.value)

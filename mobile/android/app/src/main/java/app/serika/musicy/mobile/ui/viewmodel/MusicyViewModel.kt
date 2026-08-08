@@ -125,11 +125,9 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     init {
         player.connect()
         mirrorSyncClient()
-        viewModelScope.launch {
-            // Off the main thread, before any queue is built.
-            withContext(Dispatchers.IO) { repo.downloadStore.warmUp() }
-            repo.pullAccountSettings()
-        }
+        // Download index is warmed synchronously when MusicyRepository is
+        // constructed, so playbackUrl() already prefers local files here.
+        viewModelScope.launch { repo.pullAccountSettings() }
         viewModelScope.launch { repo.ensureLikedIdsLoaded() }
         loadHome()
         loadLibrary()
