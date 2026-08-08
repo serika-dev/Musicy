@@ -25,18 +25,40 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const { id } = await params
-    const { title, description, coverImageUrl, genre, isPublic, albumType } = await request.json()
+    const { title, description, coverImageUrl, genre, isPublic, albumType, releaseDate, artistId } = await request.json()
+
+    // If changing artist, check unique constraint [title, artistId]
+    if (artistId) {
+      const existing = await prisma.album.findFirst({
+        where: {
+          title: { equals: title || '', mode: 'insensitive' },
+          artistId,
+          id: { not: id },
+        },
+      })
+      if (existing) {
+        return NextResponse.json({ message: 'An album with this title already exists for that artist' }, { status: 409 })
+      }
+    }
+
+    const updateData: any = {
+      ...(title !== undefined && { title: title?.trim() || undefined }),
+      ...(description !== undefined && { description: description || null }),
+      ...(coverImageUrl !== undefined && { coverImageUrl: coverImageUrl || null }),
+      ...(genre !== undefined && { genre: genre || null }),
+      ...(typeof isPublic === 'boolean' && { isPublic }),
+      ...(albumType && { albumType }),
+      ...(artistId !== undefined && { artistId: artistId || undefined }),
+    }
+
+    // Handle releaseDate - allow null to unset
+    if (releaseDate !== undefined) {
+      updateData.releaseDate = releaseDate ? new Date(releaseDate) : null
+    }
 
     const updatedAlbum = await prisma.album.update({
       where: { id },
-      data: {
-        ...(title && { title: title.trim() }),
-        ...(description !== undefined && { description: description || null }),
-        ...(coverImageUrl !== undefined && { coverImageUrl: coverImageUrl || null }),
-        ...(genre !== undefined && { genre: genre || null }),
-        ...(typeof isPublic === 'boolean' && { isPublic }),
-        ...(albumType && { albumType }),
-      },
+      data: updateData,
     })
 
     return NextResponse.json(updatedAlbum)

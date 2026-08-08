@@ -481,6 +481,10 @@ export default function AdminPage() {
     genre: "",
     year: "",
     trackNumber: "",
+    artistId: "",
+    albumId: "",
+    coverImageUrl: "",
+    isPublic: true,
   });
   const [isUpdatingTrack, setIsUpdatingTrack] = useState(false);
 
@@ -493,6 +497,8 @@ export default function AdminPage() {
     genre: "",
     albumType: "ALBUM",
     isPublic: true,
+    releaseDate: "",
+    artistId: "",
   });
   const [isUpdatingAlbum, setIsUpdatingAlbum] = useState(false);
 
@@ -1020,14 +1026,41 @@ export default function AdminPage() {
   };
 
   // Track editing handlers
-  const handleEditTrackClick = (track: any) => {
+  const handleEditTrackClick = async (track: any) => {
     setEditingTrack(track);
     setEditTrackForm({
       title: track.title || "",
       genre: track.genre || "",
       year: track.year ? String(track.year) : "",
       trackNumber: track.trackNumber ? String(track.trackNumber) : "",
+      artistId: track.artist?.id || "",
+      albumId: track.album?.id || "",
+      coverImageUrl: track.coverImageUrl || "",
+      isPublic: track.isPublic ?? true,
     });
+    // Load artists and albums for dropdowns if not already loaded
+    if (availableArtists.length === 0) {
+      try {
+        const response = await fetch("/api/admin/artists-list");
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableArtists(data.artists || []);
+        }
+      } catch (error) {
+        console.error("Error loading artists:", error);
+      }
+    }
+    if (availableAlbums.length === 0) {
+      try {
+        const response = await fetch("/api/admin/albums-list");
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableAlbums(data.albums || []);
+        }
+      } catch (error) {
+        console.error("Error loading albums:", error);
+      }
+    }
   };
 
   const handleUpdateTrack = async () => {
@@ -1043,6 +1076,10 @@ export default function AdminPage() {
           genre: editTrackForm.genre || null,
           year: editTrackForm.year ? parseInt(editTrackForm.year) : null,
           trackNumber: editTrackForm.trackNumber ? parseInt(editTrackForm.trackNumber) : null,
+          artistId: editTrackForm.artistId || undefined,
+          albumId: editTrackForm.albumId || null,
+          coverImageUrl: editTrackForm.coverImageUrl || null,
+          isPublic: editTrackForm.isPublic,
         }),
       });
 
@@ -1063,7 +1100,7 @@ export default function AdminPage() {
   };
 
   // Album editing handlers
-  const handleEditAlbumClick = (album: any) => {
+  const handleEditAlbumClick = async (album: any) => {
     setEditingAlbum(album);
     setEditAlbumForm({
       title: album.title || "",
@@ -1072,7 +1109,21 @@ export default function AdminPage() {
       genre: album.genre || "",
       albumType: album.albumType || "ALBUM",
       isPublic: album.isPublic ?? true,
+      releaseDate: album.releaseDate ? new Date(album.releaseDate).toISOString().split('T')[0] : "",
+      artistId: album.artist?.id || "",
     });
+    // Load artists for dropdown if not already loaded
+    if (availableArtists.length === 0) {
+      try {
+        const response = await fetch("/api/admin/artists-list");
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableArtists(data.artists || []);
+        }
+      } catch (error) {
+        console.error("Error loading artists:", error);
+      }
+    }
   };
 
   const handleUpdateAlbum = async () => {
@@ -1083,7 +1134,11 @@ export default function AdminPage() {
       const response = await fetch(`/api/admin/albums/${editingAlbum.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editAlbumForm),
+        body: JSON.stringify({
+          ...editAlbumForm,
+          releaseDate: editAlbumForm.releaseDate || null,
+          artistId: editAlbumForm.artistId || undefined,
+        }),
       });
 
       if (response.ok) {
@@ -1936,6 +1991,9 @@ export default function AdminPage() {
               placeholder="Search tracks by title, artist, genre..."
             />
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <Button variant="outline" size="sm" onClick={handleScanDuplicateTracks} disabled={isMergingTracks} className="border-purple-600/40 bg-purple-950/30 hover:bg-purple-900/30 text-purple-300 font-semibold gap-2 h-10 px-4">
+                <Music className={cn("h-3.5 w-3.5", isMergingTracks && "animate-spin")} /> Merge Duplicates
+              </Button>
               <Button onClick={() => setActiveTab("upload")} className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-2 shrink-0 h-10 px-4">
                 <Plus className="w-4 h-4" /> Add Track
               </Button>
@@ -3221,6 +3279,34 @@ export default function AdminPage() {
               />
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-zinc-200">Artist *</Label>
+              <select
+                value={editTrackForm.artistId}
+                onChange={(e) => setEditTrackForm({ ...editTrackForm, artistId: e.target.value })}
+                className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+              >
+                <option value="">Select artist...</option>
+                {availableArtists.map((artist: any) => (
+                  <option key={artist.id} value={artist.id}>{artist.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-zinc-200">Album</Label>
+              <select
+                value={editTrackForm.albumId}
+                onChange={(e) => setEditTrackForm({ ...editTrackForm, albumId: e.target.value })}
+                className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+              >
+                <option value="">No album (single)</option>
+                {availableAlbums.map((album: any) => (
+                  <option key={album.id} value={album.id}>{album.title} — {album.artist?.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-zinc-200">Genre</Label>
@@ -3248,6 +3334,25 @@ export default function AdminPage() {
                   className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
                 />
               </div>
+            </div>
+
+            <ImageUrlOrUploadField
+              label="Cover Image (optional, overrides album cover)"
+              value={editTrackForm.coverImageUrl}
+              onChange={(url) => setEditTrackForm({ ...editTrackForm, coverImageUrl: url })}
+              type="playlist"
+              placeholder="https://example.com/cover.jpg"
+            />
+
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-bold text-white">Public Visibility</Label>
+                <p className="text-xs text-zinc-400 font-medium">Visible to all users when enabled</p>
+              </div>
+              <Switch
+                checked={editTrackForm.isPublic}
+                onCheckedChange={(val) => setEditTrackForm({ ...editTrackForm, isPublic: val })}
+              />
             </div>
           </div>
 
@@ -3281,6 +3386,20 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-zinc-200">Artist *</Label>
+              <select
+                value={editAlbumForm.artistId}
+                onChange={(e) => setEditAlbumForm({ ...editAlbumForm, artistId: e.target.value })}
+                className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+              >
+                <option value="">Select artist...</option>
+                {availableArtists.map((artist: any) => (
+                  <option key={artist.id} value={artist.id}>{artist.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
               <Label className="text-xs font-bold text-zinc-200">Description</Label>
               <Textarea
                 value={editAlbumForm.description}
@@ -3309,9 +3428,41 @@ export default function AdminPage() {
                   <option value="ALBUM">ALBUM</option>
                   <option value="EP">EP</option>
                   <option value="SINGLE">SINGLE</option>
+                  <option value="COMPILATION">COMPILATION</option>
                   <option value="MIXTAPE">MIXTAPE</option>
                 </select>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-zinc-200">Genre</Label>
+                <Input
+                  value={editAlbumForm.genre}
+                  onChange={(e) => setEditAlbumForm({ ...editAlbumForm, genre: e.target.value })}
+                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-zinc-200">Release Date</Label>
+                <Input
+                  type="date"
+                  value={editAlbumForm.releaseDate}
+                  onChange={(e) => setEditAlbumForm({ ...editAlbumForm, releaseDate: e.target.value })}
+                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-bold text-white">Public Visibility</Label>
+                <p className="text-xs text-zinc-400 font-medium">Visible to all users when enabled</p>
+              </div>
+              <Switch
+                checked={editAlbumForm.isPublic}
+                onCheckedChange={(val) => setEditAlbumForm({ ...editAlbumForm, isPublic: val })}
+              />
             </div>
           </div>
 

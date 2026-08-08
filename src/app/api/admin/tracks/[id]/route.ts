@@ -26,22 +26,50 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const { id } = await params
-    const { isPublic, title, genre, year } = await request.json()
+    const { isPublic, title, genre, year, trackNumber, artistId, albumId, coverImageUrl } = await request.json()
+
+    // If changing artist, check unique constraint [title, artistId]
+    if (artistId) {
+      const existing = await prisma.track.findFirst({
+        where: {
+          title: { equals: title || '', mode: 'insensitive' },
+          artistId,
+          id: { not: id },
+        },
+      })
+      if (existing) {
+        return NextResponse.json({ message: 'A track with this title already exists for that artist' }, { status: 409 })
+      }
+    }
+
+    const updateData: any = {
+      ...(typeof isPublic === 'boolean' && { isPublic }),
+      ...(title !== undefined && { title: title?.trim() || undefined }),
+      ...(genre !== undefined && { genre: genre || null }),
+      ...(year !== undefined && { year: year ? parseInt(String(year)) : null }),
+      ...(trackNumber !== undefined && { trackNumber: trackNumber ? parseInt(String(trackNumber)) : null }),
+      ...(artistId !== undefined && { artistId: artistId || undefined }),
+      ...(coverImageUrl !== undefined && { coverImageUrl: coverImageUrl || null }),
+    }
+
+    // Handle albumId separately - allow null to unset album
+    if (albumId !== undefined) {
+      updateData.albumId = albumId || null
+    }
 
     const updatedTrack = await prisma.track.update({
       where: { id },
-      data: {
-        ...(typeof isPublic === 'boolean' && { isPublic }),
-        ...(title && { title }),
-        ...(genre && { genre }),
-        ...(year && { year: parseInt(year) }),
-      },
+      data: updateData,
       select: {
         id: true,
         title: true,
         isPublic: true,
         genre: true,
         year: true,
+        trackNumber: true,
+        artistId: true,
+        albumId: true,
+        coverImageUrl: true,
       },
     })
 
