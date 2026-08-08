@@ -615,24 +615,32 @@ export default function AdminPage() {
     }
   }, [activeTab]);
 
-  // Load rendition stats when overview tab is active
+  // Load rendition stats when renditions tab is active, and auto-poll while backfill is running
   useEffect(() => {
-    if (activeTab !== "overview") return;
+    if (activeTab !== "renditions") return;
+    let interval: ReturnType<typeof setInterval> | undefined;
     const loadRenditionStats = async () => {
-      setRenditionLoading(true);
       try {
         const res = await fetch("/api/admin/renditions");
         if (res.ok) {
           const data = await res.json();
           setRenditionStats(data);
+          // Keep polling while any tracks are in "processing" or "pending" state
+          const active = (data.coverage?.processing ?? 0) + (data.coverage?.pending ?? 0);
+          if (active > 0 && !interval) {
+            interval = setInterval(loadRenditionStats, 3000);
+          } else if (active === 0 && interval) {
+            clearInterval(interval);
+            interval = undefined;
+          }
         }
       } catch (e) {
         console.error("Error loading rendition stats:", e);
-      } finally {
-        setRenditionLoading(false);
       }
     };
-    loadRenditionStats();
+    setRenditionLoading(true);
+    loadRenditionStats().finally(() => setRenditionLoading(false));
+    return () => { if (interval) clearInterval(interval); };
   }, [activeTab]);
 
   // Load system settings on mount
@@ -1298,6 +1306,7 @@ export default function AdminPage() {
               { value: "collabs", label: "Collabs", icon: Users, badge: collabsData?.total },
               { value: "albums", label: "Albums", icon: AlbumIcon, badge: albumsData?.total },
               { value: "upload", label: "Upload", icon: Upload },
+              { value: "renditions", label: "Renditions", icon: FileMusic },
               { value: "settings", label: "Settings", icon: Settings },
             ].map(({ value, label, icon: Icon, badge }) => (
               <TabsTrigger
@@ -1455,8 +1464,11 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
 
-          {/* Rendition Backfill */}
+        {/* 🎵 RENDITIONS TAB */}
+        <TabsContent value="renditions" className="space-y-6">
+          {/* Stats + Actions */}
           <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
             <CardHeader className="border-b border-zinc-800 pb-4">
               <CardTitle className="text-lg font-extrabold text-white flex items-center gap-2">
@@ -1468,14 +1480,19 @@ export default function AdminPage() {
             <CardContent className="space-y-4 pt-4">
               {renditionStats ? (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  {/* Coverage stats grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30">
                       <span className="text-zinc-400 block mb-1 font-semibold">Ready</span>
                       <span className="font-bold text-emerald-400 text-lg">{renditionStats.coverage?.ready ?? 0}</span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30">
+                      <span className="text-zinc-400 block mb-1 font-semibold">Processing</span>
+                      <span className="font-bold text-amber-400 text-lg">{renditionStats.coverage?.processing ?? 0}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-blue-500/30">
                       <span className="text-zinc-400 block mb-1 font-semibold">Pending</span>
-                      <span className="font-bold text-amber-400 text-lg">{renditionStats.coverage?.pending ?? 0}</span>
+                      <span className="font-bold text-blue-400 text-lg">{renditionStats.coverage?.pending ?? 0}</span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950 border border-rose-500/30">
                       <span className="text-zinc-400 block mb-1 font-semibold">Failed</span>
@@ -1486,6 +1503,42 @@ export default function AdminPage() {
                       <span className="font-bold text-white text-lg">{renditionStats.coverage?.none ?? 0}</span>
                     </div>
                   </div>
+
+                  {/* Progress bar */}
+                  {(() => {
+                    const total = renditionStats.total || 1;
+                    const ready = renditionStats.coverage?.ready ?? 0;
+                    const processing = renditionStats.coverage?.processing ?? 0;
+                    const pending = renditionStats.coverage?.pending ?? 0;
+                    const failed = renditionStats.coverage?.failed ?? 0;
+                    const done = ready + failed;
+                    const active = processing + pending;
+                    const pct = Math.round((done / total) * 100);
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-zinc-300">
+                            {active > 0 ? `Processing… ${done}/${total} done` : `Complete: ${ready}/${total} ready`}
+                          </span>
+                          <span className="font-bold text-white">{pct}%</span>
+                        </div>
+                        <div className="h-3 rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        {active > 0 && (
+                          <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            Auto-refreshing every 3s while tracks are being processed…
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Summary row */}
                   <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800">
                     <div className="text-xs text-zinc-400">
                       <span className="font-semibold">Total tracks:</span> <span className="font-bold text-white">{renditionStats.total}</span>
@@ -1500,6 +1553,8 @@ export default function AdminPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Action buttons */}
                   <div className="flex items-center gap-3">
                     <Button
                       size="sm"
@@ -1511,6 +1566,9 @@ export default function AdminPage() {
                           if (res.ok) {
                             const data = await res.json();
                             toast.success(data.message);
+                            // Immediately re-fetch stats to start polling
+                            const statRes = await fetch("/api/admin/renditions");
+                            if (statRes.ok) setRenditionStats(await statRes.json());
                           } else {
                             toast.error("Failed to start backfill");
                           }
@@ -1536,6 +1594,8 @@ export default function AdminPage() {
                           if (res.ok) {
                             const data = await res.json();
                             toast.success(data.message);
+                            const statRes = await fetch("/api/admin/renditions");
+                            if (statRes.ok) setRenditionStats(await statRes.json());
                           } else {
                             toast.error("Failed to start full regeneration");
                           }
@@ -1550,11 +1610,47 @@ export default function AdminPage() {
                       <RefreshCw className="w-4 h-4" />
                       Regenerate All
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        setRenditionLoading(true);
+                        try {
+                          const res = await fetch("/api/admin/renditions");
+                          if (res.ok) setRenditionStats(await res.json());
+                        } finally {
+                          setRenditionLoading(false);
+                        }
+                      }}
+                      className="text-zinc-400 hover:text-white font-semibold gap-1.5"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${renditionLoading ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
                   </div>
                 </>
               ) : (
                 <div className="text-xs text-zinc-500 py-2">Loading rendition stats…</div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* What are renditions? Info card */}
+          <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
+            <CardHeader className="border-b border-zinc-800 pb-4">
+              <CardTitle className="text-base font-extrabold text-white">How it works</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4 text-xs text-zinc-400 leading-relaxed">
+              <p>Each track is transcoded into multiple quality tiers on upload using <span className="font-bold text-white">ffmpeg</span>:</p>
+              <ul className="space-y-1.5 ml-4">
+                <li className="flex items-center gap-2"><Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold">lossless</Badge> FLAC — bit-for-bit identical to source</li>
+                <li className="flex items-center gap-2"><Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[10px] font-bold">high</Badge> MP3 320 kbps</li>
+                <li className="flex items-center gap-2"><Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] font-bold">medium</Badge> MP3 192 kbps</li>
+                <li className="flex items-center gap-2"><Badge className="bg-zinc-500/20 text-zinc-300 border-zinc-500/40 text-[10px] font-bold">low</Badge> MP3 128 kbps</li>
+              </ul>
+              <p className="pt-1">Mobile clients pick a tier via the <code className="text-purple-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[11px]">audioQuality</code> setting and stream through <code className="text-purple-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[11px]">/api/tracks/&#123;id&#125;/stream?quality=</code>, which 302-redirects to the matching rendition (falling back to the original when none exists).</p>
+              <p className="pt-1"><span className="font-bold text-amber-400">Backfill Missing</span> generates renditions for tracks with no, failed, or pending status. <span className="font-bold text-white">Regenerate All</span> force-regenerates every track, even those already marked ready.</p>
+              <p className="pt-1 text-zinc-500">Processing runs sequentially in the background via Next.js <code className="text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded text-[11px]">after()</code>. The progress bar auto-refreshes every 3 seconds while tracks are being processed.</p>
             </CardContent>
           </Card>
         </TabsContent>
