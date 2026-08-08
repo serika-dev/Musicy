@@ -46,11 +46,35 @@ export async function GET(
 
   // Pick the requested quality rendition (defaults to the original/lossless).
   const requestedQuality = new URL(req.url).searchParams.get("quality");
-  const rendition = requestedQuality
-    ? track.renditions.find((r) => r.quality === requestedQuality)
-    : undefined;
-  const sourceUrl = rendition?.filePath || track.filePath;
-  const sourceFormat = rendition?.format || track.format;
+  const renditions = track.renditions;
+  let sourceUrl = track.filePath;
+  let sourceFormat = track.format;
+
+  if (requestedQuality && renditions.length > 0) {
+    // Try exact match, then fallback to lower quality, then higher.
+    const QUALITY_ORDER = ["lossless", "high", "medium", "low"];
+    const idx = QUALITY_ORDER.indexOf(requestedQuality);
+    if (idx >= 0) {
+      const byQuality = new Map(renditions.map(r => [r.quality, r]));
+      const exact = byQuality.get(requestedQuality);
+      if (exact) {
+        sourceUrl = exact.filePath;
+        sourceFormat = exact.format;
+      } else {
+        // Try lower tiers first, then higher.
+        for (let i = idx + 1; i < QUALITY_ORDER.length; i++) {
+          const r = byQuality.get(QUALITY_ORDER[i]);
+          if (r) { sourceUrl = r.filePath; sourceFormat = r.format; break; }
+        }
+        if (sourceUrl === track.filePath) {
+          for (let i = idx - 1; i >= 0; i--) {
+            const r = byQuality.get(QUALITY_ORDER[i]);
+            if (r) { sourceUrl = r.filePath; sourceFormat = r.format; break; }
+          }
+        }
+      }
+    }
+  }
 
   // Fetch from B2/R2 and stream back to the client
   const upstream = await fetch(sourceUrl);

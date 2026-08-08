@@ -304,8 +304,7 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     // -- actions ------------------------------------------------------------
 
     fun play(tracks: List<Track>, startIndex: Int = 0, contextId: String? = null) {
-        val playable = tracks.filter { !it.filePath.isNullOrBlank() }
-        if (playable.isEmpty()) {
+        if (tracks.isEmpty()) {
             showToast("Nothing playable here yet")
             return
         }
@@ -322,12 +321,11 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         play(mix.tracks.orEmpty(), startIndex, MusicyLibrary.mixId(mix.id))
 
     fun shuffle(tracks: List<Track>, contextId: String? = null) {
-        val playable = tracks.filter { !it.filePath.isNullOrBlank() }
-        if (playable.isEmpty()) {
+        if (tracks.isEmpty()) {
             showToast("Nothing playable here yet")
             return
         }
-        player.play(playable.shuffled(), 0, contextId)
+        player.play(tracks.shuffled(), 0, contextId)
     }
 
     fun toggleLike(track: Track) {

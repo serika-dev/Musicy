@@ -78,6 +78,15 @@ final class MusicyAPI: ObservableObject {
         return URL(string: "\(base)/api/tracks/\(trackId)/stream?quality=\(q)")
     }
 
+    /// Quality-aware download URL. Streams the file through the server proxy
+    /// (avoids CORS issues with B2/R2 and respects quality selection).
+    func downloadURL(trackId: String, quality: String) -> URL? {
+        let base = normalizedBaseURL
+        guard !base.isEmpty else { return nil }
+        let q = quality.isEmpty ? "auto" : quality
+        return URL(string: "\(base)/api/tracks/\(trackId)/download?quality=\(q)")
+    }
+
     func makeRequest(path: String, method: String = "GET", body: Data? = nil) -> URLRequest? {
         guard let url = fullURL(path: path) else { return nil }
         var request = URLRequest(url: url)

@@ -89,7 +89,10 @@ class DownloadStore(context: Context) {
         withContext(Dispatchers.IO) {
             runCatching {
                 val extension = track.format?.lowercase()?.takeIf { it.isNotBlank() }
-                    ?: remoteUrl.substringAfterLast('.', "").substringBefore('?').ifBlank { "mp3" }
+                    ?: run {
+                        val path = remoteUrl.substringBefore('?').substringAfterLast('/')
+                        path.substringAfterLast('.', "").ifBlank { "mp3" }
+                    }
                 val target = File(directory, "${track.id}.$extension")
                 val request = Request.Builder().url(remoteUrl).build()
                 client.newCall(request).execute().use { response ->

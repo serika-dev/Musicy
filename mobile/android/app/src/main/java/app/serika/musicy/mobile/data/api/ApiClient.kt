@@ -28,6 +28,7 @@ object ApiClient {
     private val apis = mutableMapOf<ServerConfig, MusicyApi>()
     private val clients = mutableMapOf<ServerConfig, OkHttpClient>()
     private val streamClients = mutableMapOf<ServerConfig, OkHttpClient>()
+    private val downloadClients = mutableMapOf<ServerConfig, OkHttpClient>()
 
     /** `https://host` with no trailing slash. */
     fun normalizedBaseUrl(config: ServerConfig): String =
@@ -97,5 +98,14 @@ object ApiClient {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(MusicyApi::class.java)
+    }
+
+    /**
+     * Dedicated client for file downloads: a 5-minute read timeout so large
+     * FLAC files on a slow connection don't get killed mid-transfer.
+     */
+    @Synchronized
+    fun downloadOkHttp(config: ServerConfig): OkHttpClient = downloadClients.getOrPut(config) {
+        builder(config).readTimeout(5, TimeUnit.MINUTES).build()
     }
 }

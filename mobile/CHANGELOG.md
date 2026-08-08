@@ -10,6 +10,32 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.5.1]
+
+### Fixed
+- **iOS downloads now use the server proxy** instead of hitting B2/R2 directly.
+  This fixes CORS failures and ensures auth headers and quality selection work.
+- **Android downloads now pass the quality parameter** so downloads respect the
+  user's audio quality setting (previously always downloaded the original).
+- **Download file extension extraction fixed** on Android — URLs with query
+  parameters no longer produce invalid file extensions.
+- **Dedicated download HTTP client** with 5-minute timeout on both platforms
+  prevents large FLAC files from timing out mid-download.
+- **Album genre filter now works** — the albums API endpoint was ignoring the
+  `genre` query parameter; it now filters by genre as expected.
+- **Album detail API now supports mobile auth** — previously only web sessions
+  and API keys were checked, so mobile clients couldn't see file paths for
+  private albums.
+- **Tracks without `filePath` are now playable** — the stream endpoint looks up
+  tracks by ID server-side, so the client no longer needs `filePath` to
+  construct the streaming URL. This fixes albums/playlists where some tracks
+  had masked file paths.
+- **Download quality fallback** — if a specific quality rendition doesn't
+  exist, the download endpoint now falls back to the next available tier
+  (matching the stream endpoint's behavior).
+
+---
+
 ## [1.5.0]
 
 ### Fixed

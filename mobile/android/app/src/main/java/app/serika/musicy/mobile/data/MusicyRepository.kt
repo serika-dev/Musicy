@@ -71,7 +71,6 @@ class MusicyRepository private constructor(context: Context) {
      */
     fun playbackUrl(track: Track): String? {
         downloadStore.localUri(track.id)?.let { return it }
-        if (track.filePath.isNullOrBlank()) return null
         val base = ApiClient.normalizedBaseUrl(_config.value)
         val quality = _settings.value.audioQuality.ifBlank { "auto" }
         return "$base/api/tracks/${track.id}/stream?quality=$quality"
@@ -84,8 +83,9 @@ class MusicyRepository private constructor(context: Context) {
     suspend fun download(track: Track): Result<Unit> {
         val config = _config.value
         val base = ApiClient.normalizedBaseUrl(config)
-        val url = "$base/api/tracks/${track.id}/download"
-        return downloadStore.download(track, ApiClient.okHttp(config), url).map { }
+        val quality = _settings.value.audioQuality.ifBlank { "auto" }
+        val url = "$base/api/tracks/${track.id}/download?quality=$quality"
+        return downloadStore.download(track, ApiClient.downloadOkHttp(config), url).map { }
     }
 
     suspend fun removeDownload(trackId: String) = downloadStore.remove(trackId)

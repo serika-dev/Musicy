@@ -8,9 +8,17 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number(searchParams.get('limit')) || 20, 100)
     const offset = Math.max(Number(searchParams.get('offset')) || 0, 0)
     const search = searchParams.get('search')
+    const genre = searchParams.get('genre')
     
     let whereClause: any = {
       isPublic: true
+    }
+    
+    if (genre) {
+      whereClause.genre = {
+        contains: genre,
+        mode: 'insensitive',
+      }
     }
     
     if (search) {

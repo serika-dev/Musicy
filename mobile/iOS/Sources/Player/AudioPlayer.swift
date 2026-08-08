@@ -328,9 +328,7 @@ final class AudioPlayer: ObservableObject {
         let track = queue[currentIndex]
         // Prefer a downloaded copy so offline (and just-faster) playback works;
         // otherwise stream through the quality-aware endpoint.
-        let streamURL = (track.filePath?.isEmpty == false)
-            ? MusicyAPI.shared.streamURL(trackId: track.id, quality: SettingsStore.shared.audioQuality)
-            : nil
+        let streamURL = MusicyAPI.shared.streamURL(trackId: track.id, quality: SettingsStore.shared.audioQuality)
         guard let url = DownloadStore.shared.localURL(track.id) ?? streamURL else { return }
 
         let item = AVPlayerItem(url: url)

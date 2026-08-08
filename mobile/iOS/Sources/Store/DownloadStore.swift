@@ -93,7 +93,11 @@ final class DownloadStore: ObservableObject {
     func download(_ track: Track) async -> Bool {
         let id = track.id
         if isDownloaded(id) || isDownloading(id) { return true }
-        guard let remote = MusicyAPI.shared.absoluteURL(track.filePath) else { return false }
+
+        // Use the server-side download proxy to avoid CORS issues with B2/R2
+        // and to respect the user's quality setting.
+        let quality = await MainActor.run { SettingsStore.shared.audioQuality }
+        guard let remote = MusicyAPI.shared.downloadURL(trackId: id, quality: quality) else { return false }
 
         _ = await MainActor.run { self.downloadingIds.insert(id) }
         defer { Task { @MainActor in self.downloadingIds.remove(id) } }
@@ -105,7 +109,11 @@ final class DownloadStore: ObservableObject {
         }
 
         do {
-            let (tempURL, response) = try await URLSession.shared.download(for: request)
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 300
+            config.timeoutIntervalForResource = 600
+            let session = URLSession(configuration: config)
+            let (tempURL, response) = try await session.download(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode >= 400 { return false }
 
             let dest = directory.appendingPathComponent("\(id).\(fileExtension(for: track, remote: remote))")

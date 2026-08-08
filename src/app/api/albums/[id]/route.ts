@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { validateApiKey } from "@/lib/api-utils"
+import { getAuthSession } from "@/lib/mobile-auth"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -11,8 +12,8 @@ interface RouteContext {
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
-    
     const apiKeyUser = await validateApiKey(request)
+    const mobileSession = await getAuthSession(request)
     // Allow public access for basic metadata (needed for Embeds)
 
     const { id } = await params
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const isAuthorized = session || apiKeyUser;
+    const isAuthorized = session || apiKeyUser || mobileSession;
     
     // Mask file paths for unauthorized access
     const returnedAlbum = {
