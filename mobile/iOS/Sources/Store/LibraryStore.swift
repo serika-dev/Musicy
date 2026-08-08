@@ -120,7 +120,15 @@ final class LibraryStore: ObservableObject {
     func setFollowing(_ artistId: String, follow: Bool) async -> Bool {
         do {
             try await MusicyAPI.shared.setFollowing(id: artistId, follow: follow)
-            if !follow { followedArtists.removeAll { $0.id == artistId } }
+            if follow {
+                if !followedArtists.contains(where: { $0.id == artistId }) {
+                    if let artist = try? await MusicyAPI.shared.getArtist(id: artistId) {
+                        followedArtists.insert(artist, at: 0)
+                    }
+                }
+            } else {
+                followedArtists.removeAll { $0.id == artistId }
+            }
             return follow
         } catch {
             return !follow

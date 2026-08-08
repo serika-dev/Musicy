@@ -71,7 +71,7 @@ export function DownloadButton({ track, className, showLabel = false }: Download
     <Button
       variant="ghost"
       size={showLabel ? "default" : "icon"}
-      onClick={download}
+      onClick={() => download()}
       className={cn("text-white/60 hover:text-white hover:bg-white/10", className)}
     >
       <Download className="h-5 w-5" />

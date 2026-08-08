@@ -191,6 +191,10 @@ model Track {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Streaming quality renditions (transcoded variants)
+  renditionStatus String?          // null | "pending" | "processing" | "ready" | "failed"
+  renditions      TrackRendition[]
+
   // Lyrics support
   lrcId         Int?     // LRCLib ID
   plainLyrics   String?  @db.Text
@@ -217,6 +221,24 @@ model Track {
 
   @@unique([title, artistId])
   @@map("tracks")
+}
+
+// Transcoded quality variants of a track (e.g. lossless FLAC, 320/192/128 kbps MP3)
+model TrackRendition {
+  id         String   @id @default(cuid())
+  trackId    String
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  quality    String   // "lossless" | "high" | "medium" | "low"
+  format     String   // "FLAC" | "MP3"
+  filePath   String   // public B2 URL
+  fileSize   BigInt
+  bitRate    Int?     // kbps (null for lossless)
+  sampleRate Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([trackId, quality])
+  @@index([trackId])
+  @@map("track_renditions")
 }
 
 // Playlist Models

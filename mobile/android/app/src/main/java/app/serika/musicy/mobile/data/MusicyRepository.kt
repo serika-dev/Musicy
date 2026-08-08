@@ -66,10 +66,16 @@ class MusicyRepository private constructor(context: Context) {
 
     /**
      * Where the player should actually stream a track from: the downloaded
-     * copy when one exists, otherwise the server.
+     * copy when one exists, otherwise the quality-aware stream endpoint (which
+     * 302-redirects to the rendition matching the user's chosen quality).
      */
-    fun playbackUrl(track: Track): String? =
-        downloadStore.localUri(track.id) ?: resolveUrl(track.filePath)
+    fun playbackUrl(track: Track): String? {
+        downloadStore.localUri(track.id)?.let { return it }
+        if (track.filePath.isNullOrBlank()) return null
+        val base = ApiClient.normalizedBaseUrl(_config.value)
+        val quality = _settings.value.audioQuality.ifBlank { "auto" }
+        return "$base/api/tracks/${track.id}/stream?quality=$quality"
+    }
 
     fun isDownloaded(trackId: String): Boolean = downloadStore.isDownloaded(trackId)
 

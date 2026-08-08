@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import {
   createContext,
   type ReactNode,
@@ -9,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { AutoplayWarning } from "@/components/autoplay-warning";
 import { WebScrobblerMetadata } from "@/components/web-scrobbler-metadata";
@@ -474,14 +474,18 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         audio.src = objectUrl;
       } else {
         clearLoadedObjectUrl();
-        let audioSrc = currentTrack.filePath;
-        if (audioSrc.includes("?")) {
-          audioSrc = `${audioSrc}&t=${Date.now()}`;
-        } else {
-          audioSrc = `${audioSrc}?t=${Date.now()}`;
-        }
+        // Stream through our quality-aware endpoint, which 302-redirects to the
+        // rendition matching the user's chosen quality (falls back to the
+        // original when no renditions exist yet).
+        const quality = settings.audioQuality || "auto";
+        const audioSrc = `/api/tracks/${currentTrack.id}/stream?quality=${encodeURIComponent(
+          quality,
+        )}&t=${Date.now()}`;
         audio.src = audioSrc;
-        console.log("🌐 Loading track from network:", currentTrack.title);
+        console.log(
+          `🌐 Loading track from network (${quality}):`,
+          currentTrack.title,
+        );
       }
 
       loadedTrackIdRef.current = currentTrack.id;
@@ -938,7 +942,16 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         payload: { action: "claim" },
       });
     },
-    [deviceId, syncPublish, isActiveDevice, isPlaying, currentTime, duration, queue, currentIndex],
+    [
+      deviceId,
+      syncPublish,
+      isActiveDevice,
+      isPlaying,
+      currentTime,
+      duration,
+      queue,
+      currentIndex,
+    ],
   );
 
   // React to a dedicated "transfer" command (handled above could be extended)
@@ -973,23 +986,35 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         .then((res) => res.json())
         .then((data) => {
           const sys = data.settings || {};
-          const allowAnon = sys.ALLOW_ANONYMOUS_PLAYBACK !== "false" && sys.allow_anonymous_playback !== "false";
-          const reqEmail = sys.REQUIRE_EMAIL_VERIFICATION === "true" || sys.require_email_verification === "true";
+          const allowAnon =
+            sys.ALLOW_ANONYMOUS_PLAYBACK !== "false" &&
+            sys.allow_anonymous_playback !== "false";
+          const reqEmail =
+            sys.REQUIRE_EMAIL_VERIFICATION === "true" ||
+            sys.require_email_verification === "true";
 
           if (!session?.user && !allowAnon) {
             toast.error("Guest Playback Disabled", {
-              description: "Public audio streaming is disabled by system administrator. Please log in to listen.",
+              description:
+                "Public audio streaming is disabled by system administrator. Please log in to listen.",
               action: {
                 label: "Log in",
-                onClick: () => { window.location.href = "/login"; },
+                onClick: () => {
+                  window.location.href = "/login";
+                },
               },
             });
             return;
           }
 
-          if (session?.user && reqEmail && !(session.user as any)?.emailVerified) {
+          if (
+            session?.user &&
+            reqEmail &&
+            !(session.user as any)?.emailVerified
+          ) {
             toast.error("Email Verification Required", {
-              description: "Email verification is required by system administrator before playing tracks.",
+              description:
+                "Email verification is required by system administrator before playing tracks.",
             });
             return;
           }

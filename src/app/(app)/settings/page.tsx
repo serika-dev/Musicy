@@ -629,7 +629,7 @@ export default function SettingsPage() {
               <CardContent className="divide-y divide-border">
                 <SettingRow
                   title="Streaming quality"
-                  description="Higher quality uses more bandwidth"
+                  description="Low 128 · Med 192 · High 320 kbps MP3 · Lossless FLAC. Higher quality uses more bandwidth."
                 >
                   <SegmentedControl
                     value={settings.audioQuality}

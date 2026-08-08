@@ -65,11 +65,16 @@ function absoluteUrl(url?: string | null) {
 
 export async function downloadTrackNatively(
   track: Track,
+  quality?: string,
 ): Promise<NativeDownloadResult | null> {
   if (!isNativeDownloadsAvailable()) return null;
 
-  // Use the server-side proxy to avoid CORS issues with B2/R2
-  const sourceUrl = absoluteUrl(`/api/tracks/${track.id}/download`);
+  // Use the server-side proxy to avoid CORS issues with B2/R2.
+  // No quality → original/lossless file (best for offline).
+  const path = quality
+    ? `/api/tracks/${track.id}/download?quality=${encodeURIComponent(quality)}`
+    : `/api/tracks/${track.id}/download`;
+  const sourceUrl = absoluteUrl(path);
   if (!sourceUrl) return null;
 
   try {

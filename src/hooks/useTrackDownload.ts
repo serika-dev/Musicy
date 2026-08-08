@@ -28,14 +28,18 @@ export function useTrackDownload(track: Track | null) {
     checkStatus();
   }, [checkStatus]);
 
-  const download = async () => {
+  const download = async (quality?: string) => {
     if (!track) return;
     setIsDownloading(true);
     setProgress(10);
 
     try {
-      // 1. Fetch the audio file through our server-side proxy to avoid CORS
-      const response = await fetch(`/api/tracks/${track.id}/download`);
+      // 1. Fetch the audio file through our server-side proxy to avoid CORS.
+      //    No quality → original/lossless (best for offline).
+      const downloadUrl = quality
+        ? `/api/tracks/${track.id}/download?quality=${encodeURIComponent(quality)}`
+        : `/api/tracks/${track.id}/download`;
+      const response = await fetch(downloadUrl);
       if (!response.ok) throw new Error("Failed to fetch track audio");
 
       const reader = response.body?.getReader();
@@ -62,7 +66,7 @@ export function useTrackDownload(track: Track | null) {
 
       // 2. Save to native app storage when available so Android Auto can browse it.
       setProgress(95);
-      const nativeDownload = await downloadTrackNatively(track);
+      const nativeDownload = await downloadTrackNatively(track, quality);
 
       // 3. Save to IndexedDB for web/PWA playback and offline UI.
       await saveTrackOffline(track, blob, {

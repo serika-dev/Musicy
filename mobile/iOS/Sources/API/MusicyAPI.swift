@@ -69,6 +69,15 @@ final class MusicyAPI: ObservableObject {
         return URL(string: value.hasPrefix("/") ? base + value : "\(base)/\(value)")
     }
 
+    /// Quality-aware streaming URL. The endpoint 302-redirects to the rendition
+    /// matching `quality` (falling back to the original when none exist yet).
+    func streamURL(trackId: String, quality: String) -> URL? {
+        let base = normalizedBaseURL
+        guard !base.isEmpty else { return nil }
+        let q = quality.isEmpty ? "auto" : quality
+        return URL(string: "\(base)/api/tracks/\(trackId)/stream?quality=\(q)")
+    }
+
     func makeRequest(path: String, method: String = "GET", body: Data? = nil) -> URLRequest? {
         guard let url = fullURL(path: path) else { return nil }
         var request = URLRequest(url: url)

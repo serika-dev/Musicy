@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { uploadFileToR2, uploadFileToR2Direct, uploadLargeFileToR2, generateAudioFileKey } from '@/lib/r2-client'
+import { ensureRenditions } from '@/lib/rendition-service'
 import * as musicMetadata from 'music-metadata'
 
 // Configure Next.js for large file uploads
@@ -337,6 +338,7 @@ export async function POST(request: NextRequest) {
           connect: featuredArtists.map(f => ({ id: f.id }))
         } : undefined,
         albumId: album?.id || null,
+        renditionStatus: 'pending',
       },
       include: {
         artist: {
@@ -497,6 +499,13 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`🎉 Successfully uploaded track: ${finalData.title} by ${finalData.artistName}`)
+
+    // Generate quality renditions in the background.
+    after(() =>
+      ensureRenditions(track.id).catch((e) =>
+        console.error('[upload-auto] rendition generation failed:', e)
+      )
+    )
 
     // Convert BigInt fields to strings for JSON serialization
     const serializedTrack = {

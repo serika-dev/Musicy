@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
           altNames: true,
           bio: true,
           imageUrl: true,
+          bannerUrl: true,
           verified: true,
           _count: {
             select: {

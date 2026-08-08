@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { uploadFileToR2, generateAudioFileKey } from '@/lib/r2-client'
+import { ensureRenditions } from '@/lib/rendition-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -171,7 +172,8 @@ export async function POST(request: NextRequest) {
         isPublic: isPublic,
         artistId: artist.id,
         albumId: album?.id || null,
-        
+        renditionStatus: 'pending',
+
         // Lyrics data
         lrcId: lrcId ? parseInt(lrcId) : null,
         plainLyrics: plainLyrics || null,
@@ -228,6 +230,14 @@ export async function POST(request: NextRequest) {
         }
       }
     })
+
+    // Generate lower-quality + lossless renditions in the background so the
+    // response returns immediately.
+    after(() =>
+      ensureRenditions(track.id).catch((e) =>
+        console.error('[upload] rendition generation failed:', e)
+      )
+    )
 
     return NextResponse.json({
       message: 'Track uploaded successfully',

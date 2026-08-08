@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { validateApiKey } from "@/lib/api-utils";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getAuthSession } from "@/lib/mobile-auth";
-import { validateApiKey } from "@/lib/api-utils";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,14 @@ export async function GET(
 
   const track = await prisma.track.findUnique({
     where: { id },
-    select: { id: true, title: true, filePath: true, format: true, fileSize: true },
+    select: {
+      id: true,
+      title: true,
+      filePath: true,
+      format: true,
+      fileSize: true,
+      renditions: { select: { quality: true, format: true, filePath: true } },
+    },
   });
 
   if (!track) {
@@ -37,8 +44,16 @@ export async function GET(
     return NextResponse.json({ error: "No file available" }, { status: 404 });
   }
 
+  // Pick the requested quality rendition (defaults to the original/lossless).
+  const requestedQuality = new URL(req.url).searchParams.get("quality");
+  const rendition = requestedQuality
+    ? track.renditions.find((r) => r.quality === requestedQuality)
+    : undefined;
+  const sourceUrl = rendition?.filePath || track.filePath;
+  const sourceFormat = rendition?.format || track.format;
+
   // Fetch from B2/R2 and stream back to the client
-  const upstream = await fetch(track.filePath);
+  const upstream = await fetch(sourceUrl);
   if (!upstream.ok) {
     return NextResponse.json(
       { error: `Upstream error: ${upstream.status}` },
@@ -46,11 +61,10 @@ export async function GET(
     );
   }
 
-  const contentType =
-    upstream.headers.get("content-type") || "audio/mpeg";
+  const contentType = upstream.headers.get("content-type") || "audio/mpeg";
   const contentLength = upstream.headers.get("content-length");
 
-  const extension = track.format?.toLowerCase() || "mp3";
+  const extension = sourceFormat?.toLowerCase() || "mp3";
   const filename = `${track.title.replace(/[^a-zA-Z0-9]/g, "_")}.${extension}`;
 
   const headers = new Headers({

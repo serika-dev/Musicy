@@ -109,6 +109,32 @@ struct ArtistDetailView: View {
         AsyncContent(load: { try await MusicyAPI.shared.getArtist(id: artistId) }) { artist in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
+                    // Artist banner: wide image with gradient fade into the background.
+                    if let banner = artist.bannerUrl, let bannerURL = MusicyAPI.shared.absoluteURL(banner) {
+                        ZStack(alignment: .bottom) {
+                            AsyncImage(url: bannerURL) { phase in
+                                if let image = phase.image {
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } else {
+                                    LinearGradient(
+                                        colors: [Color.accentColor.opacity(0.35), Color("Surface")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                }
+                            }
+                            .frame(height: 200)
+                            .clipped()
+
+                            LinearGradient(
+                                colors: [.clear, Color("Surface")],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 80)
+                        }
+                    }
+
                     DetailHeader(
                         title: artist.name,
                         subtitle: artist.verified == true ? "Verified artist" : "Artist",

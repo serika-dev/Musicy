@@ -26,6 +26,21 @@ Before setting up Musicy, ensure you have the following installed:
 - **Redis** 6 or higher
 - **Git**
 - **Backblaze B2 account** (or S3-compatible storage)
+- **ffmpeg** + **ffprobe** on PATH (required for generating streaming-quality renditions)
+
+### Streaming quality renditions
+
+On upload, each track is transcoded into multiple quality tiers (lossless FLAC +
+320/192/128 kbps MP3) stored alongside the original in B2. Clients pick a tier via
+the `audioQuality` setting and stream through `GET /api/tracks/{id}/stream?quality=`,
+which 302-redirects to the matching rendition (falling back to the original when a
+rendition doesn't exist yet).
+
+- New uploads generate renditions automatically in the background (Next `after()`).
+- Backfill the existing library with: `bun run db:renditions` (see
+  `scripts/generate-renditions.ts` for `--all` / `--limit` / `--concurrency` flags).
+- `ffmpeg` must be installed on the host. It is added to `nixpacks.toml` for
+  production builds; install it locally (e.g. `sudo apt install ffmpeg`) for dev.
 
 ### Installing Node.js
 

@@ -69,6 +69,7 @@ private fun DetailHero(
     circular: Boolean = false,
     accent: Color = Primary,
     isPlaying: Boolean = false,
+    bannerUrl: String? = null,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     trailing: (@Composable RowScope.() -> Unit)? = null
@@ -77,38 +78,70 @@ private fun DetailHero(
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.35f), Color.Transparent)))
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp, bottom = 16.dp),
+            .padding(bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Artwork(
-            url = artworkUrl,
-            contentDescription = title,
-            shape = if (circular) CircleShape else RoundedCornerShape(12.dp),
-            modifier = Modifier.size(190.dp)
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineLarge,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = OnSurfaceVariant, textAlign = TextAlign.Center)
-        if (!meta.isNullOrBlank()) {
-            Text(meta, style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            trailing?.invoke(this)
-            OutlinedButton(onClick = onShuffle) {
-                Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Shuffle")
+        // Artist banner: a wide image at the top that fades into the background.
+        if (!bannerUrl.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                Artwork(
+                    url = bannerUrl,
+                    contentDescription = "$title banner",
+                    shape = RoundedCornerShape(0.dp),
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Gradient fade at the bottom of the banner.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, MaterialTheme.colorScheme.background)
+                            )
+                        )
+                )
             }
-            PlayPauseButton(isPlaying = isPlaying, onClick = onPlay, size = 56.dp)
+        }
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Artwork(
+                url = artworkUrl,
+                contentDescription = title,
+                shape = if (circular) CircleShape else RoundedCornerShape(12.dp),
+                modifier = Modifier.size(190.dp)
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineLarge,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = OnSurfaceVariant, textAlign = TextAlign.Center)
+            if (!meta.isNullOrBlank()) {
+                Text(meta, style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                trailing?.invoke(this)
+                OutlinedButton(onClick = onShuffle) {
+                    Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Shuffle")
+                }
+                PlayPauseButton(isPlaying = isPlaying, onClick = onPlay, size = 56.dp)
+            }
         }
     }
 }
@@ -276,6 +309,7 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                             meta = data.count?.tracks?.let { "$it tracks" },
                             artworkUrl = vm.repo.resolveUrl(data.imageUrl),
                             circular = true,
+                            bannerUrl = vm.repo.resolveUrl(data.bannerUrl),
                             isPlaying = playback.isPlaying && topTracks.any { it.id == playback.currentTrack?.id },
                             onPlay = { vm.play(topTracks, 0, contextId) },
                             onShuffle = { vm.shuffle(topTracks, contextId) },
