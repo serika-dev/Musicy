@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -287,6 +288,9 @@ export default function DailyMixPage() {
                     <DialogTitle className="text-2xl font-black mb-2">
                       Save Mix to Library
                     </DialogTitle>
+                    <DialogDescription>
+                      Save this daily mix as a playlist in your library.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>

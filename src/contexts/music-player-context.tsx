@@ -437,8 +437,6 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
     console.log("🔄 Loading new track:", currentTrack.title);
     console.log("🔗 Track ID:", currentTrack.id);
-    console.log("🔗 Audio URL:", currentTrack.filePath);
-
     // Reset current time immediately
     setCurrentTime(0);
 
@@ -486,6 +484,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           `🌐 Loading track from network (${quality}):`,
           currentTrack.title,
         );
+        console.log("🔗 Audio URL:", audioSrc);
       }
 
       loadedTrackIdRef.current = currentTrack.id;
@@ -969,7 +968,6 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       },
     ) => {
       console.log("🎵 Playing track:", track.title, "by", track.artist.name);
-      console.log("🔗 File path:", track.filePath);
 
       // Set playback context
       if (context) {
