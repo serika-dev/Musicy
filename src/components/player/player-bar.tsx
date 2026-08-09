@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { DeviceSwitcher } from "./device-switcher";
 import { NowPlaying } from "./now-playing";
 import { PlayerControls } from "./player-controls";
+import { QualityBadge } from "./quality-badge";
 import { getTrackArtwork } from "./player-utils";
 import { SeekBar } from "./seek-bar";
 import { VolumeControl } from "./volume-control";
@@ -73,12 +74,15 @@ export function PlayerBar() {
               >
                 {currentTrack.title}
               </Link>
-              <Link
-                href={`/artists/${currentTrack.artist.id}`}
-                className="block truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
-              >
-                {currentTrack.artist.name}
-              </Link>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href={`/artists/${currentTrack.artist.id}`}
+                  className="block truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  {currentTrack.artist.name}
+                </Link>
+                <QualityBadge className="hidden md:flex" />
+              </div>
             </div>
             <LikeButton
               trackId={currentTrack.id}

@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { LyricsView, useHasLyrics } from "./lyrics-view";
 import { PlayerControls } from "./player-controls";
+import { QualityBadge } from "./quality-badge";
 import { getTrackArtwork } from "./player-utils";
 import { SeekBar } from "./seek-bar";
 import { VolumeControl } from "./volume-control";
@@ -159,9 +160,12 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
                     <h3 className="truncate text-base font-bold text-white">
                       {currentTrack.title}
                     </h3>
-                    <p className="truncate text-sm text-white/70">
-                      {currentTrack.artist.name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm text-white/70">
+                        {currentTrack.artist.name}
+                      </p>
+                      <QualityBadge variant="immersive" />
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -191,15 +195,18 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
                     {cover("400px", "object-cover")}
                   </div>
                 </div>
-                <div className="mt-auto shrink-0">
+                <div className="min-h-0 flex-1">
                   <div className="mb-5 flex items-center justify-between">
                     <div className="min-w-0 pr-4">
                       <h1 className="truncate text-2xl font-bold text-white">
                         {currentTrack.title}
                       </h1>
-                      <p className="truncate text-lg text-white/70">
-                        {currentTrack.artist.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-lg text-white/70">
+                          {currentTrack.artist.name}
+                        </p>
+                        <QualityBadge variant="immersive" />
+                      </div>
                     </div>
                     <LikeButton
                       trackId={currentTrack.id}
@@ -283,9 +290,12 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
                       <h3 className="truncate font-semibold text-white">
                         {currentTrack.title}
                       </h3>
-                      <p className="truncate text-sm text-white/70">
-                        {currentTrack.artist.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm text-white/70">
+                          {currentTrack.artist.name}
+                        </p>
+                        <QualityBadge variant="immersive" />
+                      </div>
                     </div>
                     <LikeButton
                       trackId={currentTrack.id}
