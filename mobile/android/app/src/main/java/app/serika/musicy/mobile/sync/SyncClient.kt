@@ -221,8 +221,11 @@ class SyncClient(
     }
 
     /** Asks another device to take over playback. */
-    fun transferTo(targetDeviceId: String) {
+    fun transferTo(targetDeviceId: String, current: Track? = null, queue: List<Track> = emptyList(), index: Int = 0, position: Double = 0.0, duration: Double = 0.0, playing: Boolean = true) {
         val id = _deviceId.value.ifBlank { return }
+        if (current != null) {
+            publishState(current, playing, position, duration, queue, index)
+        }
         publish(
             buildJsonObject {
                 put("type", "command")
@@ -234,7 +237,15 @@ class SyncClient(
     }
 
     /** Sends a transport command to the device currently holding playback. */
-    fun sendCommand(action: String, seconds: Double? = null, volume: Double? = null, trackId: String? = null) {
+    fun sendCommand(
+        action: String,
+        seconds: Double? = null,
+        volume: Double? = null,
+        trackId: String? = null,
+        queue: List<Track>? = null,
+        currentIndex: Int? = null,
+        mode: String? = null
+    ) {
         val id = _deviceId.value.ifBlank { return }
         val target = _activeDeviceId.value
         publish(
@@ -249,6 +260,9 @@ class SyncClient(
                         seconds?.let { put("seconds", it) }
                         volume?.let { put("volume", it) }
                         trackId?.let { put("trackId", it) }
+                        currentIndex?.let { put("currentIndex", it) }
+                        mode?.let { put("mode", it) }
+                        queue?.let { put("queue", json.encodeToJsonElement(it.take(80))) }
                     }
                 )
             }
@@ -262,14 +276,16 @@ class SyncClient(
         positionSeconds: Double,
         durationSeconds: Double,
         queue: List<Track>,
-        currentIndex: Int
+        currentIndex: Int,
+        shuffle: Boolean = false,
+        repeatMode: String = "off"
     ) {
         val id = _deviceId.value.ifBlank { return }
         if (!repo.settings.value.syncEnabled) return
         val trackJson: JsonElement = currentTrack?.let { json.encodeToJsonElement(it) } ?: JsonObject(emptyMap())
         // Long queues are trimmed: the payload only exists so remote UIs can
         // render "up next", and the server relays it to every device.
-        val queueJson = json.encodeToJsonElement(queue.take(50))
+        val queueJson = json.encodeToJsonElement(queue.take(80))
         publish(
             buildJsonObject {
                 put("type", "state")
@@ -284,6 +300,8 @@ class SyncClient(
                         put("duration", durationSeconds)
                         put("queue", queueJson)
                         put("currentIndex", currentIndex)
+                        put("shuffle", shuffle)
+                        put("repeatMode", repeatMode)
                         put("activeDeviceId", id)
                     }
                 )

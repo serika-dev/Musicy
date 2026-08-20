@@ -203,7 +203,7 @@ class PlayerConnection(
      */
     fun play(tracks: List<Track>, startIndex: Int = 0, contextId: String? = null) {
         val player = controller ?: return
-        val playable = tracks.filter { !it.filePath.isNullOrBlank() }
+        val playable = tracks.filter { it.id.isNotBlank() }
         if (playable.isEmpty()) return
         val start = playable.indexOfFirst { it.id == tracks.getOrNull(startIndex)?.id }.coerceAtLeast(0)
         val items: List<MediaItem> = playable.map { MediaItems.fromTrack(it, repo, contextId) }
@@ -226,7 +226,7 @@ class PlayerConnection(
 
     fun addToQueue(tracks: List<Track>) {
         val player = controller ?: return
-        val items = tracks.filter { !it.filePath.isNullOrBlank() }
+        val items = tracks.filter { it.id.isNotBlank() }
             .map { MediaItems.fromTrack(it, repo) }
         if (items.isEmpty()) return
         player.addMediaItems(items)

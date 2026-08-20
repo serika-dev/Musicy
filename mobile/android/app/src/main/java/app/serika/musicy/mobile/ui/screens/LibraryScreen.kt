@@ -71,6 +71,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
         is Async.Failure -> ErrorBox(state.message, onRetry = { vm.loadLibrary(force = true) })
         is Async.Success -> {
             val data = state.value
+            val chrome = rememberTrackListChrome(vm, data.likedSongs)
             MusicyPullToRefresh(isRefreshing = refreshing, onRefresh = { vm.refreshLibrary() }) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
@@ -200,6 +201,7 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
                             trackItems(
                                 tracks = data.likedSongs,
                                 likedIds = liked,
+                                chrome = chrome,
                                 currentTrackId = playback.currentTrack?.id,
                                 isPlaying = playback.isPlaying,
                                 resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },

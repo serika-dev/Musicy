@@ -12,6 +12,28 @@ import app.serika.musicy.mobile.data.model.Track
 import app.serika.musicy.mobile.ui.Nav
 import app.serika.musicy.mobile.ui.viewmodel.MusicyViewModel
 
+/** Shared download/select state so every track list gets badges and multi-select for free. */
+data class TrackListChrome(
+    val downloadedIds: Set<String> = emptySet(),
+    val downloadingIds: Set<String> = emptySet(),
+    val selectedIds: Set<String>? = null,
+    val onToggleSelect: ((Track) -> Unit)? = null
+)
+
+@Composable
+fun rememberTrackListChrome(vm: MusicyViewModel, tracks: List<Track> = emptyList()): TrackListChrome {
+    val downloadedIds by vm.downloadedIds.collectAsState()
+    val downloadingIds by vm.downloadingIds.collectAsState()
+    val selecting by vm.selecting.collectAsState()
+    val selectedIds by vm.selectedIds.collectAsState()
+    return TrackListChrome(
+        downloadedIds = downloadedIds,
+        downloadingIds = downloadingIds,
+        selectedIds = if (selecting) selectedIds else null,
+        onToggleSelect = { track -> vm.toggleSelected(track.id, tracks) }
+    )
+}
+
 /** Renders a list of tracks inside a LazyColumn with consistent affordances. */
 fun LazyListScope.trackItems(
     tracks: List<Track>,
@@ -22,8 +44,13 @@ fun LazyListScope.trackItems(
     onPlay: (Int) -> Unit,
     onToggleLike: (Track) -> Unit,
     onMore: (Track) -> Unit,
-    numbered: Boolean = false
+    numbered: Boolean = false,
+    chrome: TrackListChrome? = null,
+    downloadedIds: Set<String> = chrome?.downloadedIds ?: emptySet(),
+    selectedIds: Set<String>? = chrome?.selectedIds,
+    onToggleSelect: ((Track) -> Unit)? = chrome?.onToggleSelect
 ) {
+    val downloadingIds = chrome?.downloadingIds ?: emptySet()
     itemsIndexedTracks(tracks) { index, track ->
         TrackRow(
             track = track,
@@ -33,7 +60,14 @@ fun LazyListScope.trackItems(
             isCurrent = track.id == currentTrackId,
             isPlaying = isPlaying,
             isLiked = track.id in likedIds,
-            onClick = { onPlay(index) },
+            isDownloaded = track.id in downloadedIds,
+            isDownloading = track.id in downloadingIds,
+            selected = selectedIds?.let { track.id in it },
+            onClick = {
+                if (onToggleSelect != null && selectedIds != null) onToggleSelect(track)
+                else onPlay(index)
+            },
+            onLongClick = onToggleSelect?.let { toggle -> { toggle(track) } },
             onToggleLike = { onToggleLike(track) },
             onMore = { onMore(track) }
         )
@@ -92,7 +126,8 @@ fun TrackActionsHost(
             onRemove = onRemoveFromPlaylist?.let { remove -> { remove(track) } },
             isDownloaded = track.id in downloadedIds,
             isDownloading = track.id in downloadingIds,
-            onToggleDownload = { vm.toggleDownload(track) }
+            onToggleDownload = { vm.toggleDownload(track) },
+            onSelect = { vm.enterSelectMode(track.id, listOf(track)) }
         )
     }
 

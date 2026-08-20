@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Download
@@ -106,7 +107,8 @@ fun TrackActionsSheet(
     onRemove: (() -> Unit)? = null,
     isDownloaded: Boolean = false,
     isDownloading: Boolean = false,
-    onToggleDownload: (() -> Unit)? = null
+    onToggleDownload: (() -> Unit)? = null,
+    onSelect: (() -> Unit)? = null
 ) {
     MusicySheet(onDismiss = onDismiss) {
         Row(
@@ -143,6 +145,7 @@ fun TrackActionsSheet(
         SheetAction("Play next", Icons.Default.QueueMusic, { onPlayNext(); onDismiss() })
         SheetAction("Add to queue", Icons.Default.Add, { onAddToQueue(); onDismiss() })
         SheetAction("Add to playlist", Icons.Default.PlaylistAdd, { onAddToPlaylist(); onDismiss() })
+        if (onSelect != null) SheetAction("Select", Icons.Default.Check, { onSelect(); onDismiss() })
         if (onToggleDownload != null) {
             SheetAction(
                 label = when {

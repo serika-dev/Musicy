@@ -108,6 +108,13 @@ struct Album: Codable, Identifiable, Hashable {
         return String(releaseDate.prefix(4))
     }
 
+    var looksLikeSingle: Bool {
+        let type = (albumType ?? "").uppercased()
+        if type == "SINGLE" || type == "EP" { return true }
+        let t = title.lowercased()
+        return [" live", "(live", "- live", "remix", "instrumental", "off vocal", "anime size"].contains { t.contains($0) }
+    }
+
     static func == (lhs: Album, rhs: Album) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
@@ -367,6 +374,13 @@ struct DeviceListEvent: Codable {
     let payload: Payload
 }
 
+struct SavedQueue: Codable {
+    var tracks: [Track]
+    var index: Int
+    var position: Double
+    var isUsable: Bool { !tracks.isEmpty && tracks.indices.contains(index) }
+}
+
 struct SyncStateEvent: Codable {
     struct Payload: Codable {
         let trackId: String?
@@ -374,7 +388,10 @@ struct SyncStateEvent: Codable {
         let isPlaying: Bool?
         let currentTime: Double?
         let duration: Double?
+        let queue: [Track]?
         let currentIndex: Int?
+        let shuffle: Bool?
+        let repeatMode: String?
         let activeDeviceId: String?
     }
 
@@ -388,6 +405,9 @@ struct SyncCommandEvent: Codable {
         let seconds: Double?
         let volume: Double?
         let trackId: String?
+        let queue: [Track]?
+        let currentIndex: Int?
+        let mode: String?
     }
 
     let fromDeviceId: String?

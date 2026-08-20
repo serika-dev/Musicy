@@ -129,6 +129,7 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
                     )
                 } else {
                     val tracks = data.tracks?.items.orEmpty()
+                    val chrome = rememberTrackListChrome(vm, tracks)
                     LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
                         if (filter == SearchFilter.ALL || filter == SearchFilter.TRACKS) {
                             if (tracks.isNotEmpty()) {
@@ -136,6 +137,7 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
                                 trackItems(
                                     tracks = tracks,
                                     likedIds = liked,
+                                    chrome = chrome,
                                     currentTrackId = playback.currentTrack?.id,
                                     isPlaying = playback.isPlaying,
                                     resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },

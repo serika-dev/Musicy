@@ -117,8 +117,19 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
     val onPrevious = rememberHapticClick(haptics) {
         if (remote) vm.sendRemoteCommand("previous") else vm.player.previous()
     }
-    val onShuffle = rememberHapticClick(haptics) { vm.player.toggleShuffle() }
-    val onRepeat = rememberHapticClick(haptics) { vm.player.cycleRepeat() }
+    val onShuffle = rememberHapticClick(haptics) {
+        if (remote) vm.sendRemoteCommand("shuffle") else vm.player.toggleShuffle()
+    }
+    val onRepeat = rememberHapticClick(haptics) {
+        if (remote) {
+            val next = when (state.repeatMode) {
+                RepeatMode.OFF -> "playlist"
+                RepeatMode.ALL -> "track"
+                RepeatMode.ONE -> "off"
+            }
+            vm.sendRemoteCommand("setRepeat", mode = next)
+        } else vm.player.cycleRepeat()
+    }
     val onRewind = rememberHapticClick(haptics) { vm.player.seekBy(-settings.seekStepSeconds) }
     val onForward = rememberHapticClick(haptics) { vm.player.seekBy(settings.seekStepSeconds) }
 

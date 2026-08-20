@@ -11,6 +11,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
@@ -306,20 +309,31 @@ fun TrackRow(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
     isLiked: Boolean = false,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
+    selected: Boolean? = null,
     showArtwork: Boolean = true,
     artworkUrl: String? = null,
+    onLongClick: (() -> Unit)? = null,
     onToggleLike: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            // Long-press opens the same menu as the overflow button: reaching
-            // for a 36dp target is not how anyone actually uses a track list.
-            .combinedClickable(onClick = onClick, onLongClick = onMore)
+            .background(if (selected == true) Primary.copy(alpha = 0.14f) else Color.Transparent)
+            // Long-press starts multi-select; otherwise it opens the overflow menu.
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick ?: onMore)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selected != null) {
+            androidx.compose.material3.Checkbox(
+                checked = selected,
+                onCheckedChange = null,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+        }
         if (index != null && !showArtwork) {
             Box(modifier = Modifier.width(28.dp), contentAlignment = Alignment.Center) {
                 if (isCurrent && isPlaying) {
@@ -357,6 +371,21 @@ fun TrackRow(
                 color = OnSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+        when {
+            isDownloading -> CircularProgressIndicator(
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(14.dp),
+                strokeWidth = 2.dp,
+                color = Primary
+            )
+            isDownloaded -> Icon(
+                Icons.Default.DownloadDone,
+                contentDescription = "Downloaded",
+                tint = Primary,
+                modifier = Modifier.size(16.dp)
             )
         }
         Text(
@@ -459,6 +488,37 @@ fun ErrorBox(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Try again")
+        }
+    }
+}
+
+/** Sticky bar while multi-selecting tracks to download. */
+@Composable
+fun SelectModeBar(
+    count: Int,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(SurfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onCancel) {
+            Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+        }
+        Text(
+            if (count == 0) "Select tracks" else "$count selected",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f)
+        )
+        FilledTonalButton(onClick = onDownload, enabled = count > 0) {
+            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Download")
         }
     }
 }

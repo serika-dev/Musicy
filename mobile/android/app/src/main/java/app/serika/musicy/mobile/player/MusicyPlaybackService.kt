@@ -175,6 +175,7 @@ class MusicyPlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             startScrobble(mediaItem?.mediaId)
             maybeExtendQueue()
+            attachLockScreenLyrics(mediaItem?.mediaId)
             if (sleepAtEndOfTrack) {
                 // The user asked to stop after *this* song, and it just ended.
                 sleepAtEndOfTrack = false
@@ -191,6 +192,35 @@ class MusicyPlaybackService : MediaLibraryService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) flushScrobble()
+        }
+    }
+
+    /** Track id we already attached lyrics to, so replaceMediaItem does not loop. */
+    private var lyricsAttachedFor: String? = null
+
+    /**
+     * Fills the current item's metadata with lyrics so lock screens and Android
+     * Auto can show them. replaceMediaItem keeps the playhead where it is.
+     */
+    private fun attachLockScreenLyrics(trackId: String?) {
+        if (trackId.isNullOrBlank() || lyricsAttachedFor == trackId) return
+        lyricsAttachedFor = trackId
+        serviceScope.launch {
+            val lyrics = withContext(Dispatchers.IO) { runCatching { repo.lyrics(trackId) }.getOrNull() } ?: return@launch
+            val text = lyrics.plainLyrics?.takeIf { it.isNotBlank() }
+                ?: lyrics.syncedLyrics?.replace(Regex("""\[\d+:\d+[.\d]*]"""), "")?.trim()
+            if (text.isNullOrBlank()) return@launch
+            val index = player.currentMediaItemIndex
+            val current = player.currentMediaItem ?: return@launch
+            if (current.mediaId != trackId) return@launch
+            val extras = Bundle(current.mediaMetadata.extras ?: Bundle()).apply {
+                putString(android.media.MediaMetadata.METADATA_KEY_LYRICS, text)
+            }
+            val metadata = current.mediaMetadata.buildUpon()
+                .setDescription(text.lineSequence().take(6).joinToString("\n"))
+                .setExtras(extras)
+                .build()
+            player.replaceMediaItem(index, current.buildUpon().setMediaMetadata(metadata).build())
         }
     }
 
@@ -231,20 +261,27 @@ class MusicyPlaybackService : MediaLibraryService() {
      * user left off. Throttled — this runs on ordinary playback events.
      */
     private fun persistQueue() {
-        val now = System.currentTimeMillis()
-        if (now - lastPersistMs < 5_000) return
-        lastPersistMs = now
-
         val tracks = buildList {
             for (i in 0 until player.mediaItemCount) {
                 MediaItems.toTrack(player.getMediaItemAt(i))?.let { add(it) }
             }
         }
         if (tracks.isEmpty()) return
+        val index = player.currentMediaItemIndex.coerceAtLeast(0)
+        val current = tracks.getOrNull(index)
+        app.serika.musicy.mobile.widget.WidgetSnapshotStore.updateContinue(
+            this,
+            current,
+            tracks.size
+        )
+        val now = System.currentTimeMillis()
+        if (now - lastPersistMs < 5_000) return
+        lastPersistMs = now
         val snapshot = SavedQueue(
             tracks = tracks,
-            index = player.currentMediaItemIndex.coerceAtLeast(0),
-            positionMs = player.currentPosition.coerceAtLeast(0L)
+            index = index,
+            positionMs = player.currentPosition.coerceAtLeast(0L),
+            contextId = player.currentMediaItem?.let { MediaItems.parentIdOf(it) }
         )
         serviceScope.launch { repo.playbackStateStore.save(snapshot) }
     }
@@ -623,14 +660,40 @@ private object PlaybackBridge {
                             }
                         }
                         if (state?.isPlaying != false) p.play()
+                        state?.let {
+                            p.shuffleModeEnabled = it.shuffle
+                            p.repeatMode = when (it.repeatMode) {
+                                "one", "track" -> Player.REPEAT_MODE_ONE
+                                "all", "playlist" -> Player.REPEAT_MODE_ALL
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                        }
                     }
-                    "playTrack" -> command.trackId?.let { id ->
-                        val track: Track? = withContext(Dispatchers.IO) { library.trackFor(id) }
-                        if (track != null) {
-                            p.setMediaItem(MediaItems.fromTrack(track, repo))
+                    "playTrack" -> {
+                        val queued = command.queue.orEmpty()
+                        if (queued.isNotEmpty()) {
+                            val items = queued.map { MediaItems.fromTrack(it, repo) }
+                            val start = command.currentIndex
+                                ?: queued.indexOfFirst { it.id == command.trackId }.coerceAtLeast(0)
+                            p.setMediaItems(items, start, 0L)
                             p.prepare()
                             p.play()
+                        } else {
+                            command.trackId?.let { id ->
+                                val track: Track? = withContext(Dispatchers.IO) { library.trackFor(id) }
+                                if (track != null) {
+                                    p.setMediaItem(MediaItems.fromTrack(track, repo))
+                                    p.prepare()
+                                    p.play()
+                                }
+                            }
                         }
+                    }
+                    "shuffle" -> p.shuffleModeEnabled = !p.shuffleModeEnabled
+                    "setRepeat" -> p.repeatMode = when (command.mode) {
+                        "one", "track" -> Player.REPEAT_MODE_ONE
+                        "all", "playlist" -> Player.REPEAT_MODE_ALL
+                        else -> Player.REPEAT_MODE_OFF
                     }
                 }
             }
@@ -659,10 +722,16 @@ private object PlaybackBridge {
                         positionSeconds = p.currentPosition / 1000.0,
                         durationSeconds = p.duration.takeIf { it > 0 }?.div(1000.0) ?: 0.0,
                         queue = queue,
-                        currentIndex = p.currentMediaItemIndex
+                        currentIndex = p.currentMediaItemIndex,
+                        shuffle = p.shuffleModeEnabled,
+                        repeatMode = when (p.repeatMode) {
+                            Player.REPEAT_MODE_ONE -> "track"
+                            Player.REPEAT_MODE_ALL -> "playlist"
+                            else -> "off"
+                        }
                     )
                 }
-                delay(2_000)
+                delay(if (p.isPlaying) 1_000 else 3_000)
             }
         }
     }

@@ -42,7 +42,9 @@ import app.serika.musicy.mobile.data.MusicyRepository
 import app.serika.musicy.mobile.data.model.ServerConfig
 import app.serika.musicy.mobile.ui.components.Artwork
 import app.serika.musicy.mobile.ui.components.MiniPlayer
+import app.serika.musicy.mobile.ui.components.SelectModeBar
 import app.serika.musicy.mobile.ui.components.rememberHapticClick
+import app.serika.musicy.mobile.widget.WidgetActions
 import app.serika.musicy.mobile.ui.screens.*
 import app.serika.musicy.mobile.ui.theme.MusicyTheme
 import app.serika.musicy.mobile.ui.theme.OnSurfaceVariant
@@ -98,6 +100,8 @@ private fun MainScaffold(config: ServerConfig) {
     val haptics = settings.hapticFeedback
     val toast by vm.toast.collectAsState()
     val profile by vm.profile.collectAsState()
+    val selecting by vm.selecting.collectAsState()
+    val selectedIds by vm.selectedIds.collectAsState()
     val snackbarHost = remember { SnackbarHostState() }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -110,6 +114,13 @@ private fun MainScaffold(config: ServerConfig) {
             snackbarHost.showSnackbar(it)
             vm.consumeToast()
         }
+    }
+
+    val widgetAction by WidgetActions.pending.collectAsState()
+    LaunchedEffect(widgetAction) {
+        val action = widgetAction ?: return@LaunchedEffect
+        vm.handleWidgetAction(action)
+        WidgetActions.consume()
     }
 
     // Warm the next couple of covers into the image cache so skipping forward
@@ -211,6 +222,13 @@ private fun MainScaffold(config: ServerConfig) {
                                 modifier = Modifier.weight(1f)
                             )
                         }
+                    }
+                    if (selecting) {
+                        SelectModeBar(
+                            count = selectedIds.size,
+                            onDownload = { vm.downloadSelected() },
+                            onCancel = { vm.exitSelectMode() }
+                        )
                     }
                     MiniPlayer(
                         state = playback,

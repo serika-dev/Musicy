@@ -104,6 +104,8 @@ struct ArtistDetailView: View {
     @State private var albums: [Album] = []
     @State private var isFollowing = false
     @State private var actionTrack: Track?
+    @State private var albumFilter = "all"
+    @State private var albumSort = "year"
 
     var body: some View {
         AsyncContent(load: { try await MusicyAPI.shared.getArtist(id: artistId) }) { artist in
@@ -159,6 +161,24 @@ struct ArtistDetailView: View {
 
                     let popular = topTracks(artist)
                     let playQueue = tracks.isEmpty ? popular : tracks
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            filterChip("All", selected: albumFilter == "all") { albumFilter = "all" }
+                            filterChip("Albums", selected: albumFilter == "albums") { albumFilter = "albums" }
+                            filterChip("Singles", selected: albumFilter == "singles") { albumFilter = "singles" }
+                            filterChip("Year", selected: albumSort == "year") { albumSort = "year" }
+                            filterChip("Name", selected: albumSort == "name") { albumSort = "name" }
+                            Button {
+                                player.play(tracks: playQueue.shuffled())
+                            } label: {
+                                Label("Radio", systemImage: "dot.radiowaves.left.and.right")
+                                    .font(.caption.bold())
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
                     if !popular.isEmpty {
                         HStack {
                             Text("Popular").font(.title3.bold())
@@ -192,7 +212,7 @@ struct ArtistDetailView: View {
                         }
                     }
 
-                    let artistAlbums = artist.albums ?? albums
+                    let artistAlbums = filteredAlbums(artist.albums ?? albums)
                     if !artistAlbums.isEmpty {
                         Text("Albums").font(.title3.bold()).padding(.top, 8)
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -246,6 +266,32 @@ struct ArtistDetailView: View {
 
     private func topTracks(_ artist: Artist) -> [Track] {
         artist.topTracks ?? Array(tracks.prefix(10))
+    }
+
+    private func filteredAlbums(_ list: [Album]) -> [Album] {
+        let filtered: [Album]
+        switch albumFilter {
+        case "albums": filtered = list.filter { !$0.looksLikeSingle }
+        case "singles": filtered = list.filter { $0.looksLikeSingle }
+        default: filtered = list
+        }
+        if albumSort == "name" {
+            return filtered.sorted { $0.title.lowercased() < $1.title.lowercased() }
+        }
+        return filtered.sorted { ($0.year ?? "0000") > ($1.year ?? "0000") }
+    }
+
+    private func filterChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.bold())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(selected ? Color.accentColor : Color("Surface"))
+                .foregroundColor(selected ? .white : .primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
 

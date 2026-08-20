@@ -10,6 +10,21 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.7.0]
+
+### Added
+- **Continue listening** on Home, plus a 4×2 Android home-screen widget for resume / Liked Songs / last daily mix.
+- **Artist albums/singles filter**, sort by year or name, and a Radio chip that shuffles the whole catalogue.
+- **Multi-select download.** Long-press a track (or pick Select in the overflow menu) to tick several songs and download them together.
+- **Download progress notification** and a clearer downloaded badge on every track row.
+- **Lock-screen lyrics.** Now-playing metadata includes lyrics so the lock screen and Android Auto can show them.
+- **Quality-aware downloads.** Already-saved tracks at the same quality are skipped; a different quality replaces the file.
+
+### Changed
+- **Musicy Connect** now hands the full queue (not just one track) between web and the apps, keeps shuffle/repeat in sync, and heartbeats faster while playing.
+
+---
+
 ## [1.6.1]
 
 ### Changed

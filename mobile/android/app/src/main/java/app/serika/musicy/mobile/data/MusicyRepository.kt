@@ -119,14 +119,18 @@ class MusicyRepository private constructor(context: Context) {
 
     val downloads get() = downloadStore.downloads
 
-    suspend fun download(track: Track): Result<Unit> {
+    suspend fun download(track: Track, replace: Boolean = false): Result<Unit> {
         val net = connectivity.current()
         if (_settings.value.downloadOnWifiOnly && net.online && !net.wifi) {
             return Result.failure(IOException("Waiting for Wi-Fi to download"))
         }
+        val quality = effectiveQuality()
+        val existingQuality = downloadStore.qualityOf(track.id)
+        if (downloadStore.isDownloaded(track.id) && existingQuality == quality && !replace) {
+            return Result.success(Unit)
+        }
         val config = _config.value
         val base = ApiClient.normalizedBaseUrl(config)
-        val quality = effectiveQuality()
         val url = "$base/api/tracks/${track.id}/download?quality=$quality"
         return downloadStore.download(track, ApiClient.downloadOkHttp(config), url, quality).map { }
     }

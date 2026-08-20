@@ -59,6 +59,9 @@ class DownloadStore(context: Context) {
     private val _items = MutableStateFlow<List<DownloadedTrack>>(emptyList())
     val downloads: StateFlow<List<DownloadedTrack>> = _items.asStateFlow()
 
+    private val _progress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val progress: StateFlow<Map<String, Float>> = _progress.asStateFlow()
+
     @Volatile
     private var scanned = false
 
@@ -110,6 +113,8 @@ class DownloadStore(context: Context) {
 
     fun isDownloaded(trackId: String): Boolean = localFiles.containsKey(trackId)
 
+    fun qualityOf(trackId: String): String? = _items.value.firstOrNull { it.track.id == trackId }?.quality
+
     suspend fun download(
         track: Track,
         client: OkHttpClient,
@@ -118,6 +123,7 @@ class DownloadStore(context: Context) {
     ): Result<DownloadedTrack> =
         withContext(Dispatchers.IO) {
             runCatching {
+                try {
                 val extension = track.format?.lowercase()?.takeIf { it.isNotBlank() }
                     ?: run {
                         val path = remoteUrl.substringBefore('?').substringAfterLast('/')
@@ -129,8 +135,24 @@ class DownloadStore(context: Context) {
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("Download failed (${response.code})")
                     val body = response.body ?: error("Empty download body")
-                    tmp.outputStream().use { out -> body.byteStream().copyTo(out) }
+                    val total = body.contentLength()
+                    var copied = 0L
+                    tmp.outputStream().use { out ->
+                        body.byteStream().use { input ->
+                            val buf = ByteArray(32 * 1024)
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                copied += n
+                                if (total > 0) {
+                                    _progress.value = _progress.value + (track.id to (copied.toFloat() / total))
+                                }
+                            }
+                        }
+                    }
                 }
+                _progress.value = _progress.value - track.id
                 if (tmp.length() <= 0L) {
                     tmp.delete()
                     error("Empty download")
@@ -151,6 +173,9 @@ class DownloadStore(context: Context) {
                 writeSidecar(entry)
                 updateItems { items -> items.filterNot { it.track.id == track.id } + entry }
                 entry
+                } finally {
+                    _progress.value = _progress.value - track.id
+                }
             }
         }
 

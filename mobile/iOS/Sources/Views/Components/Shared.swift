@@ -175,6 +175,7 @@ struct TrackRow: View {
     var onMore: (() -> Void)?
 
     @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var downloads = DownloadStore.shared
 
     var body: some View {
         HStack(spacing: 12) {
@@ -201,6 +202,13 @@ struct TrackRow: View {
                             .lineLimit(1)
                     }
                     Spacer()
+                    if downloads.isDownloading(track.id) {
+                        ProgressView().scaleEffect(0.7)
+                    } else if downloads.isDownloaded(track.id) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.accentColor)
+                    }
                     Text(formatDuration(track.duration))
                         .font(.caption)
                         .foregroundColor(.secondary)

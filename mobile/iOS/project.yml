@@ -5,7 +5,7 @@ options:
     iOS: "17.0"
   developmentLanguage: en
 settings:
-  MARKETING_VERSION: "1.6.1"
+  MARKETING_VERSION: "1.7.0"
   CURRENT_PROJECT_VERSION: "${GITHUB_RUN_NUMBER}"
   SWIFT_VERSION: "5.0"
   # The shared singletons (player, library, sync) are main-actor by design;

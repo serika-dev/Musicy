@@ -45,6 +45,7 @@ final class SyncClient: ObservableObject {
 
     private var streamTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
+    private var remoteState: SyncStateEvent.Payload?
 
     private init() {}
 
@@ -75,7 +76,8 @@ final class SyncClient: ObservableObject {
 
         heartbeatTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                let playing = self?.isThisDeviceActive == true && AudioPlayer.shared.isPlaying
+                try? await Task.sleep(nanoseconds: playing ? 1_000_000_000 : 3_000_000_000)
                 self?.publishStateIfActive()
             }
         }
@@ -142,6 +144,7 @@ final class SyncClient: ObservableObject {
         case "state":
             guard let parsed = try? decoder.decode(SyncStateEvent.self, from: data),
                   parsed.fromDeviceId != deviceId else { return }
+            remoteState = parsed.payload
             if let active = parsed.payload.activeDeviceId { activeDeviceId = active }
 
         case "claim":
@@ -182,13 +185,27 @@ final class SyncClient: ObservableObject {
         case "setVolume": if let volume = command.volume { player.setVolume(Float(volume)) }
         case "claim":
             claim()
-            player.player.play()
+            applyRemoteState()
         case "playTrack":
-            guard let trackId = command.trackId else { return }
-            Task {
-                if let track = try? await MusicyAPI.shared.getTrack(id: trackId) {
-                    player.play(tracks: [track])
+            if let queued = command.queue, !queued.isEmpty {
+                let start = command.currentIndex
+                    ?? queued.firstIndex(where: { $0.id == command.trackId })
+                    ?? 0
+                player.play(tracks: queued, startAt: start)
+            } else if let trackId = command.trackId {
+                Task {
+                    if let track = try? await MusicyAPI.shared.getTrack(id: trackId) {
+                        player.play(tracks: [track])
+                    }
                 }
+            }
+        case "shuffle":
+            player.toggleShuffle()
+        case "setRepeat":
+            switch command.mode {
+            case "one", "track": player.repeatMode = .one
+            case "all", "playlist": player.repeatMode = .all
+            default: player.repeatMode = .off
             }
         default:
             break
@@ -196,6 +213,32 @@ final class SyncClient: ObservableObject {
     }
 
     // MARK: - Outbound
+
+    private func applyRemoteState() {
+        let player = AudioPlayer.shared
+        guard let state = remoteState else {
+            player.player.play()
+            return
+        }
+        if let queue = state.queue, !queue.isEmpty {
+            let start = state.currentIndex
+                ?? queue.firstIndex(where: { $0.id == state.trackId })
+                ?? 0
+            player.play(tracks: queue, startAt: start)
+            if let time = state.currentTime, time > 1 { player.seek(to: time) }
+        } else if let track = state.currentTrack {
+            player.play(tracks: [track])
+            if let time = state.currentTime, time > 1 { player.seek(to: time) }
+        }
+        if let shuffle = state.shuffle { player.shuffle = shuffle }
+        switch state.repeatMode {
+        case "one", "track": player.repeatMode = .one
+        case "all", "playlist": player.repeatMode = .all
+        case "off": player.repeatMode = .off
+        default: break
+        }
+        if state.isPlaying == false { player.player.pause() }
+    }
 
     /// Announces this device as the one playing audio.
     func claim() {
@@ -209,6 +252,7 @@ final class SyncClient: ObservableObject {
 
     /// Asks another device to take over playback.
     func transfer(to device: SyncDevice) {
+        publishStateIfActive()
         publish([
             "type": "command",
             "fromDeviceId": deviceId,
@@ -218,9 +262,10 @@ final class SyncClient: ObservableObject {
     }
 
     /// Sends a transport command to whichever device is currently playing.
-    func sendCommand(_ action: String, seconds: Double? = nil) {
+    func sendCommand(_ action: String, seconds: Double? = nil, mode: String? = nil) {
         var payload: [String: Any] = ["action": action]
         if let seconds { payload["seconds"] = seconds }
+        if let mode { payload["mode"] = mode }
         var body: [String: Any] = [
             "type": "command",
             "fromDeviceId": deviceId,
@@ -237,6 +282,16 @@ final class SyncClient: ObservableObject {
               let trackData = try? JSONEncoder().encode(track),
               let trackJSON = try? JSONSerialization.jsonObject(with: trackData) else { return }
 
+        let queueJSON = (try? JSONEncoder().encode(Array(player.queue.prefix(80)))).flatMap {
+            try? JSONSerialization.jsonObject(with: $0)
+        } ?? []
+        let repeatMode: String = {
+            switch player.repeatMode {
+            case .one: return "track"
+            case .all: return "playlist"
+            case .off: return "off"
+            }
+        }()
         publish([
             "type": "state",
             "fromDeviceId": deviceId,
@@ -246,8 +301,10 @@ final class SyncClient: ObservableObject {
                 "isPlaying": player.isPlaying,
                 "currentTime": player.position,
                 "duration": player.duration,
-                "queue": [],
+                "queue": queueJSON,
                 "currentIndex": player.currentIndex,
+                "shuffle": player.shuffle,
+                "repeatMode": repeatMode,
                 "activeDeviceId": deviceId
             ] as [String: Any]
         ])

@@ -9,6 +9,7 @@ struct DownloadedTrack: Codable, Identifiable {
     let fileName: String
     let sizeBytes: Int64
     let downloadedAt: Double
+    var quality: String?
 
     var id: String { track.id }
 }
@@ -68,6 +69,10 @@ final class DownloadStore: ObservableObject {
 
     func isDownloading(_ trackId: String) -> Bool { downloadingIds.contains(trackId) }
 
+    func qualityOf(_ trackId: String) -> String? {
+        items.first(where: { $0.track.id == trackId })?.quality
+    }
+
     /// Local file URL when the track is available offline (and still on disk).
     /// Safe to call from the player's load path on any thread.
     func localURL(_ trackId: String) -> URL? {
@@ -88,15 +93,16 @@ final class DownloadStore: ObservableObject {
 
     // MARK: - Mutations
 
-    /// Save a single track. No-op if already saved or in flight.
+    /// Save a single track. No-op if already saved at this quality or in flight.
     @discardableResult
-    func download(_ track: Track) async -> Bool {
+    func download(_ track: Track, replace: Bool = false) async -> Bool {
         let id = track.id
-        if isDownloaded(id) || isDownloading(id) { return true }
+        let quality = SettingsStore.readsEffectiveQuality
+        if isDownloaded(id), qualityOf(id) == quality, !replace { return true }
+        if isDownloading(id) { return true }
 
         // Use the server-side download proxy to avoid CORS issues with B2/R2
         // and to respect the user's quality setting.
-        let quality = SettingsStore.readsEffectiveQuality
         let wifiOnly = SettingsStore.readsDownloadOnWifiOnly
         let net = NetworkMonitor.shared
         if wifiOnly, net.isOnline, !net.isWifi { return false }
@@ -128,7 +134,8 @@ final class DownloadStore: ObservableObject {
                 track: track,
                 fileName: dest.lastPathComponent,
                 sizeBytes: size,
-                downloadedAt: Date().timeIntervalSince1970
+                downloadedAt: Date().timeIntervalSince1970,
+                quality: quality
             )
             setLocalFile(dest, for: id)
             if let data = try? JSONEncoder().encode(entry) {
@@ -150,8 +157,11 @@ final class DownloadStore: ObservableObject {
     @discardableResult
     func downloadAll(_ tracks: [Track]) async -> Int {
         var saved = 0
-        for track in tracks where !isDownloaded(track.id) {
-            if await download(track) { saved += 1 }
+        let quality = SettingsStore.readsEffectiveQuality
+        for track in tracks {
+            let existing = qualityOf(track.id)
+            if existing == quality { continue }
+            if await download(track, replace: existing != nil) { saved += 1 }
         }
         return saved
     }
@@ -165,8 +175,12 @@ final class DownloadStore: ObservableObject {
     }
 
     func toggle(_ track: Track) async {
-        if isDownloaded(track.id) { await MainActor.run { self.remove(track.id) } }
-        else { await download(track) }
+        let quality = SettingsStore.readsEffectiveQuality
+        if isDownloaded(track.id), qualityOf(track.id) == quality {
+            await MainActor.run { self.remove(track.id) }
+        } else {
+            await download(track, replace: isDownloaded(track.id))
+        }
     }
 
     @MainActor

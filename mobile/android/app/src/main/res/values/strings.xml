@@ -4,4 +4,9 @@
     <string name="channel_playback_name">Playback</string>
     <string name="channel_playback_description">Shows the currently playing track</string>
     <string name="auto_sign_in_action">Sign in</string>
+    <string name="widget_description">Resume listening, play Liked Songs, or start your last mix</string>
+    <string name="widget_continue_label">Continue listening</string>
+    <string name="widget_play_continue">Play last queue</string>
+    <string name="widget_liked">Liked Songs</string>
+    <string name="widget_mix">Daily mix</string>
 </resources>

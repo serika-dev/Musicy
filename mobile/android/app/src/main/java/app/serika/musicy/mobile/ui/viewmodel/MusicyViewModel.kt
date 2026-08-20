@@ -6,11 +6,15 @@ import android.media.audiofx.AudioEffect
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.serika.musicy.mobile.data.MusicyRepository
+import app.serika.musicy.mobile.data.downloads.DownloadNotifier
 import app.serika.musicy.mobile.data.model.*
+import app.serika.musicy.mobile.data.preferences.SavedQueue
 import app.serika.musicy.mobile.player.AudioEngineState
 import app.serika.musicy.mobile.player.MusicyLibrary
 import app.serika.musicy.mobile.player.PlayerConnection
 import app.serika.musicy.mobile.player.SyncHolder
+import app.serika.musicy.mobile.widget.WidgetActions
+import app.serika.musicy.mobile.widget.WidgetSnapshotStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -77,6 +82,15 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     private val _downloadingIds = MutableStateFlow<Set<String>>(emptySet())
     val downloadingIds: StateFlow<Set<String>> = _downloadingIds.asStateFlow()
 
+    private val _continueQueue = MutableStateFlow<SavedQueue?>(null)
+    val continueQueue: StateFlow<SavedQueue?> = _continueQueue.asStateFlow()
+
+    private val _selecting = MutableStateFlow(false)
+    val selecting: StateFlow<Boolean> = _selecting.asStateFlow()
+    private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
+    private var selectPool: List<Track> = emptyList()
+
     private val _home = MutableStateFlow<Async<HomeState>>(Async.Loading)
     val home: StateFlow<Async<HomeState>> = _home.asStateFlow()
 
@@ -130,6 +144,24 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         // constructed, so playbackUrl() already prefers local files here.
         viewModelScope.launch { repo.pullAccountSettings() }
         viewModelScope.launch { repo.ensureLikedIdsLoaded() }
+        viewModelScope.launch {
+            val saved = repo.playbackStateStore.load()
+            _continueQueue.value = saved
+            saved?.takeIf { it.isUsable }?.let {
+                WidgetSnapshotStore.updateContinue(
+                    getApplication(),
+                    it.tracks.getOrNull(it.index) ?: it.tracks.first(),
+                    it.tracks.size
+                )
+            }
+        }
+        viewModelScope.launch {
+            combine(_downloadingIds, repo.downloadStore.progress) { ids, prog ->
+                ids.size to prog.values.maxOrNull()
+            }.collect { (n, p) ->
+                DownloadNotifier.update(getApplication(), n, p)
+            }
+        }
         loadHome()
         loadLibrary()
         refreshProfile()
@@ -196,13 +228,15 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             val followed = async { repo.followedArtists() }
             val recent = async { repo.recentlyPlayed() }
             val albums = async { runCatching { repo.albums(limit = 30).albums }.getOrDefault(emptyList()) }
-            LibraryState(
+            val state = LibraryState(
                 likedSongs = liked.await(),
                 playlists = playlists.await(),
                 followedArtists = followed.await(),
                 recentlyPlayed = recent.await(),
                 albums = albums.await()
             )
+            WidgetSnapshotStore.updateLikedCount(getApplication(), state.likedSongs.size)
+            state
         }
     }
 
@@ -326,8 +360,10 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     fun playPlaylist(playlist: Playlist, startIndex: Int = 0) =
         play(playlist.trackList(), startIndex, MusicyLibrary.playlistId(playlist.id))
 
-    fun playMix(mix: DailyMix, startIndex: Int = 0) =
+    fun playMix(mix: DailyMix, startIndex: Int = 0) {
+        WidgetSnapshotStore.saveLastMix(getApplication(), mix.id, mix.name)
         play(mix.tracks.orEmpty(), startIndex, MusicyLibrary.mixId(mix.id))
+    }
 
     fun shuffle(tracks: List<Track>, contextId: String? = null) {
         val source = if (repo.shouldPlayLocalOnly()) tracks.filter { repo.isDownloaded(it.id) } else tracks
@@ -359,14 +395,22 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
      * a download is already in flight for it. Emits a toast on completion.
      */
     fun downloadTrack(track: Track) {
-        if (track.id in downloadedIds.value || track.id in _downloadingIds.value) return
+        val quality = repo.effectiveQuality()
+        val existing = repo.downloadStore.qualityOf(track.id)
+        if (track.id in downloadedIds.value && existing == quality) return
+        if (track.id in _downloadingIds.value) return
         _downloadingIds.value = _downloadingIds.value + track.id
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { repo.download(track) }
+            val result = withContext(Dispatchers.IO) {
+                repo.download(track, replace = existing != null && existing != quality)
+            }
             _downloadingIds.value = _downloadingIds.value - track.id
             showToast(
                 result.fold(
-                    onSuccess = { "Saved for offline" },
+                    onSuccess = {
+                        if (existing != null && existing != quality) "Updated download to $quality"
+                        else "Saved for offline"
+                    },
                     onFailure = { it.message?.takeIf { msg -> msg.isNotBlank() } ?: "Download failed" }
                 )
             )
@@ -383,7 +427,45 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Convenience toggle for menus/rows. */
     fun toggleDownload(track: Track) {
-        if (track.id in downloadedIds.value) removeDownload(track) else downloadTrack(track)
+        val quality = repo.effectiveQuality()
+        val existing = repo.downloadStore.qualityOf(track.id)
+        if (track.id in downloadedIds.value && existing == quality) removeDownload(track)
+        else downloadTrack(track)
+    }
+
+    fun resumeContinueListening() {
+        val saved = _continueQueue.value ?: return
+        play(saved.tracks, saved.index, saved.contextId)
+        if (saved.positionMs > 0) player.seekTo(saved.positionMs)
+    }
+
+    fun enterSelectMode(firstId: String? = null, pool: List<Track> = emptyList()) {
+        if (pool.isNotEmpty()) selectPool = pool
+        _selecting.value = true
+        _selectedIds.value = firstId?.let { setOf(it) } ?: emptySet()
+    }
+
+    fun exitSelectMode() {
+        _selecting.value = false
+        _selectedIds.value = emptySet()
+        selectPool = emptyList()
+    }
+
+    fun toggleSelected(id: String, pool: List<Track> = emptyList()) {
+        if (pool.isNotEmpty()) selectPool = pool
+        if (!_selecting.value) enterSelectMode(id, pool)
+        else {
+            val next = _selectedIds.value.toMutableSet()
+            if (!next.add(id)) next.remove(id)
+            _selectedIds.value = next
+            if (next.isEmpty()) exitSelectMode()
+        }
+    }
+
+    fun downloadSelected(tracks: List<Track> = selectPool) {
+        val chosen = tracks.filter { it.id in _selectedIds.value }
+        exitSelectMode()
+        if (chosen.isNotEmpty()) downloadAll(chosen)
     }
 
     /**
@@ -391,7 +473,12 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
      * songs). Runs sequentially to stay friendly to the connection and storage.
      */
     fun downloadAll(tracks: List<Track>) {
-        val pending = tracks.filter { it.id !in downloadedIds.value && it.id !in _downloadingIds.value }
+        val quality = repo.effectiveQuality()
+        val pending = tracks.filter { track ->
+            if (track.id in _downloadingIds.value) return@filter false
+            val existing = repo.downloadStore.qualityOf(track.id)
+            existing == null || existing != quality
+        }
         if (pending.isEmpty()) {
             showToast("Already downloaded")
             return
@@ -401,11 +488,43 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             var ok = 0
             for (track in pending) {
-                val result = withContext(Dispatchers.IO) { repo.download(track) }
+                val existing = repo.downloadStore.qualityOf(track.id)
+                val result = withContext(Dispatchers.IO) {
+                    repo.download(track, replace = existing != null && existing != quality)
+                }
                 _downloadingIds.value = _downloadingIds.value - track.id
                 if (result.isSuccess) ok++
             }
             showToast("Saved $ok of ${pending.size} for offline")
+        }
+    }
+
+    /** Home-screen widget: resume, liked, or last mix. Waits for the player to attach. */
+    fun handleWidgetAction(action: String) {
+        viewModelScope.launch {
+            var waits = 0
+            while (!player.connected.value && waits < 50) {
+                delay(100)
+                waits++
+            }
+            when (action) {
+                WidgetActions.PLAY_CONTINUE -> resumeContinueListening()
+                WidgetActions.PLAY_LIKED -> {
+                    val tracks = library.valueOrNull?.likedSongs
+                        ?: withContext(Dispatchers.IO) { runCatching { repo.likedSongs() }.getOrDefault(emptyList()) }
+                    play(tracks, 0, MusicyLibrary.NODE_LIKED)
+                }
+                WidgetActions.PLAY_MIX -> {
+                    val mixId = WidgetSnapshotStore.read(getApplication()).mixId
+                    if (mixId.isNullOrBlank()) {
+                        showToast("Play a daily mix once and it will show up here")
+                    } else {
+                        val mix = withContext(Dispatchers.IO) { runCatching { repo.dailyMix(mixId) }.getOrNull() }
+                        if (mix == null) showToast("Couldn't load that mix")
+                        else playMix(mix)
+                    }
+                }
+            }
         }
     }
 
@@ -453,13 +572,23 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun transferPlaybackTo(device: SyncDevice) {
-        SyncHolder.client?.transferTo(device.id)
+        val s = player.state.value
+        val pos = player.position.value
+        SyncHolder.client?.transferTo(
+            targetDeviceId = device.id,
+            current = s.currentTrack,
+            queue = s.queue,
+            index = s.currentIndex,
+            position = pos.positionMs / 1000.0,
+            duration = s.durationMs / 1000.0,
+            playing = s.isPlaying
+        )
         showToast("Moving playback to ${device.name}")
     }
 
     /** Drives the remote device when this phone is only acting as a remote. */
-    fun sendRemoteCommand(action: String, seconds: Double? = null) {
-        SyncHolder.client?.sendCommand(action, seconds = seconds)
+    fun sendRemoteCommand(action: String, seconds: Double? = null, mode: String? = null) {
+        SyncHolder.client?.sendCommand(action, seconds = seconds, mode = mode)
     }
 
     /** True when another device holds playback and we are acting as a remote. */

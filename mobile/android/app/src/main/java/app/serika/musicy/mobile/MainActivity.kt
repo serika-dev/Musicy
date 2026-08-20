@@ -1,6 +1,7 @@
 package app.serika.musicy.mobile
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import app.serika.musicy.mobile.ui.MusicyApp
+import app.serika.musicy.mobile.widget.WidgetActions
 
 class MainActivity : ComponentActivity() {
 
@@ -20,9 +22,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         ensureNotificationPermission()
+        handleWidgetIntent(intent)
         setContent {
             MusicyApp()
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleWidgetIntent(intent)
+    }
+
+    private fun handleWidgetIntent(intent: Intent?) {
+        WidgetActions.offer(intent?.action)
     }
 
     /**

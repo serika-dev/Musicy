@@ -1,7 +1,9 @@
 package app.serika.musicy.mobile.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -246,6 +248,7 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
                 val data: Album = state.value
                 val tracks = data.tracks.orEmpty()
                 val contextId = MusicyLibrary.albumId(data.id)
+                val chrome = rememberTrackListChrome(vm, tracks)
                 LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
@@ -274,6 +277,7 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
                         currentTrackId = playback.currentTrack?.id,
                         isPlaying = playback.isPlaying,
                         numbered = true,
+                        chrome = chrome,
                         resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl ?: data.coverImageUrl) },
                         onPlay = { index -> vm.play(tracks, index, contextId) },
                         onToggleLike = { vm.toggleLike(it) },
@@ -314,6 +318,8 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     var following by remember(artistId) { mutableStateOf<Boolean?>(null) }
+    var albumFilter by remember { mutableStateOf("all") }
+    var albumSort by remember { mutableStateOf("year") }
     val listState = rememberLazyListState()
     val scrolled = rememberHeroScrolled(listState)
 
@@ -331,9 +337,20 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                 val allTracks = tracks.valueOrNull.orEmpty()
                 val popular = data.topTracks?.takeIf { it.isNotEmpty() } ?: allTracks.take(10)
                 val contextId = MusicyLibrary.artistId(data.id)
-                val artistAlbums = data.albums ?: albums.valueOrNull.orEmpty()
+                val artistAlbums = (data.albums ?: albums.valueOrNull.orEmpty()).let { list ->
+                    val filtered = when (albumFilter) {
+                        "albums" -> list.filter { !it.looksLikeSingle() }
+                        "singles" -> list.filter { it.looksLikeSingle() }
+                        else -> list
+                    }
+                    when (albumSort) {
+                        "name" -> filtered.sortedBy { it.title.lowercase() }
+                        else -> filtered.sortedByDescending { it.year ?: "0000" }
+                    }
+                }
                 val playQueue = allTracks.ifEmpty { popular }
                 val trackCount = data.count?.tracks ?: allTracks.size
+                val chrome = rememberTrackListChrome(vm, playQueue)
 
                 LazyColumn(state = listState, contentPadding = padding) {
                     item {
@@ -370,6 +387,26 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                         )
                     }
 
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MusicyChip("All", albumFilter == "all") { albumFilter = "all" }
+                            MusicyChip("Albums", albumFilter == "albums") { albumFilter = "albums" }
+                            MusicyChip("Singles", albumFilter == "singles") { albumFilter = "singles" }
+                            MusicyChip("Year", albumSort == "year") { albumSort = "year" }
+                            MusicyChip("Name", albumSort == "name") { albumSort = "name" }
+                            FilledTonalButton(onClick = { vm.shuffle(playQueue, contextId) }) {
+                                Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Radio")
+                            }
+                        }
+                    }
+
                     if (!data.bio.isNullOrBlank()) {
                         item {
                             Text(
@@ -394,6 +431,7 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                             likedIds = liked,
                             currentTrackId = playback.currentTrack?.id,
                             isPlaying = playback.isPlaying,
+                            chrome = chrome,
                             resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                             onPlay = { index -> vm.play(playQueue.ifEmpty { popular }, index, contextId) },
                             onToggleLike = { vm.toggleLike(it) },
@@ -442,6 +480,7 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val name = artist.valueOrNull?.name ?: "Artist"
     val list = tracks.valueOrNull.orEmpty()
+    val chrome = rememberTrackListChrome(vm, list)
     val contextId = MusicyLibrary.artistId(artistId)
     val listState = rememberLazyListState()
     val scrolled = rememberHeroScrolled(listState)
@@ -473,11 +512,6 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(name, style = MaterialTheme.typography.headlineSmall)
                                 Text("All songs · ${list.size} tracks", style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
-                                Text(
-                                    "${list.size} tracks",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = OnSurfaceVariant
-                                )
                             }
                             DownloadAllButton(vm, list)
                             Spacer(Modifier.width(8.dp))
@@ -497,6 +531,7 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                         currentTrackId = playback.currentTrack?.id,
                         isPlaying = playback.isPlaying,
                         numbered = true,
+                        chrome = chrome,
                         resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                         onPlay = { index -> vm.play(list, index, contextId) },
                         onToggleLike = { vm.toggleLike(it) },
@@ -584,6 +619,7 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
                 val data: Playlist = state.value
                 val tracks = data.trackList()
                 val contextId = MusicyLibrary.playlistId(data.id)
+                val chrome = rememberTrackListChrome(vm, tracks)
                 LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
@@ -610,6 +646,7 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
                         likedIds = liked,
                         currentTrackId = playback.currentTrack?.id,
                         isPlaying = playback.isPlaying,
+                        chrome = chrome,
                         resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                         onPlay = { index -> vm.play(tracks, index, contextId) },
                         onToggleLike = { vm.toggleLike(it) },
@@ -653,6 +690,7 @@ fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
                 val data: DailyMix = state.value
                 val tracks = data.tracks.orEmpty()
                 val contextId = MusicyLibrary.mixId(data.id)
+                val chrome = rememberTrackListChrome(vm, tracks)
                 LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
@@ -671,6 +709,7 @@ fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
                         likedIds = liked,
                         currentTrackId = playback.currentTrack?.id,
                         isPlaying = playback.isPlaying,
+                        chrome = chrome,
                         resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                         onPlay = { index -> vm.play(tracks, index, contextId) },
                         onToggleLike = { vm.toggleLike(it) },
@@ -704,6 +743,7 @@ fun GenreScreen(vm: MusicyViewModel, nav: Nav, genre: String) {
             is Async.Success -> {
                 val list = state.value
                 val contextId = MusicyLibrary.genreId(genre)
+                val chrome = rememberTrackListChrome(vm, list)
                 LazyColumn(contentPadding = padding) {
                     item {
                         Box(
@@ -753,6 +793,7 @@ fun GenreScreen(vm: MusicyViewModel, nav: Nav, genre: String) {
                         likedIds = liked,
                         currentTrackId = playback.currentTrack?.id,
                         isPlaying = playback.isPlaying,
+                        chrome = chrome,
                         resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                         onPlay = { index -> vm.play(list, index, contextId) },
                         onToggleLike = { vm.toggleLike(it) },
@@ -778,6 +819,7 @@ fun LikedSongsScreen(vm: MusicyViewModel, nav: Nav) {
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val tracks = library.valueOrNull?.likedSongs.orEmpty()
+    val chrome = rememberTrackListChrome(vm, tracks)
     val listState = rememberLazyListState()
     val scrolled = rememberHeroScrolled(listState)
 
@@ -811,6 +853,7 @@ fun LikedSongsScreen(vm: MusicyViewModel, nav: Nav) {
                 likedIds = liked,
                 currentTrackId = playback.currentTrack?.id,
                 isPlaying = playback.isPlaying,
+                chrome = chrome,
                 resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                 onPlay = { index -> vm.play(tracks, index, MusicyLibrary.NODE_LIKED) },
                 onToggleLike = { vm.toggleLike(it) },
@@ -883,6 +926,7 @@ fun CollectionScreen(vm: MusicyViewModel, nav: Nav, kind: String) {
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data = state.value
+                val chrome = rememberTrackListChrome(vm, data.tracks)
                 val columns = when {
                     data.albums.isNotEmpty() -> 2
                     data.artists.isNotEmpty() -> 3
@@ -972,6 +1016,7 @@ fun CollectionScreen(vm: MusicyViewModel, nav: Nav, kind: String) {
                                 likedIds = liked,
                                 currentTrackId = playback.currentTrack?.id,
                                 isPlaying = playback.isPlaying,
+                                chrome = chrome,
                                 resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
                                 onPlay = { index -> vm.play(data.tracks, index) },
                                 onToggleLike = { vm.toggleLike(it) },

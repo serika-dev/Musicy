@@ -11,6 +11,9 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 22) {
                     greeting
+                    if player.currentTrack == nil, let saved = player.savedQueue, saved.isUsable {
+                        continueCard(saved)
+                    }
                     quickAccess
 
                     if let featured = store.feed?.featuredAlbum {
@@ -157,6 +160,37 @@ struct HomeView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
+        .padding(.horizontal)
+    }
+
+    private func continueCard(_ saved: SavedQueue) -> some View {
+        let track = saved.tracks[saved.index]
+        return Button(action: { player.resumeSavedQueue() }) {
+            HStack(spacing: 12) {
+                Artwork(url: track.artworkUrl, cornerRadius: 10)
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Continue listening")
+                        .font(.caption.bold())
+                        .foregroundColor(.accentColor)
+                    Text(track.title).font(.subheadline.bold()).lineLimit(1)
+                    Text("\(track.artistLine) · \(saved.tracks.count) in queue")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "play.fill")
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.accentColor)
+                    .clipShape(Circle())
+            }
+            .padding(12)
+            .background(Color("Surface"))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
         .padding(.horizontal)
     }
 

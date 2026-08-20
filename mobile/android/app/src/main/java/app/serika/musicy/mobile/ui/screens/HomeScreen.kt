@@ -52,6 +52,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
     val refreshing by vm.homeRefreshing.collectAsState()
+    val continueQueue by vm.continueQueue.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
     // Crossfade on the load phase, not on the value, so a pull-refresh (which
@@ -69,6 +70,8 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
         is Async.Success -> {
             val data = state.value
             val feed = data.feed
+            val recommended = feed?.recommendedTracks.orEmpty()
+            val chrome = rememberTrackListChrome(vm, recommended.take(8))
 
             MusicyPullToRefresh(isRefreshing = refreshing, onRefresh = { vm.refreshHome() }) {
             LazyColumn(
@@ -82,6 +85,20 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
                             "Welcome back, $userName",
                             style = MaterialTheme.typography.bodyMedium,
                             color = OnSurfaceVariant
+                        )
+                    }
+                }
+
+                continueQueue?.takeIf { it.isUsable && playback.currentTrack == null }?.let { saved ->
+                    item {
+                        ContinueListeningCard(
+                            track = saved.tracks.getOrNull(saved.index) ?: saved.tracks.first(),
+                            coverUrl = vm.repo.resolveUrl(
+                                saved.tracks.getOrNull(saved.index)?.artworkUrl
+                                    ?: saved.tracks.first().artworkUrl
+                            ),
+                            remaining = saved.tracks.size,
+                            onResume = { vm.resumeContinueListening() }
                         )
                     }
                 }
@@ -147,12 +164,12 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
                     )
                 }
 
-                val recommended = feed?.recommendedTracks.orEmpty()
                 if (recommended.isNotEmpty()) {
                     item { SectionHeader("Recommended for you", subtitle = "Based on your listening") }
                     trackItems(
                         tracks = recommended.take(8),
                         likedIds = liked,
+                        chrome = chrome,
                         currentTrackId = playback.currentTrack?.id,
                         isPlaying = playback.isPlaying,
                         resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
@@ -250,6 +267,40 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
     in 12..17 -> "Good afternoon"
     in 18..21 -> "Good evening"
     else -> "Late night listening"
+}
+
+@Composable
+private fun ContinueListeningCard(
+    track: Track,
+    coverUrl: String?,
+    remaining: Int,
+    onResume: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceVariant)
+            .clickable(onClick = onResume)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Artwork(url = coverUrl, contentDescription = track.title, modifier = Modifier.size(56.dp), shape = RoundedCornerShape(10.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Continue listening", style = MaterialTheme.typography.labelMedium, color = Primary)
+            Text(track.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${track.artistLine} · $remaining in queue",
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        PlayPauseButton(isPlaying = false, onClick = onResume, size = 44.dp)
+    }
 }
 
 @Composable

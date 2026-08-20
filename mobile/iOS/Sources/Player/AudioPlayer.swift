@@ -49,6 +49,9 @@ final class AudioPlayer: ObservableObject {
     /// True when playback should stop once the current song finishes.
     @Published private(set) var sleepAtEndOfTrack = false
 
+    /// Last queue persisted so Home can offer Continue listening.
+    @Published private(set) var savedQueue: SavedQueue?
+
     /// Called whenever transport state changes, so the sync client can
     /// broadcast without this type knowing anything about the network.
     var onStateChanged: (() -> Void)?
@@ -65,6 +68,7 @@ final class AudioPlayer: ObservableObject {
         configureSession()
         observePlayer()
         setupRemoteCommands()
+        savedQueue = Self.loadSavedQueue()
     }
 
     private func configureSession() {
@@ -149,7 +153,7 @@ final class AudioPlayer: ObservableObject {
     // MARK: - Transport
 
     func play(tracks: [Track], startAt index: Int = 0) {
-        let playable = tracks.filter { !($0.filePath ?? "").isEmpty }
+        let playable = tracks.filter { !$0.id.isEmpty }
         guard !playable.isEmpty else { return }
         let requestedId = tracks.indices.contains(index) ? tracks[index].id : playable[0].id
         queue = shuffle ? playable.shuffled() : playable
@@ -172,7 +176,7 @@ final class AudioPlayer: ObservableObject {
     }
 
     func addToQueue(_ tracks: [Track]) {
-        let playable = tracks.filter { !($0.filePath ?? "").isEmpty }
+        let playable = tracks.filter { !$0.id.isEmpty }
         guard !playable.isEmpty else { return }
         if queue.isEmpty {
             play(tracks: playable)
@@ -305,6 +309,7 @@ final class AudioPlayer: ObservableObject {
         case .all: repeatMode = .one
         case .one: repeatMode = .off
         }
+        onStateChanged?()
     }
 
     func stop() {
@@ -350,7 +355,15 @@ final class AudioPlayer: ObservableObject {
             if rate != 1 { player.rate = rate }
         }
         updateNowPlayingInfo()
+        loadLyrics(for: track)
+        persistQueue()
         onStateChanged?()
+    }
+
+    func resumeSavedQueue() {
+        guard let saved = savedQueue ?? Self.loadSavedQueue(), saved.isUsable else { return }
+        play(tracks: saved.tracks, startAt: saved.index)
+        if saved.position > 1 { seek(to: saved.position) }
     }
 
     private func handleTrackFinished() {
@@ -402,6 +415,38 @@ final class AudioPlayer: ObservableObject {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
 
         loadArtwork(for: track)
+    }
+
+    private func loadLyrics(for track: Track) {
+        Task {
+            let lyrics = try? await MusicyAPI.shared.getLyrics(trackId: track.id)
+            let text = lyrics?.plainLyrics ?? lyrics?.syncedLyrics
+            guard let text, !text.isEmpty else { return }
+            await MainActor.run {
+                guard self.currentTrack?.id == track.id else { return }
+                var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                info[MPMediaItemPropertyLyrics] = text
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            }
+        }
+    }
+
+    private func persistQueue() {
+        guard !queue.isEmpty else { return }
+        let snapshot = SavedQueue(
+            tracks: Array(queue.prefix(80)),
+            index: currentIndex,
+            position: position
+        )
+        savedQueue = snapshot
+        if let data = try? JSONEncoder().encode(snapshot) {
+            UserDefaults.standard.set(data, forKey: "musicy_saved_queue")
+        }
+    }
+
+    private static func loadSavedQueue() -> SavedQueue? {
+        guard let data = UserDefaults.standard.data(forKey: "musicy_saved_queue") else { return nil }
+        return try? JSONDecoder().decode(SavedQueue.self, from: data)
     }
 
     private var artworkTrackId: String?

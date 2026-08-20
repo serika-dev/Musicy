@@ -118,6 +118,13 @@ data class Album(
 ) {
     val trackCount: Int get() = tracks?.size ?: count?.tracks ?: 0
     val year: String? get() = releaseDate?.take(4)?.takeIf { it.length == 4 }
+
+    fun looksLikeSingle(): Boolean {
+        val type = albumType?.uppercase().orEmpty()
+        if (type == "SINGLE" || type == "EP") return true
+        val t = title.lowercase()
+        return listOf(" live", "(live", "- live", "remix", "instrumental", "off vocal", "anime size").any { it in t }
+    }
 }
 
 @Serializable
@@ -398,6 +405,8 @@ data class SyncStatePayload(
     val duration: Double = 0.0,
     val queue: List<Track> = emptyList(),
     val currentIndex: Int = 0,
+    val shuffle: Boolean = false,
+    val repeatMode: String? = null,
     val activeDeviceId: String? = null
 )
 
@@ -413,7 +422,10 @@ data class SyncCommandPayload(
     val action: String = "",
     val seconds: Double? = null,
     val volume: Double? = null,
-    val trackId: String? = null
+    val trackId: String? = null,
+    val queue: List<Track>? = null,
+    val currentIndex: Int? = null,
+    val mode: String? = null
 )
 
 @Serializable

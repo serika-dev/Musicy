@@ -673,6 +673,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           duration: number;
           queue: Track[];
           currentIndex: number;
+          shuffle?: boolean;
+          repeatMode?: "off" | "track" | "playlist";
           activeDeviceId: string;
         };
         handlingRemoteRef.current = true;
@@ -684,6 +686,11 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         if (p.currentTrack) setCurrentTrack(p.currentTrack);
         if (Array.isArray(p.queue)) setQueueState(p.queue);
         if (typeof p.currentIndex === "number") setCurrentIndex(p.currentIndex);
+        if (typeof p.shuffle === "boolean") setIsShuffle(p.shuffle);
+        if (p.repeatMode === "off" || p.repeatMode === "track" || p.repeatMode === "playlist") {
+          setRepeatMode(p.repeatMode);
+          setIsRepeat(p.repeatMode !== "off");
+        }
         handlingRemoteRef.current = false;
         return;
       }
@@ -694,6 +701,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           seconds?: number;
           volume?: number;
           trackId?: string;
+          queue?: Track[];
+          index?: number;
+          mode?: string;
         };
 
         // Allow remote device to trigger claim directly
@@ -770,7 +780,17 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           case "playTrack": {
             const id = payload.trackId;
             if (!id) break;
-            // Fetch full track info and play it
+            const incoming = payload.queue;
+            const startAt = payload.index ?? 0;
+            if (incoming && incoming.length > 0) {
+              const idx = incoming.findIndex((t) => t.id === id);
+              setQueueState(incoming);
+              setCurrentIndex(idx >= 0 ? idx : startAt);
+              setCurrentTrack(incoming[idx >= 0 ? idx : startAt] ?? incoming[0]);
+              setIsPlaying(true);
+              shouldAutoPlayRef.current = true;
+              break;
+            }
             fetch(`/api/tracks/${id}`)
               .then((r) => (r.ok ? r.json() : null))
               .then((track: Track | null) => {
@@ -784,6 +804,38 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
               .catch((err) =>
                 console.error("Remote playTrack fetch failed:", err),
               );
+            break;
+          }
+          case "shuffle":
+            setIsShuffle((prev) => {
+              const next = !prev;
+              if (next && queue.length > 1 && currentTrackRef.current) {
+                const current = currentTrackRef.current;
+                const at = queue.findIndex((t) => t.id === current.id);
+                const remaining = at >= 0 ? queue.slice(at + 1) : queue.filter((t) => t.id !== current.id);
+                const previous = at >= 0 ? queue.slice(0, at) : [];
+                const rebuilt = [
+                  ...shuffleArray(previous),
+                  current,
+                  ...shuffleArray(remaining),
+                ];
+                setQueueState(rebuilt);
+                setCurrentIndex(rebuilt.findIndex((t) => t.id === current.id));
+              }
+              return next;
+            });
+            break;
+          case "setRepeat": {
+            const mode =
+              payload.mode === "track" || payload.mode === "playlist" || payload.mode === "off"
+                ? payload.mode
+                : payload.mode === "one"
+                  ? "track"
+                  : payload.mode === "all"
+                    ? "playlist"
+                    : "off";
+            setRepeatMode(mode);
+            setIsRepeat(mode !== "off");
             break;
           }
           default:
@@ -845,13 +897,15 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           duration,
           queue,
           currentIndex,
+          shuffle: isShuffle,
+          repeatMode,
           activeDeviceId: deviceId,
         },
       });
     };
     // Immediate + interval while playing
     broadcast();
-    const interval = window.setInterval(broadcast, 1500);
+    const interval = window.setInterval(broadcast, isPlaying ? 1000 : 3000);
     // Broadcast immediately when tab becomes visible again (e.g. after
     // background suspension) so other devices get fresh state without
     // waiting up to 1.5s for the next interval tick.
@@ -871,6 +925,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     duration,
     queue,
     currentIndex,
+    isShuffle,
+    repeatMode,
     syncPublish,
   ]);
 
@@ -930,6 +986,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
             duration,
             queue,
             currentIndex,
+            shuffle: isShuffle,
+            repeatMode,
             activeDeviceId: deviceId,
           },
         });
@@ -950,6 +1008,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       duration,
       queue,
       currentIndex,
+      isShuffle,
+      repeatMode,
     ],
   );
 
@@ -1165,11 +1225,21 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     (track, trackList, context) => {
       const target = ensureActiveDeviceIfNone();
       if (target && target !== deviceId) {
-        // Forward to active device
+        const list = trackList && trackList.length > 0 ? trackList : [track];
+        const index = Math.max(0, list.findIndex((t) => t.id === track.id));
+        const windowSize = 80;
+        const start = Math.max(0, index - 10);
+        const windowed = list.slice(start, start + windowSize);
+        const windowIndex = windowed.findIndex((t) => t.id === track.id);
         syncPublish({
           type: "command",
           targetDeviceId: target,
-          payload: { action: "playTrack", trackId: track.id },
+          payload: {
+            action: "playTrack",
+            trackId: track.id,
+            queue: windowed,
+            index: windowIndex >= 0 ? windowIndex : 0,
+          },
         });
         return;
       }
@@ -1259,11 +1329,29 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         : repeatMode === "track"
           ? "playlist"
           : "off";
+    const target = ensureActiveDeviceIfNone();
+    if (target && target !== deviceId) {
+      syncPublish({
+        type: "command",
+        targetDeviceId: target,
+        payload: { action: "setRepeat", mode: nextMode },
+      });
+    }
     setRepeatMode(nextMode);
     setIsRepeat(nextMode !== "off");
-  }, [repeatMode]);
+  }, [repeatMode, ensureActiveDeviceIfNone, deviceId, syncPublish]);
 
   const toggleShuffle = useCallback(() => {
+    const target = ensureActiveDeviceIfNone();
+    if (target && target !== deviceId) {
+      syncPublish({
+        type: "command",
+        targetDeviceId: target,
+        payload: { action: "shuffle" },
+      });
+      setIsShuffle((prev) => !prev);
+      return;
+    }
     const newShuffleState = !isShuffle;
     setIsShuffle(newShuffleState);
 
@@ -1292,7 +1380,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         console.log("🔀 Shuffle disabled - keeping current queue order");
       }
     }
-  }, [isShuffle, queue, currentTrack, currentIndex]);
+  }, [isShuffle, queue, currentTrack, currentIndex, ensureActiveDeviceIfNone, deviceId, syncPublish]);
 
   const setQueue = useCallback((tracks: Track[], startIndex: number = 0) => {
     setQueueState(tracks);

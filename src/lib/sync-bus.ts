@@ -16,6 +16,8 @@ export type SyncEvent =
         duration: number;
         queue: unknown[];
         currentIndex: number;
+        shuffle?: boolean;
+        repeatMode?: string;
         activeDeviceId: string;
       };
     }
@@ -31,7 +33,9 @@ export type SyncEvent =
         | { action: "previous" }
         | { action: "seek"; seconds: number }
         | { action: "setVolume"; volume: number }
-        | { action: "playTrack"; trackId: string };
+        | { action: "playTrack"; trackId: string; queue?: unknown[]; index?: number }
+        | { action: "shuffle" }
+        | { action: "setRepeat"; mode?: string };
     }
   | {
       type: "claim";
