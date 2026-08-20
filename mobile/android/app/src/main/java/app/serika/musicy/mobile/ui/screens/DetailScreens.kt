@@ -394,11 +394,11 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                                 .padding(horizontal = 16.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            MusicyChip("All", albumFilter == "all") { albumFilter = "all" }
-                            MusicyChip("Albums", albumFilter == "albums") { albumFilter = "albums" }
-                            MusicyChip("Singles", albumFilter == "singles") { albumFilter = "singles" }
-                            MusicyChip("Year", albumSort == "year") { albumSort = "year" }
-                            MusicyChip("Name", albumSort == "name") { albumSort = "name" }
+                            MusicyChip("All", albumFilter == "all", { albumFilter = "all" })
+                            MusicyChip("Albums", albumFilter == "albums", { albumFilter = "albums" })
+                            MusicyChip("Singles", albumFilter == "singles", { albumFilter = "singles" })
+                            MusicyChip("Year", albumSort == "year", { albumSort = "year" })
+                            MusicyChip("Name", albumSort == "name", { albumSort = "name" })
                             FilledTonalButton(onClick = { vm.shuffle(playQueue, contextId) }) {
                                 Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))

@@ -214,7 +214,7 @@ class MusicyPlaybackService : MediaLibraryService() {
             val current = player.currentMediaItem ?: return@launch
             if (current.mediaId != trackId) return@launch
             val extras = Bundle(current.mediaMetadata.extras ?: Bundle()).apply {
-                putString(android.media.MediaMetadata.METADATA_KEY_LYRICS, text)
+                putString("android.media.metadata.LYRICS", text)
             }
             val metadata = current.mediaMetadata.buildUpon()
                 .setDescription(text.lineSequence().take(6).joinToString("\n"))

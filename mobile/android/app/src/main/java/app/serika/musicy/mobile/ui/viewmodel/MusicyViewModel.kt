@@ -510,7 +510,7 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             when (action) {
                 WidgetActions.PLAY_CONTINUE -> resumeContinueListening()
                 WidgetActions.PLAY_LIKED -> {
-                    val tracks = library.valueOrNull?.likedSongs
+                    val tracks = library.value.valueOrNull?.likedSongs
                         ?: withContext(Dispatchers.IO) { runCatching { repo.likedSongs() }.getOrDefault(emptyList()) }
                     play(tracks, 0, MusicyLibrary.NODE_LIKED)
                 }
