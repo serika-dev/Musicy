@@ -244,6 +244,57 @@ fun MediaCard(
     }
 }
 
+/** Full-width cover used in 2- and 3-column album/artist grids. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun GridCover(
+    title: String,
+    subtitle: String?,
+    imageUrl: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    circular: Boolean = false,
+    icon: ImageVector = Icons.Default.Album
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = if (circular) Alignment.CenterHorizontally else Alignment.Start
+    ) {
+        Artwork(
+            url = imageUrl,
+            contentDescription = title,
+            shape = if (circular) CircleShape else RoundedCornerShape(12.dp),
+            icon = icon,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (circular) TextAlign.Center else TextAlign.Start,
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = if (circular) TextAlign.Center else TextAlign.Start,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
 /** One row in a track list. Shows a violet title while it is the active song. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

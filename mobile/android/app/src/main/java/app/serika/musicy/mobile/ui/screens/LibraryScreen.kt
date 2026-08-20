@@ -156,26 +156,33 @@ fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
                                         icon = Icons.Default.Person
                                     )
                                 }
-                            }
-                            items(data.followedArtists, key = { it.id }) { artist ->
-                                ListRow(
-                                    title = artist.name,
-                                    subtitle = "Artist",
-                                    imageUrl = vm.repo.resolveUrl(artist.imageUrl),
-                                    icon = Icons.Default.Person,
-                                    circular = true,
-                                    onClick = { nav.artist(artist.id) }
+                            } else {
+                                artistGrid(
+                                    title = "",
+                                    artists = data.followedArtists,
+                                    resolveArtwork = { vm.repo.resolveUrl(it.imageUrl) },
+                                    onOpen = { nav.artist(it.id) },
+                                    maxItems = 99
                                 )
                             }
                         }
 
                         LibraryTab.ALBUMS -> {
-                            items(data.albums, key = { it.id }) { album ->
-                                ListRow(
-                                    title = album.title,
-                                    subtitle = listOfNotNull("Album", album.artist?.name, album.year).joinToString(" · "),
-                                    imageUrl = vm.repo.resolveUrl(album.coverImageUrl),
-                                    onClick = { nav.album(album.id) }
+                            if (data.albums.isEmpty()) {
+                                item {
+                                    EmptyState(
+                                        title = "No albums here yet",
+                                        message = "Albums you play will show up in your library.",
+                                        icon = Icons.Default.QueueMusic
+                                    )
+                                }
+                            } else {
+                                albumGrid(
+                                    title = "",
+                                    albums = data.albums,
+                                    resolveArtwork = { vm.repo.resolveUrl(it.coverImageUrl) },
+                                    onOpen = { nav.album(it.id) },
+                                    maxItems = 60
                                 )
                             }
                         }

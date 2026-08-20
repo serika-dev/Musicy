@@ -318,6 +318,12 @@ private fun MainScaffold(config: ServerConfig) {
                 ArtistTracksScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
             }
             composable(
+                route = Routes.ARTIST_ALBUMS,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entry ->
+                ArtistAlbumsScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
+            }
+            composable(
                 route = Routes.PLAYLIST,
                 arguments = listOf(navArgument("id") { type = NavType.StringType })
             ) { entry ->

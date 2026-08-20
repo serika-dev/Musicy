@@ -3,7 +3,14 @@ package app.serika.musicy.mobile.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -172,27 +179,50 @@ private fun DownloadAllButton(vm: MusicyViewModel, tracks: List<Track>) {
     }
 }
 
-/** Wraps a detail page with a back-arrow app bar. */
+/** Wraps a detail page with a back-arrow app bar. The title only appears after
+ *  the hero has scrolled away, so it never sits on top of the track list. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DetailScaffold(
     titleWhenScrolled: String,
     nav: Nav,
+    scrolled: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit
 ) {
+    val barColor = if (scrolled) {
+        MaterialTheme.colorScheme.background.copy(alpha = 0.94f)
+    } else {
+        Color.Transparent
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(titleWhenScrolled, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    if (scrolled) {
+                        Text(titleWhenScrolled, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                },
                 navigationIcon = { BackButton(nav::back) },
                 actions = actions,
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = barColor,
+                    scrolledContainerColor = barColor
+                )
             )
         },
         containerColor = Color.Transparent,
         content = content
     )
+}
+
+@Composable
+private fun rememberHeroScrolled(state: LazyListState): Boolean {
+    return remember {
+        androidx.compose.runtime.derivedStateOf {
+            state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 140
+        }
+    }.value
 }
 
 // ---------------------------------------------------------------------------
@@ -205,8 +235,10 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
+    val listState = rememberLazyListState()
+    val scrolled = rememberHeroScrolled(listState)
 
-    DetailScaffold(titleWhenScrolled = album.valueOrNull?.title ?: "Album", nav = nav) { padding ->
+    DetailScaffold(titleWhenScrolled = album.valueOrNull?.title ?: "Album", nav = nav, scrolled = scrolled) { padding ->
         when (val state = album) {
             is Async.Loading -> DetailSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
@@ -214,7 +246,7 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
                 val data: Album = state.value
                 val tracks = data.tracks.orEmpty()
                 val contextId = MusicyLibrary.albumId(data.id)
-                LazyColumn(contentPadding = padding) {
+                LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
                             title = data.title,
@@ -282,13 +314,15 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     var following by remember(artistId) { mutableStateOf<Boolean?>(null) }
+    val listState = rememberLazyListState()
+    val scrolled = rememberHeroScrolled(listState)
 
     LaunchedEffect(artistId, artist) {
         val known = artist.valueOrNull?.isFollowing
         following = known ?: withContext(Dispatchers.IO) { vm.repo.isFollowing(artistId) }
     }
 
-    DetailScaffold(titleWhenScrolled = artist.valueOrNull?.name ?: "Artist", nav = nav) { padding ->
+    DetailScaffold(titleWhenScrolled = artist.valueOrNull?.name ?: "Artist", nav = nav, scrolled = scrolled) { padding ->
         when (val state = artist) {
             is Async.Loading -> DetailSkeleton(circular = true, modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
@@ -301,7 +335,7 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                 val playQueue = allTracks.ifEmpty { popular }
                 val trackCount = data.count?.tracks ?: allTracks.size
 
-                LazyColumn(contentPadding = padding) {
+                LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
                             title = data.name,
@@ -351,7 +385,7 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                         item {
                             SectionHeader(
                                 "Popular",
-                                actionLabel = if (allTracks.size > popular.size || trackCount > popular.size) "See all" else null,
+                                actionLabel = if (allTracks.size > popular.size || trackCount > popular.size) "View all" else null,
                                 onAction = { nav.artistTracks(data.id) }
                             )
                         }
@@ -370,24 +404,14 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                         item { ListSkeleton() }
                     }
 
-                    if (allTracks.size > 10) {
-                        item {
-                            ListRow(
-                                title = "See all songs",
-                                subtitle = "$trackCount tracks",
-                                imageUrl = null,
-                                icon = Icons.Default.QueueMusic,
-                                onClick = { nav.artistTracks(data.id) }
-                            )
-                        }
-                    }
-
                     if (artistAlbums.isNotEmpty()) {
-                        albumRow(
+                        albumGrid(
                             title = "Albums",
                             albums = artistAlbums,
                             resolveArtwork = { vm.repo.resolveUrl(it.coverImageUrl) },
-                            onOpen = { nav.album(it.id) }
+                            onOpen = { nav.album(it.id) },
+                            onSeeAll = if (artistAlbums.size > 8) ({ nav.artistAlbums(data.id) }) else null,
+                            maxItems = 8
                         )
                     }
 
@@ -419,10 +443,13 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     val name = artist.valueOrNull?.name ?: "Artist"
     val list = tracks.valueOrNull.orEmpty()
     val contextId = MusicyLibrary.artistId(artistId)
+    val listState = rememberLazyListState()
+    val scrolled = rememberHeroScrolled(listState)
 
     DetailScaffold(
         titleWhenScrolled = name,
         nav = nav,
+        scrolled = scrolled,
         actions = {
             if (list.isNotEmpty()) {
                 IconButton(onClick = { vm.shuffle(list, contextId) }) {
@@ -435,7 +462,7 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
             is Async.Loading -> ListSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
-                LazyColumn(contentPadding = padding) {
+                LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         Row(
                             modifier = Modifier
@@ -444,7 +471,8 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("All songs", style = MaterialTheme.typography.titleMedium)
+                                Text(name, style = MaterialTheme.typography.headlineSmall)
+                                Text("All songs · ${list.size} tracks", style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
                                 Text(
                                     "${list.size} tracks",
                                     style = MaterialTheme.typography.bodySmall,
@@ -483,6 +511,57 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     TrackActionsHost(vm = vm, nav = nav, selected = actionTrack, onDismiss = { actionTrack = null })
 }
 
+@Composable
+fun ArtistAlbumsScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
+    val artist by loadAsync("albums-name-$artistId") { vm.repo.artist(artistId) }
+    val albums by loadAsync("all-albums-$artistId") {
+        val fromArtist = vm.repo.artist(artistId).albums
+        if (!fromArtist.isNullOrEmpty()) fromArtist else vm.repo.artistAlbums(artistId)
+    }
+    val name = artist.valueOrNull?.name ?: "Artist"
+    val list = albums.valueOrNull.orEmpty()
+    val gridState = rememberLazyGridState()
+    val scrolled = remember {
+        androidx.compose.runtime.derivedStateOf {
+            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 80
+        }
+    }.value
+
+    DetailScaffold(titleWhenScrolled = name, nav = nav, scrolled = scrolled) { padding ->
+        when (val state = albums) {
+            is Async.Loading -> ListSkeleton(modifier = Modifier.padding(padding))
+            is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
+            is Async.Success -> {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    state = gridState,
+                    contentPadding = padding,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    item(span = { GridItemSpan(2) }) {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Text(name, style = MaterialTheme.typography.headlineSmall)
+                            Text(
+                                "${list.size} albums",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurfaceVariant
+                            )
+                        }
+                    }
+                    items(list, key = { it.id }) { album ->
+                        GridCover(
+                            title = album.title,
+                            subtitle = listOfNotNull(album.year, "${album.trackCount} tracks").joinToString(" · "),
+                            imageUrl = vm.repo.resolveUrl(album.coverImageUrl),
+                            onClick = { nav.album(album.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Playlist
 // ---------------------------------------------------------------------------
@@ -494,8 +573,10 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
+    val listState = rememberLazyListState()
+    val scrolled = rememberHeroScrolled(listState)
 
-    DetailScaffold(titleWhenScrolled = playlist.valueOrNull?.name ?: "Playlist", nav = nav) { padding ->
+    DetailScaffold(titleWhenScrolled = playlist.valueOrNull?.name ?: "Playlist", nav = nav, scrolled = scrolled) { padding ->
         when (val state = playlist) {
             is Async.Loading -> DetailSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
@@ -503,7 +584,7 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
                 val data: Playlist = state.value
                 val tracks = data.trackList()
                 val contextId = MusicyLibrary.playlistId(data.id)
-                LazyColumn(contentPadding = padding) {
+                LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
                             title = data.name,
@@ -561,8 +642,10 @@ fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
     val liked by vm.likedTrackIds.collectAsState()
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
+    val listState = rememberLazyListState()
+    val scrolled = rememberHeroScrolled(listState)
 
-    DetailScaffold(titleWhenScrolled = mix.valueOrNull?.name ?: "Daily Mix", nav = nav) { padding ->
+    DetailScaffold(titleWhenScrolled = mix.valueOrNull?.name ?: "Daily Mix", nav = nav, scrolled = scrolled) { padding ->
         when (val state = mix) {
             is Async.Loading -> DetailSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
@@ -570,7 +653,7 @@ fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
                 val data: DailyMix = state.value
                 val tracks = data.tracks.orEmpty()
                 val contextId = MusicyLibrary.mixId(data.id)
-                LazyColumn(contentPadding = padding) {
+                LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
                             title = data.name,
@@ -695,9 +778,11 @@ fun LikedSongsScreen(vm: MusicyViewModel, nav: Nav) {
     val playback by vm.player.state.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val tracks = library.valueOrNull?.likedSongs.orEmpty()
+    val listState = rememberLazyListState()
+    val scrolled = rememberHeroScrolled(listState)
 
-    DetailScaffold(titleWhenScrolled = "Liked Songs", nav = nav) { padding ->
-        LazyColumn(contentPadding = padding) {
+    DetailScaffold(titleWhenScrolled = "Liked Songs", nav = nav, scrolled = scrolled) { padding ->
+        LazyColumn(state = listState, contentPadding = padding) {
             item {
                 DetailHero(
                     title = "Liked Songs",
@@ -775,71 +860,129 @@ fun CollectionScreen(vm: MusicyViewModel, nav: Nav, kind: String) {
         }
     }
 
-    DetailScaffold(titleWhenScrolled = title, nav = nav) { padding ->
+    val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
+    val useGrid = kind in setOf(
+        CollectionKind.ALBUMS, CollectionKind.NEW_RELEASES,
+        CollectionKind.ARTISTS, CollectionKind.FOLLOWED,
+        CollectionKind.PLAYLISTS, CollectionKind.MIXES
+    )
+    val scrolled = if (useGrid) {
+        remember {
+            androidx.compose.runtime.derivedStateOf {
+                gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 80
+            }
+        }.value
+    } else {
+        rememberHeroScrolled(listState)
+    }
+
+    DetailScaffold(titleWhenScrolled = title, nav = nav, scrolled = scrolled) { padding ->
         when (val state = content) {
             is Async.Loading -> ListSkeleton(modifier = Modifier.padding(padding))
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data = state.value
-                LazyColumn(contentPadding = padding) {
-                    items(data.albums, key = { "album-${it.id}" }) { album ->
-                        ListRow(
-                            title = album.title,
-                            subtitle = listOfNotNull("Album", album.artist?.name, album.year).joinToString(" · "),
-                            imageUrl = vm.repo.resolveUrl(album.coverImageUrl),
-                            onClick = { nav.album(album.id) }
-                        )
+                val columns = when {
+                    data.albums.isNotEmpty() -> 2
+                    data.artists.isNotEmpty() -> 3
+                    data.playlists.isNotEmpty() || data.mixes.isNotEmpty() -> 2
+                    else -> 0
+                }
+                if (columns > 0) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
+                        state = gridState,
+                        contentPadding = padding,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        item(span = { GridItemSpan(columns) }) {
+                            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                Text(title, style = MaterialTheme.typography.headlineSmall)
+                                val count = when {
+                                    data.albums.isNotEmpty() -> "${data.albums.size} albums"
+                                    data.artists.isNotEmpty() -> "${data.artists.size} artists"
+                                    data.playlists.isNotEmpty() -> "${data.playlists.size} playlists"
+                                    else -> "${data.mixes.size} mixes"
+                                }
+                                Text(count, style = MaterialTheme.typography.bodySmall, color = OnSurfaceVariant)
+                            }
+                        }
+                        items(data.albums, key = { "album-${it.id}" }) { album ->
+                            GridCover(
+                                title = album.title,
+                                subtitle = listOfNotNull(album.artist?.name, album.year).joinToString(" · "),
+                                imageUrl = vm.repo.resolveUrl(album.coverImageUrl),
+                                onClick = { nav.album(album.id) }
+                            )
+                        }
+                        items(data.artists, key = { "artist-${it.id}" }) { artist ->
+                            GridCover(
+                                title = artist.name,
+                                subtitle = artist.count?.tracks?.let { "$it tracks" } ?: "Artist",
+                                imageUrl = vm.repo.resolveUrl(artist.imageUrl),
+                                circular = true,
+                                icon = Icons.Default.Person,
+                                onClick = { nav.artist(artist.id) }
+                            )
+                        }
+                        items(data.playlists, key = { "playlist-${it.id}" }) { playlist ->
+                            GridCover(
+                                title = playlist.name,
+                                subtitle = "${playlist.trackCount} tracks",
+                                imageUrl = vm.repo.resolveUrl(playlist.coverImageUrl),
+                                icon = Icons.Default.QueueMusic,
+                                onClick = { nav.playlist(playlist.id) }
+                            )
+                        }
+                        items(data.mixes, key = { "mix-${it.id}" }) { mix ->
+                            GridCover(
+                                title = mix.name,
+                                subtitle = mix.description ?: "${mix.trackCount} tracks",
+                                imageUrl = vm.repo.resolveUrl(mix.coverImageUrl),
+                                onClick = { nav.mix(mix.id) }
+                            )
+                        }
                     }
-                    items(data.artists, key = { "artist-${it.id}" }) { artist ->
-                        ListRow(
-                            title = artist.name,
-                            subtitle = artist.count?.tracks?.let { "$it tracks" } ?: "Artist",
-                            imageUrl = vm.repo.resolveUrl(artist.imageUrl),
-                            icon = Icons.Default.Person,
-                            circular = true,
-                            onClick = { nav.artist(artist.id) }
-                        )
+                } else {
+                    LazyColumn(state = listState, contentPadding = padding) {
+                        item {
+                            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                Text(title, style = MaterialTheme.typography.headlineSmall)
+                                if (data.tracks.isNotEmpty()) {
+                                    Text(
+                                        "${data.tracks.size} songs",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = OnSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        items(data.genres, key = { "genre-$it" }) { genre ->
+                            ListRow(
+                                title = genre,
+                                subtitle = "Genre",
+                                imageUrl = null,
+                                onClick = { nav.genre(genre) }
+                            )
+                        }
+                        if (data.tracks.isNotEmpty()) {
+                            trackItems(
+                                tracks = data.tracks,
+                                likedIds = liked,
+                                currentTrackId = playback.currentTrack?.id,
+                                isPlaying = playback.isPlaying,
+                                resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
+                                onPlay = { index -> vm.play(data.tracks, index) },
+                                onToggleLike = { vm.toggleLike(it) },
+                                onMore = { actionTrack = it }
+                            )
+                        }
+                        if (data.isEmpty) {
+                            item { EmptyState("Nothing here yet", "Come back once there's more in the library.") }
+                        }
+                        item { Spacer(Modifier.height(24.dp)) }
                     }
-                    items(data.playlists, key = { "playlist-${it.id}" }) { playlist ->
-                        ListRow(
-                            title = playlist.name,
-                            subtitle = "Playlist · ${playlist.trackCount} tracks",
-                            imageUrl = vm.repo.resolveUrl(playlist.coverImageUrl),
-                            onClick = { nav.playlist(playlist.id) }
-                        )
-                    }
-                    items(data.mixes, key = { "mix-${it.id}" }) { mix ->
-                        ListRow(
-                            title = mix.name,
-                            subtitle = mix.description ?: "${mix.trackCount} tracks",
-                            imageUrl = vm.repo.resolveUrl(mix.coverImageUrl),
-                            onClick = { nav.mix(mix.id) }
-                        )
-                    }
-                    items(data.genres, key = { "genre-$it" }) { genre ->
-                        ListRow(
-                            title = genre,
-                            subtitle = "Genre",
-                            imageUrl = null,
-                            onClick = { nav.genre(genre) }
-                        )
-                    }
-                    if (data.tracks.isNotEmpty()) {
-                        trackItems(
-                            tracks = data.tracks,
-                            likedIds = liked,
-                            currentTrackId = playback.currentTrack?.id,
-                            isPlaying = playback.isPlaying,
-                            resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
-                            onPlay = { index -> vm.play(data.tracks, index) },
-                            onToggleLike = { vm.toggleLike(it) },
-                            onMore = { actionTrack = it }
-                        )
-                    }
-                    if (data.isEmpty) {
-                        item { EmptyState("Nothing here yet", "Come back once there's more in the library.") }
-                    }
-                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
         }

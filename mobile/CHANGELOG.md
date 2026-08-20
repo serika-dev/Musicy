@@ -10,6 +10,16 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.6.1]
+
+### Changed
+- **Collapsing detail titles.** Artist/album names no longer sit on top of the track list while you scroll — the app bar stays clear until the hero is off-screen, then the title fades in with a solid background.
+- **Album viewer.** Artist pages show a 2-column album grid (not a thin carousel). View all opens a full cover grid. Home/library "View all" pages use the same grid for albums, artists, playlists and mixes.
+- **View all** labels and headers with counts, instead of a bare list of rows.
+- **Library and Home album grids.** Library → Albums is a 2-column cover wall; followed artists are a 3-column grid; Home new releases and search albums use the same viewer.
+
+---
+
 ## [1.6.0]
 
 ### Fixed

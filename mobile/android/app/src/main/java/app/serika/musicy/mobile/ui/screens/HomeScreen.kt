@@ -175,12 +175,13 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
 
                 val newReleases = feed?.newReleases.orEmpty().ifEmpty { data.albums }
                 if (newReleases.isNotEmpty()) {
-                    albumRow(
+                    albumGrid(
                         title = "New releases",
                         albums = newReleases,
                         resolveArtwork = { vm.repo.resolveUrl(it.coverImageUrl) },
                         onOpen = { nav.album(it.id) },
-                        onSeeAll = { nav.collection(CollectionKind.NEW_RELEASES) }
+                        onSeeAll = { nav.collection(CollectionKind.NEW_RELEASES) },
+                        maxItems = 6
                     )
                 }
 
@@ -405,6 +406,80 @@ internal fun categoryColors(name: String): List<Color> {
 
 // -- reusable carousels ------------------------------------------------------
 
+internal fun androidx.compose.foundation.lazy.LazyListScope.albumGrid(
+    title: String,
+    albums: List<Album>,
+    resolveArtwork: (Album) -> String?,
+    onOpen: (Album) -> Unit,
+    onSeeAll: (() -> Unit)? = null,
+    maxItems: Int = 8
+) {
+    if (albums.isEmpty()) return
+    if (title.isNotBlank()) {
+        item { SectionHeader(title, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
+    }
+    val shown = albums.take(maxItems)
+    shown.chunked(2).forEachIndexed { rowIndex, row ->
+        item(key = "album-grid-$title-$rowIndex") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                row.forEach { album ->
+                    GridCover(
+                        title = album.title,
+                        subtitle = listOfNotNull(album.year, album.albumType?.takeIf { it != "ALBUM" }?.lowercase()?.replaceFirstChar { it.uppercase() }).joinToString(" · ").ifBlank { album.artist?.name },
+                        imageUrl = resolveArtwork(album),
+                        onClick = { onOpen(album) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+internal fun androidx.compose.foundation.lazy.LazyListScope.artistGrid(
+    title: String,
+    artists: List<Artist>,
+    resolveArtwork: (Artist) -> String?,
+    onOpen: (Artist) -> Unit,
+    onSeeAll: (() -> Unit)? = null,
+    maxItems: Int = 9
+) {
+    if (artists.isEmpty()) return
+    if (title.isNotBlank()) {
+        item { SectionHeader(title, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
+    }
+    val shown = artists.take(maxItems)
+    shown.chunked(3).forEachIndexed { rowIndex, row ->
+        item(key = "artist-grid-$title-$rowIndex") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                row.forEach { artist ->
+                    GridCover(
+                        title = artist.name,
+                        subtitle = artist.count?.tracks?.let { "$it tracks" },
+                        imageUrl = resolveArtwork(artist),
+                        circular = true,
+                        icon = Icons.Default.Person,
+                        onClick = { onOpen(artist) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
 internal fun androidx.compose.foundation.lazy.LazyListScope.albumRow(
     title: String,
     albums: List<Album>,
@@ -413,7 +488,7 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.albumRow(
     subtitle: String? = null,
     onSeeAll: (() -> Unit)? = null
 ) {
-    item { SectionHeader(title, subtitle = subtitle, actionLabel = onSeeAll?.let { "See all" }, onAction = onSeeAll) }
+    item { SectionHeader(title, subtitle = subtitle, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
     item {
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
             items(albums, key = { it.id }) { album ->
@@ -435,7 +510,7 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.artistRow(
     onOpen: (Artist) -> Unit,
     onSeeAll: (() -> Unit)? = null
 ) {
-    item { SectionHeader(title, actionLabel = onSeeAll?.let { "See all" }, onAction = onSeeAll) }
+    item { SectionHeader(title, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
     item {
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
             items(artists, key = { it.id }) { artist ->
@@ -459,7 +534,7 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.playlistRow(
     onOpen: (Playlist) -> Unit,
     onSeeAll: (() -> Unit)? = null
 ) {
-    item { SectionHeader(title, actionLabel = onSeeAll?.let { "See all" }, onAction = onSeeAll) }
+    item { SectionHeader(title, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
     item {
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
             items(playlists, key = { it.id }) { playlist ->
@@ -484,7 +559,7 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.mixRow(
     subtitle: String? = null,
     onSeeAll: (() -> Unit)? = null
 ) {
-    item { SectionHeader(title, subtitle = subtitle, actionLabel = onSeeAll?.let { "See all" }, onAction = onSeeAll) }
+    item { SectionHeader(title, subtitle = subtitle, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
     item {
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
             items(mixes, key = { it.id }) { mix ->
@@ -508,7 +583,7 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.trackRow(
     onPlay: (Int) -> Unit,
     onSeeAll: (() -> Unit)? = null
 ) {
-    item { SectionHeader(title, actionLabel = onSeeAll?.let { "See all" }, onAction = onSeeAll) }
+    item { SectionHeader(title, actionLabel = onSeeAll?.let { "View all" }, onAction = onSeeAll) }
     item {
         LazyRow(contentPadding = PaddingValues(horizontal = 10.dp)) {
             items(tracks.size, key = { "${it}_${tracks[it].id}" }) { index ->

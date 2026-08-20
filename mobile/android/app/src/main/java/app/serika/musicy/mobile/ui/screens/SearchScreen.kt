@@ -151,11 +151,12 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
                         if (filter == SearchFilter.ALL || filter == SearchFilter.ALBUMS) {
                             val albums = data.albums?.items.orEmpty()
                             if (albums.isNotEmpty()) {
-                                albumRow(
+                                albumGrid(
                                     title = "Albums",
                                     albums = albums,
                                     resolveArtwork = { vm.repo.resolveUrl(it.coverImageUrl) },
-                                    onOpen = { nav.album(it.id) }
+                                    onOpen = { nav.album(it.id) },
+                                    maxItems = 8
                                 )
                             }
                         }
