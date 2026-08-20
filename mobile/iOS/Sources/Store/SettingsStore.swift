@@ -78,9 +78,26 @@ final class SettingsStore: ObservableObject {
     var shouldPlayLocalOnly: Bool {
         if offlineOnly { return true }
         let net = NetworkMonitor.shared
-        if !net.online { return true }
-        if !streamOnCellular && net.cellular && !net.wifi { return true }
+        if !net.isOnline { return true }
+        if !streamOnCellular && net.isCellular && !net.isWifi { return true }
         return false
+    }
+
+    /// Off-main-actor reads for the HTTP layer. `SettingsStore` is `@MainActor`.
+    nonisolated static var readsOfflineOnly: Bool {
+        UserDefaults.standard.object(forKey: Key.offlineOnly) as? Bool ?? false
+    }
+    nonisolated static var readsDataSaver: Bool {
+        UserDefaults.standard.object(forKey: Key.dataSaver) as? Bool ?? false
+    }
+    nonisolated static var readsQuality: String {
+        UserDefaults.standard.string(forKey: Key.quality) ?? "auto"
+    }
+    nonisolated static var readsEffectiveQuality: String {
+        readsDataSaver ? "low" : readsQuality
+    }
+    nonisolated static var readsDownloadOnWifiOnly: Bool {
+        UserDefaults.standard.object(forKey: Key.wifiOnly) as? Bool ?? true
     }
 
     func applyPlaybackMode(_ mode: String) {

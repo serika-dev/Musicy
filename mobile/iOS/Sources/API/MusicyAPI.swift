@@ -40,6 +40,12 @@ final class MusicyAPI: ObservableObject {
 
     var isAuthenticated: Bool { !baseURL.isEmpty && !apiKey.isEmpty }
 
+    /// Cache-first when the user asked for offline mode or the radio is down.
+    /// Reads UserDefaults directly so this type does not hop to the main actor.
+    private var preferCache: Bool {
+        SettingsStore.readsOfflineOnly || !NetworkMonitor.shared.isOnline
+    }
+
     var normalizedBaseURL: String {
         var trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         while trimmed.hasSuffix("/") { trimmed.removeLast() }
@@ -179,8 +185,7 @@ final class MusicyAPI: ObservableObject {
     }
 
     func getAlbum(id: String) async throws -> Album {
-        if let cached = CatalogueCache.read(Album.self, key: CatalogueCache.album(id)),
-           SettingsStore.shared.offlineOnly || !NetworkMonitor.shared.online {
+        if preferCache, let cached = CatalogueCache.read(Album.self, key: CatalogueCache.album(id)) {
             return cached
         }
         let album = try await decode(Album.self, path: "api/albums/\(id)")
@@ -193,8 +198,7 @@ final class MusicyAPI: ObservableObject {
     }
 
     func getArtist(id: String) async throws -> Artist {
-        if let cached = CatalogueCache.read(Artist.self, key: CatalogueCache.artist(id)),
-           SettingsStore.shared.offlineOnly || !NetworkMonitor.shared.online {
+        if preferCache, let cached = CatalogueCache.read(Artist.self, key: CatalogueCache.artist(id)) {
             return cached
         }
         let artist = try await decode(Artist.self, path: "api/artists/\(id)")
@@ -203,7 +207,7 @@ final class MusicyAPI: ObservableObject {
     }
 
     func getArtistTracks(id: String, limit: Int = 200, offset: Int = 0) async throws -> TracksResponse {
-        if let cached = CatalogueCache.read([Track].self, key: CatalogueCache.artistTracks(id)), offset == 0, SettingsStore.shared.offlineOnly || !NetworkMonitor.shared.online {
+        if preferCache, offset == 0, let cached = CatalogueCache.read([Track].self, key: CatalogueCache.artistTracks(id)) {
             return TracksResponse(tracks: cached, total: cached.count, limit: cached.count, offset: 0, hasMore: false)
         }
         let page = try await decode(TracksResponse.self, path: "api/artists/\(id)/tracks?limit=\(limit)&offset=\(offset)")
@@ -213,8 +217,7 @@ final class MusicyAPI: ObservableObject {
 
     /// Pages until the artist catalogue is complete, including features.
     func getAllArtistTracks(id: String) async throws -> [Track] {
-        if let cached = CatalogueCache.read([Track].self, key: CatalogueCache.artistTracks(id)),
-           SettingsStore.shared.offlineOnly || !NetworkMonitor.shared.online {
+        if preferCache, let cached = CatalogueCache.read([Track].self, key: CatalogueCache.artistTracks(id)) {
             return cached
         }
         var all: [Track] = []
@@ -285,8 +288,7 @@ final class MusicyAPI: ObservableObject {
     }
 
     func getPlaylist(id: String) async throws -> Playlist {
-        if let cached = CatalogueCache.read(Playlist.self, key: CatalogueCache.playlist(id)),
-           SettingsStore.shared.offlineOnly || !NetworkMonitor.shared.online {
+        if preferCache, let cached = CatalogueCache.read(Playlist.self, key: CatalogueCache.playlist(id)) {
             return cached
         }
         let playlist = try await decode(Playlist.self, path: "api/playlists/\(id)")

@@ -96,10 +96,10 @@ final class DownloadStore: ObservableObject {
 
         // Use the server-side download proxy to avoid CORS issues with B2/R2
         // and to respect the user's quality setting.
-        let quality = await MainActor.run { SettingsStore.shared.effectiveQuality }
-        let wifiOnly = await MainActor.run { SettingsStore.shared.downloadOnWifiOnly }
+        let quality = SettingsStore.readsEffectiveQuality
+        let wifiOnly = SettingsStore.readsDownloadOnWifiOnly
         let net = NetworkMonitor.shared
-        if wifiOnly, net.online, !net.wifi { return false }
+        if wifiOnly, net.isOnline, !net.isWifi { return false }
         guard let remote = MusicyAPI.shared.downloadURL(trackId: id, quality: quality) else { return false }
 
         _ = await MainActor.run { self.downloadingIds.insert(id) }
