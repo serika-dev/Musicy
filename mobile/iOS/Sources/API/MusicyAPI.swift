@@ -293,7 +293,6 @@ final class MusicyAPI: ObservableObject {
         CatalogueCache.write(playlist, key: CatalogueCache.playlist(id))
         return playlist
     }
-    }
 
     func createPlaylist(name: String) async throws -> Playlist {
         let body = try JSONEncoder().encode(CreatePlaylistRequest(name: name, description: nil, isPublic: true))
