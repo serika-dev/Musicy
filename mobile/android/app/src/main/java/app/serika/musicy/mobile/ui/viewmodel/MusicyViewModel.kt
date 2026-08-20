@@ -66,6 +66,7 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     val config: StateFlow<ServerConfig> = repo.config
     val likedTrackIds: StateFlow<Set<String>> = repo.likedTrackIds
     val settings = repo.settings
+    val network = repo.network
 
     /** Reactive set of track ids available offline, so any list/menu stays in sync. */
     val downloadedIds: StateFlow<Set<String>> = repo.downloads
@@ -306,7 +307,17 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             showToast("Nothing playable here yet")
             return
         }
-        player.play(tracks, startIndex, contextId)
+        val queue = if (repo.shouldPlayLocalOnly()) {
+            val local = tracks.filter { repo.isDownloaded(it.id) }
+            if (local.isEmpty()) {
+                showToast("Download these tracks to play them offline")
+                return
+            }
+            local
+        } else tracks
+        val startId = tracks.getOrNull(startIndex)?.id
+        val index = startId?.let { id -> queue.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
+        player.play(queue, index, contextId)
     }
 
     fun playAlbum(album: Album, startIndex: Int = 0) =
@@ -319,11 +330,12 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         play(mix.tracks.orEmpty(), startIndex, MusicyLibrary.mixId(mix.id))
 
     fun shuffle(tracks: List<Track>, contextId: String? = null) {
-        if (tracks.isEmpty()) {
-            showToast("Nothing playable here yet")
+        val source = if (repo.shouldPlayLocalOnly()) tracks.filter { repo.isDownloaded(it.id) } else tracks
+        if (source.isEmpty()) {
+            showToast(if (repo.shouldPlayLocalOnly()) "Download these tracks to play them offline" else "Nothing playable here yet")
             return
         }
-        player.play(tracks.shuffled(), 0, contextId)
+        player.play(source.shuffled(), 0, contextId)
     }
 
     fun toggleLike(track: Track) {
@@ -352,7 +364,12 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { repo.download(track) }
             _downloadingIds.value = _downloadingIds.value - track.id
-            showToast(if (result.isSuccess) "Saved for offline" else "Download failed")
+            showToast(
+                result.fold(
+                    onSuccess = { "Saved for offline" },
+                    onFailure = { it.message?.takeIf { msg -> msg.isNotBlank() } ?: "Download failed" }
+                )
+            )
         }
     }
 
@@ -460,7 +477,52 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     fun setDeviceName(value: String) = device { setDeviceName(value) }
     fun setResumeOnLaunch(value: Boolean) = device { setResumeOnLaunch(value) }
     fun setDownloadOnWifiOnly(value: Boolean) = device { setDownloadOnWifiOnly(value) }
+    fun setStreamOnCellular(value: Boolean) = device { setStreamOnCellular(value) }
+    fun setDataSaver(value: Boolean) = device { setDataSaver(value) }
+    fun setOfflineOnly(value: Boolean) = device { setOfflineOnly(value) }
     fun setHapticFeedback(value: Boolean) = device { setHapticFeedback(value) }
+
+    /** One-tap quality / connectivity mode used by the Settings chips. */
+    fun setPlaybackMode(mode: String) {
+        viewModelScope.launch {
+            when (mode) {
+                "data_saver" -> {
+                    repo.settingsStore.setOfflineOnly(false)
+                    repo.settingsStore.setDataSaver(true)
+                }
+                "offline" -> {
+                    repo.settingsStore.setDataSaver(false)
+                    repo.settingsStore.setOfflineOnly(true)
+                }
+                "lossless" -> {
+                    repo.settingsStore.setOfflineOnly(false)
+                    repo.settingsStore.setDataSaver(false)
+                    repo.settingsStore.setAudioQuality("lossless")
+                    repo.pushAccountSettings()
+                }
+                "high" -> {
+                    repo.settingsStore.setOfflineOnly(false)
+                    repo.settingsStore.setDataSaver(false)
+                    repo.settingsStore.setAudioQuality("high")
+                    repo.pushAccountSettings()
+                }
+                else -> {
+                    repo.settingsStore.setOfflineOnly(false)
+                    repo.settingsStore.setDataSaver(false)
+                    repo.settingsStore.setAudioQuality("auto")
+                    repo.pushAccountSettings()
+                }
+            }
+        }
+    }
+
+    fun syncLibraryOffline() {
+        showToast("Saving library for offline…")
+        viewModelScope.launch {
+            val count = withContext(Dispatchers.IO) { runCatching { repo.syncLibraryForOffline() }.getOrDefault(0) }
+            showToast(if (count > 0) "Library saved for offline ($count items)" else "Couldn't sync. Check your connection.")
+        }
+    }
     fun setSkipSilence(value: Boolean) = device { setSkipSilence(value) }
     fun setSeekStep(value: Int) = device { setSeekStepSeconds(value) }
 

@@ -59,6 +59,10 @@ struct Track: Codable, Identifiable, Hashable {
 
     static func == (lhs: Track, rhs: Track) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    static func offlineStub(id: String, format: String?) -> Track {
+        Track(id: id, title: "Offline track", format: format?.uppercased())
+    }
 }
 
 struct Artist: Codable, Identifiable, Hashable {
@@ -70,9 +74,17 @@ struct Artist: Codable, Identifiable, Hashable {
     let bio: String?
     let isFollowing: Bool?
     let members: [Artist]?
+    /// Popular preview from `GET /api/artists/{id}` — the API field is `tracks`.
     let topTracks: [Track]?
     let albums: [Album]?
     let _count: Count?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, imageUrl, bannerUrl, verified, bio, isFollowing, members
+        case topTracks = "tracks"
+        case albums
+        case _count
+    }
 
     static func == (lhs: Artist, rhs: Artist) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

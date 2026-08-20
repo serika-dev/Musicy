@@ -5,6 +5,7 @@ import SwiftUI
 enum Route: Hashable {
     case album(String)
     case artist(String)
+    case artistTracks(String)
     case playlist(String)
     case mix(String)
     case genre(String)

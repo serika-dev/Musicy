@@ -280,6 +280,7 @@ extension View {
             switch route {
             case let .album(id): AlbumDetailView(albumId: id)
             case let .artist(id): ArtistDetailView(artistId: id)
+            case let .artistTracks(id): ArtistTracksView(artistId: id)
             case let .playlist(id): PlaylistDetailView(playlistId: id)
             case let .mix(id): DailyMixDetailView(mixId: id)
             case let .genre(name): GenreDetailView(genre: name)

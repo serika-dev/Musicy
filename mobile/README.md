@@ -17,9 +17,9 @@ and the same multi-device playback hand-off.
 - **Real playback** — one shared engine per app drives the in-app UI, the
   system notification / lock screen, headset buttons and the car. Queue,
   shuffle, repeat, seek, gapless-ish autoplay and play-history scrobbling.
-- **Full catalogue** — home feed, search, genre categories, albums, artists,
-  playlists, daily mixes, liked songs, recently played, followed artists and
-  "see all" index pages for each.
+- **Full catalogue** — home feed, search, genre categories, albums, artists
+  (every song, not just the top ten), playlists, daily mixes, liked songs,
+  recently played, followed artists and "see all" index pages for each.
 - **Player** — artwork, scrubbing, queue editing, synced lyrics (LRCLib, the
   same source the web player uses) and device switching. The Android player
   tints itself to the cover art, scrolls long titles, swipes sideways to
@@ -40,8 +40,13 @@ and the same multi-device playback hand-off.
 - **Android Auto / CarPlay** — browse Home, Library, Albums, Artists,
   Playlists, Genres, Liked Songs and Recently Played, then play a whole list
   or a single song from it. Android also supports assistant search.
-- **Offline downloads (Android)** — saved tracks play from local storage with
-  no network, mirroring the web app's Downloads page.
+- **Offline downloads** — saved tracks play from local storage with no
+  network. The download index is rebuilt from disk if it ever goes missing.
+- **Offline library** — Settings → Save library for offline caches metadata
+  so Home, playlists, liked songs and artist catalogues keep working with the
+  radio off. Offline mode and Data saver live in Settings too.
+- **Listening modes** — Data saver, Auto, High, Lossless or Offline-only,
+  applied to both streaming and downloads.
 
 ## Android
 

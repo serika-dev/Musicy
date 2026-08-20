@@ -3,8 +3,11 @@ package app.serika.musicy.mobile.data
 import android.content.Context
 import app.serika.musicy.mobile.data.api.ApiClient
 import app.serika.musicy.mobile.data.api.MusicyApi
+import app.serika.musicy.mobile.data.cache.CatalogueCache
 import app.serika.musicy.mobile.data.downloads.DownloadStore
 import app.serika.musicy.mobile.data.model.*
+import app.serika.musicy.mobile.data.network.ConnectivityMonitor
+import app.serika.musicy.mobile.data.network.NetworkStatus
 import app.serika.musicy.mobile.data.preferences.AppSettings
 import app.serika.musicy.mobile.data.preferences.AppSettingsStore
 import app.serika.musicy.mobile.data.preferences.PlaybackStateStore
@@ -22,6 +25,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.serializer
+import java.io.IOException
 
 /**
  * Single source of truth for server data, shared by the UI, the playback
@@ -38,6 +44,8 @@ class MusicyRepository private constructor(context: Context) {
     val downloadStore = DownloadStore(appContext)
     val playbackStateStore = PlaybackStateStore(appContext)
     val searchHistoryStore = SearchHistoryStore(appContext)
+    val catalogueCache = CatalogueCache(appContext)
+    val connectivity = ConnectivityMonitor(appContext)
 
     private val _config = MutableStateFlow(ServerConfig())
     val config: StateFlow<ServerConfig> = _config.asStateFlow()
@@ -70,6 +78,30 @@ class MusicyRepository private constructor(context: Context) {
     /** Absolute URL for a possibly-relative cover/audio path. */
     fun resolveUrl(path: String?): String? = ApiClient.absoluteUrl(_config.value, path)
 
+    val network: StateFlow<NetworkStatus> get() = connectivity.status
+
+    /** Quality sent to /stream and /download after data-saver / lossless overrides. */
+    fun effectiveQuality(): String {
+        val settings = _settings.value
+        if (settings.dataSaver) return "low"
+        return settings.audioQuality.ifBlank { "auto" }
+    }
+
+    fun isOfflineLocked(): Boolean {
+        val settings = _settings.value
+        if (settings.offlineOnly) return true
+        return !connectivity.current().online
+    }
+
+    fun shouldPlayLocalOnly(): Boolean {
+        val settings = _settings.value
+        if (settings.offlineOnly) return true
+        val net = connectivity.current()
+        if (!net.online) return true
+        if (!settings.streamOnCellular && net.cellular && !net.wifi) return true
+        return false
+    }
+
     /**
      * Where the player should actually stream a track from: the downloaded
      * copy when one exists, otherwise the quality-aware stream endpoint (which
@@ -77,8 +109,9 @@ class MusicyRepository private constructor(context: Context) {
      */
     fun playbackUrl(track: Track): String? {
         downloadStore.localUri(track.id)?.let { return it }
+        if (shouldPlayLocalOnly()) return null
         val base = ApiClient.normalizedBaseUrl(_config.value)
-        val quality = _settings.value.audioQuality.ifBlank { "auto" }
+        val quality = effectiveQuality()
         return "$base/api/tracks/${track.id}/stream?quality=$quality"
     }
 
@@ -87,11 +120,15 @@ class MusicyRepository private constructor(context: Context) {
     val downloads get() = downloadStore.downloads
 
     suspend fun download(track: Track): Result<Unit> {
+        val net = connectivity.current()
+        if (_settings.value.downloadOnWifiOnly && net.online && !net.wifi) {
+            return Result.failure(IOException("Waiting for Wi-Fi to download"))
+        }
         val config = _config.value
         val base = ApiClient.normalizedBaseUrl(config)
-        val quality = _settings.value.audioQuality.ifBlank { "auto" }
+        val quality = effectiveQuality()
         val url = "$base/api/tracks/${track.id}/download?quality=$quality"
-        return downloadStore.download(track, ApiClient.downloadOkHttp(config), url).map { }
+        return downloadStore.download(track, ApiClient.downloadOkHttp(config), url, quality).map { }
     }
 
     suspend fun removeDownload(trackId: String) = downloadStore.remove(trackId)
@@ -110,36 +147,80 @@ class MusicyRepository private constructor(context: Context) {
 
     // -- home ---------------------------------------------------------------
 
-    suspend fun feed(): FeedResponse = api.getFeed()
+    suspend fun feed(): FeedResponse = cached(CatalogueCache.FEED, serializer()) { api.getFeed() }
 
-    suspend fun dailyMixes(): List<DailyMix> = api.getDailyMixes()
+    suspend fun dailyMixes(): List<DailyMix> =
+        cached(CatalogueCache.DAILY_MIXES, ListSerializer(serializer())) { api.getDailyMixes() }
 
-    suspend fun dailyMix(id: String): DailyMix = api.getDailyMix(id)
+    suspend fun dailyMix(id: String): DailyMix =
+        cached(CatalogueCache.mix(id), serializer()) { api.getDailyMix(id) }
 
-    suspend fun genres(): List<Genre> = api.getGenres().genres
+    suspend fun genres(): List<Genre> =
+        cached(CatalogueCache.GENRES, ListSerializer(serializer())) { api.getGenres().genres }
 
     // -- catalogue ----------------------------------------------------------
 
-    suspend fun albums(limit: Int = 40, offset: Int = 0, genre: String? = null): AlbumsResponse =
-        api.getAlbums(limit = limit, offset = offset, genre = genre)
+    suspend fun albums(limit: Int = 40, offset: Int = 0, genre: String? = null): AlbumsResponse {
+        if (offset == 0 && genre == null) {
+            return cached(CatalogueCache.ALBUMS, serializer()) { api.getAlbums(limit = limit, offset = 0) }
+        }
+        return api.getAlbums(limit = limit, offset = offset, genre = genre)
+    }
 
-    suspend fun album(id: String): Album = api.getAlbum(id)
+    suspend fun album(id: String): Album = cached(CatalogueCache.album(id), serializer()) { api.getAlbum(id) }
 
-    suspend fun artists(limit: Int = 40, offset: Int = 0, search: String? = null): ArtistsResponse =
-        api.getArtists(limit = limit, offset = offset, search = search)
+    suspend fun artists(limit: Int = 40, offset: Int = 0, search: String? = null): ArtistsResponse {
+        if (offset == 0 && search == null) {
+            return cached(CatalogueCache.ARTISTS, serializer()) { api.getArtists(limit = limit, offset = 0) }
+        }
+        return api.getArtists(limit = limit, offset = offset, search = search)
+    }
 
-    suspend fun artist(id: String): Artist = api.getArtist(id)
+    suspend fun artist(id: String): Artist =
+        cached(CatalogueCache.artist(id), serializer()) { api.getArtist(id) }
 
-    suspend fun artistTracks(id: String, limit: Int = 100): List<Track> =
-        api.getArtistTracks(id, limit = limit).tracks
+    /** Every published song for an artist, including features. Pages until done. */
+    suspend fun artistTracks(id: String, limit: Int = 200): List<Track> {
+        val key = CatalogueCache.artistTracks(id)
+        if (isOfflineLocked()) {
+            return catalogueCache.read(key, ListSerializer(serializer<Track>())) ?: emptyList()
+        }
+        return runCatching {
+            val all = mutableListOf<Track>()
+            var offset = 0
+            while (true) {
+                val page = api.getArtistTracks(id, limit = limit, offset = offset)
+                all += page.tracks
+                if (!page.hasMore || page.tracks.isEmpty()) break
+                offset += page.tracks.size
+                if (offset > 5000) break
+            }
+            val unique = all.distinctBy { it.id }
+            catalogueCache.write(key, unique, ListSerializer(serializer()))
+            unique
+        }.getOrElse { err ->
+            catalogueCache.read(key, ListSerializer(serializer<Track>())) ?: throw err
+        }
+    }
 
-    suspend fun artistAlbums(id: String, limit: Int = 50): List<Album> =
-        runCatching { api.getArtistAlbums(id, limit).albums }.getOrDefault(emptyList())
+    suspend fun artistAlbums(id: String, limit: Int = 200): List<Album> {
+        val key = CatalogueCache.artistAlbums(id)
+        if (isOfflineLocked()) {
+            return catalogueCache.read(key, ListSerializer(serializer<Album>())) ?: emptyList()
+        }
+        return runCatching {
+            val page = api.getArtistAlbums(id, limit)
+            catalogueCache.write(key, page.albums, ListSerializer(serializer()))
+            page.albums
+        }.getOrElse {
+            catalogueCache.read(key, ListSerializer(serializer<Album>())) ?: emptyList()
+        }
+    }
 
     suspend fun tracks(limit: Int = 50, offset: Int = 0, genre: String? = null): TracksResponse =
         api.getTracks(limit = limit, offset = offset, genre = genre)
 
-    suspend fun track(id: String): Track = api.getTrack(id)
+    suspend fun track(id: String): Track = cached(CatalogueCache.track(id), serializer()) { api.getTrack(id) }
 
     suspend fun lyrics(id: String): LyricsResponse = api.getLyrics(id)
 
@@ -161,10 +242,17 @@ class MusicyRepository private constructor(context: Context) {
 
     // -- playlists ----------------------------------------------------------
 
-    suspend fun playlists(limit: Int = 50, offset: Int = 0): List<Playlist> =
-        api.getPlaylists(limit = limit, offset = offset).playlists
+    suspend fun playlists(limit: Int = 50, offset: Int = 0): List<Playlist> {
+        if (offset == 0) {
+            return cached(CatalogueCache.PLAYLISTS, ListSerializer(serializer())) {
+                api.getPlaylists(limit = limit, offset = 0).playlists
+            }
+        }
+        return api.getPlaylists(limit = limit, offset = offset).playlists
+    }
 
-    suspend fun playlist(id: String): Playlist = api.getPlaylist(id)
+    suspend fun playlist(id: String): Playlist =
+        cached(CatalogueCache.playlist(id), serializer()) { api.getPlaylist(id) }
 
     suspend fun createPlaylist(name: String, description: String? = null, isPublic: Boolean = true): Playlist =
         api.createPlaylist(CreatePlaylistRequest(name = name, description = description, isPublic = isPublic))
@@ -177,7 +265,62 @@ class MusicyRepository private constructor(context: Context) {
 
     // -- library ------------------------------------------------------------
 
-    suspend fun profile(): User = api.getProfile()
+    suspend fun profile(): User = cached(CatalogueCache.PROFILE, serializer()) { api.getProfile() }
+
+    /**
+     * Pulls the user's library metadata onto disk so the app can be browsed
+     * with no network: liked songs, playlists, followed artists and their
+     * catalogues, recently played, home feed.
+     */
+    suspend fun syncLibraryForOffline(): Int {
+        var saved = 0
+        fun tally() { saved++ }
+
+        runCatching { likedSongs() }.onSuccess { tally() }
+        runCatching { recentlyPlayed() }.onSuccess { tally() }
+        runCatching { feed() }.onSuccess { tally() }
+        runCatching { dailyMixes() }.onSuccess { tally() }
+        runCatching { genres() }.onSuccess { tally() }
+        runCatching { profile() }.onSuccess { tally() }
+
+        val lists = runCatching { playlists(limit = 100) }.getOrDefault(emptyList())
+        tally()
+        lists.forEach { runCatching { playlist(it.id) }.onSuccess { tally() } }
+
+        val followed = runCatching { followedArtists(limit = 200) }.getOrDefault(emptyList())
+        tally()
+        followed.forEach { artist ->
+            runCatching { artist(artist.id) }.onSuccess { tally() }
+            runCatching { artistTracks(artist.id) }.onSuccess { tally() }
+            runCatching { artistAlbums(artist.id) }.onSuccess { tally() }
+        }
+
+        // Warm cache for already-downloaded tracks so their pages render offline.
+        downloadStore.current().forEach { item ->
+            runCatching { track(item.track.id) }.onSuccess { tally() }
+            item.track.album?.id?.let { runCatching { album(it) }.onSuccess { tally() } }
+            item.track.artist?.id?.let { id ->
+                runCatching { artist(id) }.onSuccess { tally() }
+            }
+        }
+        return saved
+    }
+
+    private suspend fun <T> cached(
+        key: String,
+        serializer: kotlinx.serialization.KSerializer<T>,
+        fetch: suspend () -> T
+    ): T {
+        if (isOfflineLocked()) {
+            return catalogueCache.read(key, serializer)
+                ?: throw IOException("You're offline. Sync your library in Settings to keep browsing.")
+        }
+        return try {
+            fetch().also { catalogueCache.write(key, it, serializer) }
+        } catch (err: Exception) {
+            catalogueCache.read(key, serializer) ?: throw err
+        }
+    }
 
     /**
      * Pulls account-wide settings so preferences follow the user across
@@ -196,7 +339,17 @@ class MusicyRepository private constructor(context: Context) {
     }
 
     suspend fun likedSongs(limit: Int = 200): List<Track> {
-        val tracks = api.getLikedSongs(limit = limit).tracks
+        val tracks = cached(CatalogueCache.LIKED, ListSerializer(serializer())) {
+            val all = mutableListOf<Track>()
+            var offset = 0
+            while (true) {
+                val page = api.getLikedSongs(limit = limit, offset = offset)
+                all += page.tracks
+                if (!page.hasMore || page.tracks.isEmpty()) break
+                offset += page.tracks.size
+            }
+            all.distinctBy { it.id }
+        }
         likedMutex.withLock {
             _likedTrackIds.value = tracks.map { it.id }.toSet()
             likedLoaded = true
@@ -239,10 +392,16 @@ class MusicyRepository private constructor(context: Context) {
     }
 
     suspend fun recentlyPlayed(): List<Track> =
-        runCatching { api.getRecentlyPlayed().tracks }.getOrDefault(emptyList())
+        runCatching {
+            cached(CatalogueCache.RECENT, ListSerializer(serializer())) { api.getRecentlyPlayed().tracks }
+        }.getOrDefault(emptyList())
 
-    suspend fun followedArtists(limit: Int = 50): List<Artist> =
-        runCatching { api.getFollowedArtists(limit = limit).artists }.getOrDefault(emptyList())
+    suspend fun followedArtists(limit: Int = 100): List<Artist> =
+        runCatching {
+            cached(CatalogueCache.FOLLOWED, ListSerializer(serializer())) {
+                api.getFollowedArtists(limit = limit).artists
+            }
+        }.getOrDefault(emptyList())
 
     suspend fun isFollowing(artistId: String): Boolean =
         runCatching { api.getFollowState(artistId).isFollowing }.getOrDefault(false)

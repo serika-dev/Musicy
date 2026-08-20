@@ -96,7 +96,10 @@ final class DownloadStore: ObservableObject {
 
         // Use the server-side download proxy to avoid CORS issues with B2/R2
         // and to respect the user's quality setting.
-        let quality = await MainActor.run { SettingsStore.shared.audioQuality }
+        let quality = await MainActor.run { SettingsStore.shared.effectiveQuality }
+        let wifiOnly = await MainActor.run { SettingsStore.shared.downloadOnWifiOnly }
+        let net = NetworkMonitor.shared
+        if wifiOnly, net.online, !net.wifi { return false }
         guard let remote = MusicyAPI.shared.downloadURL(trackId: id, quality: quality) else { return false }
 
         _ = await MainActor.run { self.downloadingIds.insert(id) }
@@ -128,6 +131,9 @@ final class DownloadStore: ObservableObject {
                 downloadedAt: Date().timeIntervalSince1970
             )
             setLocalFile(dest, for: id)
+            if let data = try? JSONEncoder().encode(entry) {
+                try? data.write(to: directory.appendingPathComponent("\(id).json"), options: .atomic)
+            }
             await MainActor.run {
                 self.items.removeAll { $0.track.id == id }
                 self.items.append(entry)
@@ -182,18 +188,43 @@ final class DownloadStore: ObservableObject {
     }
 
     private func loadIndex() {
-        guard let data = try? Data(contentsOf: indexURL),
-              let decoded = try? JSONDecoder().decode([DownloadedTrack].self, from: data) else { return }
-        // Keep only entries whose file is actually still on disk.
-        var kept: [DownloadedTrack] = []
-        for entry in decoded {
-            let url = directory.appendingPathComponent(entry.fileName)
-            if fileManager.fileExists(atPath: url.path) {
-                setLocalFile(url, for: entry.track.id)
-                kept.append(entry)
+        var byId: [String: DownloadedTrack] = [:]
+        if let data = try? Data(contentsOf: indexURL),
+           let decoded = try? JSONDecoder().decode([DownloadedTrack].self, from: data) {
+            for entry in decoded { byId[entry.track.id] = entry }
+        }
+
+        // Recover audio files whose index entry was lost (the usual "downloads
+        // vanished" report after a preference wipe).
+        let files = (try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        for url in files where url.pathExtension.lowercased() != "json" {
+            let id = url.deletingPathExtension().lastPathComponent
+            let size = ((try? fileManager.attributesOfItem(atPath: url.path)[.size]) as? NSNumber)?.int64Value ?? 0
+            guard size > 0 else { continue }
+            setLocalFile(url, for: id)
+            if byId[id] == nil {
+                let sidecar = directory.appendingPathComponent("\(id).json")
+                if let data = try? Data(contentsOf: sidecar),
+                   let decoded = try? JSONDecoder().decode(DownloadedTrack.self, from: data) {
+                    byId[id] = decoded
+                } else {
+                    byId[id] = DownloadedTrack(
+                        track: Track.offlineStub(id: id, format: url.pathExtension),
+                        fileName: url.lastPathComponent,
+                        sizeBytes: size,
+                        downloadedAt: Date().timeIntervalSince1970
+                    )
+                }
             }
         }
-        items = kept
+
+        let kept = byId.values.filter { localURL($0.track.id) != nil }
+        items = kept.sorted { $0.downloadedAt < $1.downloadedAt }
+        if kept.count != byId.count { saveIndex() }
     }
 
     private func saveIndex() {

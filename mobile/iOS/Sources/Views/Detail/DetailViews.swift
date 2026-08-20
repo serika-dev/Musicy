@@ -141,8 +141,8 @@ struct ArtistDetailView: View {
                         meta: artist._count?.tracks.map { "\($0) tracks" },
                         artworkURL: artist.imageUrl,
                         circular: true,
-                        onPlay: { player.play(tracks: topTracks(artist)) },
-                        onShuffle: { player.play(tracks: topTracks(artist).shuffled()) }
+                        onPlay: { player.play(tracks: tracks.isEmpty ? topTracks(artist) : tracks) },
+                        onShuffle: { player.play(tracks: (tracks.isEmpty ? topTracks(artist) : tracks).shuffled()) }
                     )
 
                     Button {
@@ -158,15 +158,37 @@ struct ArtistDetailView: View {
                     }
 
                     let popular = topTracks(artist)
+                    let playQueue = tracks.isEmpty ? popular : tracks
                     if !popular.isEmpty {
-                        Text("Popular").font(.title3.bold()).padding(.top, 8)
+                        HStack {
+                            Text("Popular").font(.title3.bold())
+                            Spacer()
+                            if playQueue.count > 10 || (artist._count?.tracks ?? 0) > popular.count {
+                                NavigationLink(value: Route.artistTracks(artistId)) {
+                                    Text("See all").font(.caption.bold())
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
                         ForEach(Array(popular.prefix(10).enumerated()), id: \.element.id) { index, track in
                             TrackRow(
                                 track: track,
                                 isCurrent: player.currentTrack?.id == track.id,
-                                action: { player.play(tracks: Array(popular.prefix(10)), startAt: index) },
+                                action: { player.play(tracks: playQueue.isEmpty ? popular : playQueue, startAt: index) },
                                 onMore: { actionTrack = track }
                             )
+                        }
+                    }
+
+                    if playQueue.count > 10 {
+                        NavigationLink(value: Route.artistTracks(artistId)) {
+                            HStack {
+                                Image(systemName: "music.note.list")
+                                Text("See all \(playQueue.count) songs")
+                                    .font(.subheadline.bold())
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
                         }
                     }
 
@@ -213,9 +235,7 @@ struct ArtistDetailView: View {
                 } else {
                     isFollowing = (try? await MusicyAPI.shared.getFollowState(id: artistId)) ?? false
                 }
-                if artist.topTracks == nil {
-                    tracks = (try? await MusicyAPI.shared.getArtistTracks(id: artistId))?.tracks ?? []
-                }
+                tracks = (try? await MusicyAPI.shared.getAllArtistTracks(id: artistId)) ?? []
                 if artist.albums == nil {
                     albums = (try? await MusicyAPI.shared.getArtistAlbums(id: artistId))?.albums ?? []
                 }
@@ -225,7 +245,57 @@ struct ArtistDetailView: View {
     }
 
     private func topTracks(_ artist: Artist) -> [Track] {
-        artist.topTracks ?? tracks
+        artist.topTracks ?? Array(tracks.prefix(10))
+    }
+}
+
+struct ArtistTracksView: View {
+    let artistId: String
+    @ObservedObject private var player = AudioPlayer.shared
+    @ObservedObject private var downloads = DownloadStore.shared
+    @State private var tracks: [Track] = []
+    @State private var name = "Artist"
+    @State private var actionTrack: Track?
+    @State private var loaded = false
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 6) {
+                if !loaded { ProgressView().frame(maxWidth: .infinity).padding() }
+                if loaded, tracks.isEmpty {
+                    EmptyStateView(title: "No songs yet", message: "Nothing published for this artist.")
+                }
+                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                    TrackRow(
+                        track: track,
+                        index: index + 1,
+                        isCurrent: player.currentTrack?.id == track.id,
+                        action: { player.play(tracks: tracks, startAt: index) },
+                        onMore: { actionTrack = track }
+                    )
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 140)
+        }
+        .navigationTitle("All songs")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await downloads.downloadAll(tracks) }
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                }
+                .disabled(tracks.isEmpty)
+            }
+        }
+        .task {
+            name = (try? await MusicyAPI.shared.getArtist(id: artistId))?.name ?? "Artist"
+            tracks = (try? await MusicyAPI.shared.getAllArtistTracks(id: artistId)) ?? []
+            loaded = true
+        }
+        .sheet(item: $actionTrack) { TrackActionsSheet(track: $0) }
     }
 }
 

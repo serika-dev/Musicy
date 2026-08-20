@@ -4,6 +4,8 @@ struct MainTabView: View {
     @ObservedObject private var player = AudioPlayer.shared
     @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var sync = SyncClient.shared
+    @ObservedObject private var network = NetworkMonitor.shared
+    @ObservedObject private var settings = SettingsStore.shared
     @State private var showPlayer = false
 
     var body: some View {
@@ -11,6 +13,17 @@ struct MainTabView: View {
             TabView {
                 HomeView()
                     .tabItem { Label("Home", systemImage: "house.fill") }
+                    .safeAreaInset(edge: .top) {
+                        if settings.offlineOnly || !network.online {
+                            Text(settings.offlineOnly
+                                 ? "Offline mode — playing downloads only"
+                                 : "You're offline — browsing saved library")
+                                .font(.caption.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(settings.offlineOnly ? Color.accentColor.opacity(0.2) : Color("Surface"))
+                        }
+                    }
                 SearchView()
                     .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 LibraryView()

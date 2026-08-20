@@ -193,6 +193,25 @@ private fun MainScaffold(config: ServerConfig) {
         bottomBar = {
             if (!isPlayerRoute) {
                 Column {
+                    val network by vm.network.collectAsState()
+                    val offlineLocked = settings.offlineOnly || !network.online
+                    if (offlineLocked) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (settings.offlineOnly) Primary.copy(alpha = 0.18f) else SurfaceVariant)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (settings.offlineOnly) "Offline mode — playing downloads only"
+                                else "You're offline — browsing saved library",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (settings.offlineOnly) Primary else OnSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                     MiniPlayer(
                         state = playback,
                         progress = progress.progress,
@@ -291,6 +310,12 @@ private fun MainScaffold(config: ServerConfig) {
                 arguments = listOf(navArgument("id") { type = NavType.StringType })
             ) { entry ->
                 ArtistScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
+            }
+            composable(
+                route = Routes.ARTIST_TRACKS,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entry ->
+                ArtistTracksScreen(vm, nav, entry.arguments?.getString("id").orEmpty())
             }
             composable(
                 route = Routes.PLAYLIST,

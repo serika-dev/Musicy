@@ -18,6 +18,9 @@ final class SettingsStore: ObservableObject {
         static let deviceName = "musicy_device_name"
         static let resumeOnLaunch = "musicy_resume_on_launch"
         static let wifiOnly = "musicy_wifi_only"
+        static let streamCellular = "musicy_stream_cellular"
+        static let dataSaver = "musicy_data_saver"
+        static let offlineOnly = "musicy_offline_only"
         static let haptics = "musicy_haptics"
         static let speed = "musicy_speed"
         static let seekStep = "musicy_seek_step"
@@ -41,7 +44,67 @@ final class SettingsStore: ObservableObject {
     @Published var deviceName: String { didSet { store(Key.deviceName, deviceName) } }
     @Published var resumeOnLaunch: Bool { didSet { store(Key.resumeOnLaunch, resumeOnLaunch) } }
     @Published var downloadOnWifiOnly: Bool { didSet { store(Key.wifiOnly, downloadOnWifiOnly) } }
+    @Published var streamOnCellular: Bool { didSet { store(Key.streamCellular, streamOnCellular) } }
+    @Published var dataSaver: Bool {
+        didSet {
+            store(Key.dataSaver, dataSaver)
+            if dataSaver {
+                offlineOnly = false
+                audioQuality = "low"
+            }
+        }
+    }
+    @Published var offlineOnly: Bool {
+        didSet {
+            store(Key.offlineOnly, offlineOnly)
+            if offlineOnly { dataSaver = false }
+        }
+    }
     @Published var hapticFeedback: Bool { didSet { store(Key.haptics, hapticFeedback) } }
+
+    var effectiveQuality: String { dataSaver ? "low" : audioQuality }
+
+    var playbackMode: String {
+        get {
+            if offlineOnly { return "offline" }
+            if dataSaver { return "data_saver" }
+            if audioQuality == "lossless" { return "lossless" }
+            if audioQuality == "high" { return "high" }
+            return "auto"
+        }
+        set { applyPlaybackMode(newValue) }
+    }
+
+    var shouldPlayLocalOnly: Bool {
+        if offlineOnly { return true }
+        let net = NetworkMonitor.shared
+        if !net.online { return true }
+        if !streamOnCellular && net.cellular && !net.wifi { return true }
+        return false
+    }
+
+    func applyPlaybackMode(_ mode: String) {
+        switch mode {
+        case "data_saver":
+            offlineOnly = false
+            dataSaver = true
+        case "offline":
+            dataSaver = false
+            offlineOnly = true
+        case "lossless":
+            offlineOnly = false
+            dataSaver = false
+            audioQuality = "lossless"
+        case "high":
+            offlineOnly = false
+            dataSaver = false
+            audioQuality = "high"
+        default:
+            offlineOnly = false
+            dataSaver = false
+            audioQuality = "auto"
+        }
+    }
     @Published var playbackSpeed: Double {
         didSet {
             store(Key.speed, playbackSpeed)
@@ -81,6 +144,9 @@ final class SettingsStore: ObservableObject {
         deviceName = d.string(forKey: Key.deviceName) ?? UIDevice.current.name
         resumeOnLaunch = bool(Key.resumeOnLaunch, true)
         downloadOnWifiOnly = bool(Key.wifiOnly, true)
+        streamOnCellular = bool(Key.streamCellular, true)
+        dataSaver = bool(Key.dataSaver, false)
+        offlineOnly = bool(Key.offlineOnly, false)
         hapticFeedback = bool(Key.haptics, true)
         playbackSpeed = d.object(forKey: Key.speed) as? Double ?? 1
         seekStepSeconds = d.object(forKey: Key.seekStep) as? Int ?? 10
@@ -142,6 +208,9 @@ final class SettingsStore: ObservableObject {
         syncEnabled = true
         resumeOnLaunch = true
         downloadOnWifiOnly = true
+        streamOnCellular = true
+        dataSaver = false
+        offlineOnly = false
         hapticFeedback = true
         playbackSpeed = 1
         seekStepSeconds = 10

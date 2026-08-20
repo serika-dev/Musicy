@@ -140,7 +140,7 @@ class MusicyLibrary(private val repo: MusicyRepository) {
         }
 
         parentId.startsWith(PREFIX_ARTIST) ->
-            playableList(parentId, repo.artistTracks(parentId.removePrefix(PREFIX_ARTIST), limit = 100))
+            playableList(parentId, repo.artistTracks(parentId.removePrefix(PREFIX_ARTIST)))
 
         parentId.startsWith(PREFIX_PLAYLIST) -> {
             val playlist = repo.playlist(parentId.removePrefix(PREFIX_PLAYLIST))

@@ -4,7 +4,17 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cast
@@ -151,6 +161,44 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
 
             // -- Playback -------------------------------------------------------
             item { MusicyDivider(Modifier.padding(vertical = 8.dp)) }
+            item { SettingsHeader("Listening mode") }
+            item {
+                val mode = when {
+                    settings.offlineOnly -> "offline"
+                    settings.dataSaver -> "data_saver"
+                    settings.audioQuality == "lossless" -> "lossless"
+                    settings.audioQuality == "high" -> "high"
+                    else -> "auto"
+                }
+                ChoiceRow(
+                    title = "Playback",
+                    options = listOf(
+                        "Data saver" to "data_saver",
+                        "Auto" to "auto",
+                        "High" to "high",
+                        "Lossless" to "lossless",
+                        "Offline" to "offline"
+                    ),
+                    selected = mode,
+                    onSelect = vm::setPlaybackMode
+                )
+            }
+            item {
+                Text(
+                    when {
+                        settings.offlineOnly -> "Only downloaded tracks play. The rest of the app uses your saved library."
+                        settings.dataSaver -> "Streams the smallest files and skips extra artwork on mobile data."
+                        settings.audioQuality == "lossless" -> "Streams and downloads original FLAC when the server has it."
+                        settings.audioQuality == "high" -> "High-bitrate audio. Uses more data than Auto."
+                        else -> "Picks a sensible stream for your connection. Downloads still follow this quality."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                )
+            }
+
+            item { MusicyDivider(Modifier.padding(vertical = 8.dp)) }
             item { SettingsHeader("Playback") }
             item {
                 SettingsToggle(
@@ -210,8 +258,8 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
             }
             item {
                 ChoiceRow(
-                    title = "Audio quality",
-                    options = listOf("Auto" to "auto", "Low" to "low", "Medium" to "medium", "High" to "high", "Lossless" to "lossless"),
+                    title = "Download quality",
+                    options = listOf("Auto" to "auto", "Low" to "low", "High" to "high", "Lossless" to "lossless"),
                     selected = settings.audioQuality,
                     onSelect = vm::setAudioQuality
                 )
@@ -323,7 +371,31 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
 
             // -- Storage --------------------------------------------------------
             item { MusicyDivider(Modifier.padding(vertical = 8.dp)) }
-            item { SettingsHeader("Storage") }
+            item { SettingsHeader("Storage & offline") }
+            item {
+                SettingsToggle(
+                    "Offline mode",
+                    "Don't stream. Play downloads and browse the saved library only.",
+                    settings.offlineOnly,
+                    vm::setOfflineOnly
+                )
+            }
+            item {
+                SettingsToggle(
+                    "Data saver",
+                    "Use the smallest streams and skip extra images on cellular.",
+                    settings.dataSaver,
+                    vm::setDataSaver
+                )
+            }
+            item {
+                SettingsToggle(
+                    "Stream on mobile data",
+                    "Turn off to only stream on Wi-Fi. Downloads still play anywhere.",
+                    settings.streamOnCellular,
+                    vm::setStreamOnCellular
+                )
+            }
             item {
                 SettingsToggle(
                     "Download on Wi-Fi only",
@@ -337,6 +409,12 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
                     "Downloads",
                     "${downloads.size} tracks · ${formatBytes(downloads.sumOf { it.sizeBytes })}"
                 ) { nav.downloads() }
+            }
+            item {
+                SettingsRow(
+                    "Save library for offline",
+                    "Download metadata so Home, playlists, liked songs and artists work without Wi-Fi."
+                ) { vm.syncLibraryOffline() }
             }
 
             // -- Account --------------------------------------------------------
@@ -503,6 +581,7 @@ private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
 }
 
 /** A labelled row of chips — used wherever a setting is one of a few values. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> ChoiceRow(
     title: String,
@@ -513,7 +592,7 @@ private fun <T> ChoiceRow(
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (label, value) ->
                 MusicyChip(label, value == selected, { onSelect(value) })
             }

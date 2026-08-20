@@ -10,6 +10,21 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.6.0]
+
+### Fixed
+- **Artist pages now list every song.** Popular still shows the top ten, but Play / Shuffle / Download all use the full catalogue (including features), and a **See all songs** screen pages through the rest. Previously the app capped the list at 10, so big catalogues like KAF or Yama looked empty after a handful of tracks.
+- **Downloads that "vanished" come back.** The Android index lived only in DataStore; if that file corrupted or was wiped on an update, the Downloads screen went blank even though the audio was still on disk. The index is now written next to the files (and as a per-track sidecar) and rebuilt from the directory on launch, matching iOS.
+
+### Added
+- **Offline mode** — play downloads only and browse the saved library with no network.
+- **Data saver** — smallest streams, skip extra artwork on cellular.
+- **Lossless / High / Auto listening modes** in Settings, used for both streaming and downloads.
+- **Save library for offline** — caches home, liked songs, playlists, followed artists and their catalogues so the app keeps working without Wi-Fi.
+- **Stream on mobile data** toggle, plus an offline banner when the radio is down.
+
+---
+
 ## [1.5.1]
 
 ### Fixed

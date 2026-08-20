@@ -40,17 +40,44 @@ final class LibraryStore: ObservableObject {
 
         // Sequential rather than concurrent: each call is cheap, and a single
         // failure should never take the rest of the screen down with it.
-        feed = try? await api.getFeed()
-        dailyMixes = (try? await api.getDailyMixes()) ?? []
-        genres = (try? await api.getGenres()) ?? []
-        playlists = (try? await api.getPlaylists())?.playlists ?? []
-        let liked = (try? await api.getLikedSongs())?.tracks ?? []
+        feed = (try? await api.getFeed()) ?? CatalogueCache.read(FeedResponse.self, key: CatalogueCache.feed)
+        if let feed { CatalogueCache.write(feed, key: CatalogueCache.feed) }
+
+        dailyMixes = (try? await api.getDailyMixes()) ?? CatalogueCache.read([DailyMix].self, key: CatalogueCache.dailyMixes) ?? []
+        CatalogueCache.write(dailyMixes, key: CatalogueCache.dailyMixes)
+
+        genres = (try? await api.getGenres()) ?? CatalogueCache.read([Genre].self, key: CatalogueCache.genres) ?? []
+        CatalogueCache.write(genres, key: CatalogueCache.genres)
+
+        playlists = (try? await api.getPlaylists())?.playlists
+            ?? CatalogueCache.read([Playlist].self, key: CatalogueCache.playlists)
+            ?? []
+        CatalogueCache.write(playlists, key: CatalogueCache.playlists)
+
+        let liked = (try? await api.getLikedSongs())?.tracks
+            ?? CatalogueCache.read([Track].self, key: CatalogueCache.liked)
+            ?? []
         likedSongs = liked
         likedIds = Set(liked.map(\.id))
-        followedArtists = (try? await api.getFollowedArtists()) ?? []
-        recentlyPlayed = (try? await api.getRecentlyPlayed()) ?? []
-        albums = (try? await api.getAlbums())?.albums ?? []
-        profile = try? await api.getProfile()
+        CatalogueCache.write(liked, key: CatalogueCache.liked)
+
+        followedArtists = (try? await api.getFollowedArtists())
+            ?? CatalogueCache.read([Artist].self, key: CatalogueCache.followed)
+            ?? []
+        CatalogueCache.write(followedArtists, key: CatalogueCache.followed)
+
+        recentlyPlayed = (try? await api.getRecentlyPlayed())
+            ?? CatalogueCache.read([Track].self, key: CatalogueCache.recent)
+            ?? []
+        CatalogueCache.write(recentlyPlayed, key: CatalogueCache.recent)
+
+        albums = (try? await api.getAlbums())?.albums
+            ?? CatalogueCache.read([Album].self, key: CatalogueCache.albums)
+            ?? []
+        CatalogueCache.write(albums, key: CatalogueCache.albums)
+
+        profile = (try? await api.getProfile()) ?? CatalogueCache.read(User.self, key: CatalogueCache.profile)
+        if let profile { CatalogueCache.write(profile, key: CatalogueCache.profile) }
 
         if feed == nil, likedSongs.isEmpty, albums.isEmpty {
             errorMessage = "Couldn't reach the server. Pull to refresh once you're back online."
@@ -58,6 +85,22 @@ final class LibraryStore: ObservableObject {
 
         hasLoaded = true
         isLoading = false
+    }
+
+    /// Pulls library metadata onto disk so the app can be browsed offline.
+    func syncLibraryForOffline() async {
+        toast = "Saving library for offline…"
+        await reload()
+        for playlist in playlists {
+            if let full = try? await MusicyAPI.shared.getPlaylist(id: playlist.id) {
+                CatalogueCache.write(full, key: CatalogueCache.playlist(playlist.id))
+            }
+        }
+        for artist in followedArtists {
+            _ = try? await MusicyAPI.shared.getArtist(id: artist.id)
+            _ = try? await MusicyAPI.shared.getAllArtistTracks(id: artist.id)
+        }
+        toast = "Library saved for offline"
     }
 
     func isLiked(_ trackId: String) -> Bool { likedIds.contains(trackId) }

@@ -294,9 +294,12 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
             is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
             is Async.Success -> {
                 val data: Artist = state.value
-                val topTracks = data.topTracks ?: tracks.valueOrNull.orEmpty()
+                val allTracks = tracks.valueOrNull.orEmpty()
+                val popular = data.topTracks?.takeIf { it.isNotEmpty() } ?: allTracks.take(10)
                 val contextId = MusicyLibrary.artistId(data.id)
                 val artistAlbums = data.albums ?: albums.valueOrNull.orEmpty()
+                val playQueue = allTracks.ifEmpty { popular }
+                val trackCount = data.count?.tracks ?: allTracks.size
 
                 LazyColumn(contentPadding = padding) {
                     item {
@@ -306,14 +309,15 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                                 if (data.verified == true) "Verified artist" else "Artist",
                                 data.count?.followers?.let { "$it followers" }
                             ).joinToString(" · "),
-                            meta = data.count?.tracks?.let { "$it tracks" },
+                            meta = trackCount.takeIf { it > 0 }?.let { "$it tracks" },
                             artworkUrl = vm.repo.resolveUrl(data.imageUrl),
                             circular = true,
                             bannerUrl = vm.repo.resolveUrl(data.bannerUrl),
-                            isPlaying = playback.isPlaying && topTracks.any { it.id == playback.currentTrack?.id },
-                            onPlay = { vm.play(topTracks, 0, contextId) },
-                            onShuffle = { vm.shuffle(topTracks, contextId) },
+                            isPlaying = playback.isPlaying && playQueue.any { it.id == playback.currentTrack?.id },
+                            onPlay = { vm.play(playQueue, 0, contextId) },
+                            onShuffle = { vm.shuffle(playQueue, contextId) },
                             trailing = {
+                                DownloadAllButton(vm, playQueue)
                                 val isFollowing = following == true
                                 OutlinedButton(
                                     onClick = {
@@ -343,18 +347,39 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                         }
                     }
 
-                    if (topTracks.isNotEmpty()) {
-                        item { SectionHeader("Popular") }
+                    if (popular.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                "Popular",
+                                actionLabel = if (allTracks.size > popular.size || trackCount > popular.size) "See all" else null,
+                                onAction = { nav.artistTracks(data.id) }
+                            )
+                        }
                         trackItems(
-                            tracks = topTracks.take(10),
+                            tracks = popular.take(10),
                             likedIds = liked,
                             currentTrackId = playback.currentTrack?.id,
                             isPlaying = playback.isPlaying,
                             resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
-                            onPlay = { index -> vm.play(topTracks.take(10), index, contextId) },
+                            onPlay = { index -> vm.play(playQueue.ifEmpty { popular }, index, contextId) },
                             onToggleLike = { vm.toggleLike(it) },
                             onMore = { actionTrack = it }
                         )
+                    } else if (tracks is Async.Loading) {
+                        item { SectionHeader("Popular") }
+                        item { ListSkeleton() }
+                    }
+
+                    if (allTracks.size > 10) {
+                        item {
+                            ListRow(
+                                title = "See all songs",
+                                subtitle = "$trackCount tracks",
+                                imageUrl = null,
+                                icon = Icons.Default.QueueMusic,
+                                onClick = { nav.artistTracks(data.id) }
+                            )
+                        }
                     }
 
                     if (artistAlbums.isNotEmpty()) {
@@ -375,6 +400,80 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
                         )
                     }
 
+                    item { Spacer(Modifier.height(24.dp)) }
+                }
+            }
+        }
+    }
+
+    TrackActionsHost(vm = vm, nav = nav, selected = actionTrack, onDismiss = { actionTrack = null })
+}
+
+@Composable
+fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
+    val artist by loadAsync("name-$artistId") { vm.repo.artist(artistId) }
+    val tracks by loadAsync("all-tracks-$artistId") { vm.repo.artistTracks(artistId) }
+    val liked by vm.likedTrackIds.collectAsState()
+    val playback by vm.player.state.collectAsState()
+    var actionTrack by remember { mutableStateOf<Track?>(null) }
+    val name = artist.valueOrNull?.name ?: "Artist"
+    val list = tracks.valueOrNull.orEmpty()
+    val contextId = MusicyLibrary.artistId(artistId)
+
+    DetailScaffold(
+        titleWhenScrolled = name,
+        nav = nav,
+        actions = {
+            if (list.isNotEmpty()) {
+                IconButton(onClick = { vm.shuffle(list, contextId) }) {
+                    Icon(Icons.Default.Shuffle, contentDescription = "Shuffle")
+                }
+            }
+        }
+    ) { padding ->
+        when (val state = tracks) {
+            is Async.Loading -> ListSkeleton(modifier = Modifier.padding(padding))
+            is Async.Failure -> ErrorBox(state.message, onRetry = nav::back, modifier = Modifier.padding(padding))
+            is Async.Success -> {
+                LazyColumn(contentPadding = padding) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("All songs", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "${list.size} tracks",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = OnSurfaceVariant
+                                )
+                            }
+                            DownloadAllButton(vm, list)
+                            Spacer(Modifier.width(8.dp))
+                            FilledTonalButton(onClick = { vm.play(list, 0, contextId) }) {
+                                Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Play")
+                            }
+                        }
+                    }
+                    if (list.isEmpty()) {
+                        item { EmptyState("No songs yet", "Nothing published for this artist.") }
+                    }
+                    trackItems(
+                        tracks = list,
+                        likedIds = liked,
+                        currentTrackId = playback.currentTrack?.id,
+                        isPlaying = playback.isPlaying,
+                        numbered = true,
+                        resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
+                        onPlay = { index -> vm.play(list, index, contextId) },
+                        onToggleLike = { vm.toggleLike(it) },
+                        onMore = { actionTrack = it }
+                    )
                     item { Spacer(Modifier.height(24.dp)) }
                 }
             }

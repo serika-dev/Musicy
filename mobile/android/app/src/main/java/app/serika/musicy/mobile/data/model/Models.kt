@@ -96,7 +96,9 @@ data class Artist(
     val isFollowing: Boolean? = null,
     val genres: List<String>? = null,
     val members: List<Artist>? = null,
-    val topTracks: List<Track>? = null,
+    /** Popular preview from `GET /api/artists/{id}` — the API field is `tracks`. */
+    @SerialName("tracks") val topTracks: List<Track>? = null,
+    val featuredInTracks: List<Track>? = null,
     val albums: List<Album>? = null,
     @SerialName("_count") val count: Count? = null
 )

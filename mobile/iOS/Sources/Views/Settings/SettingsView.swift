@@ -38,6 +38,22 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Listening mode") {
+                Picker("Playback", selection: Binding(
+                    get: { settings.playbackMode },
+                    set: { settings.applyPlaybackMode($0) }
+                )) {
+                    Text("Data saver").tag("data_saver")
+                    Text("Auto").tag("auto")
+                    Text("High").tag("high")
+                    Text("Lossless").tag("lossless")
+                    Text("Offline").tag("offline")
+                }
+                Text(modeCaption)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             Section("Playback") {
                 Toggle("Autoplay recommendations", isOn: $settings.autoplayRecommendations)
                 Toggle("Gapless playback", isOn: $settings.gaplessPlayback)
@@ -109,8 +125,14 @@ struct SettingsView: View {
                 Toggle("Haptic feedback", isOn: $settings.hapticFeedback)
             }
 
-            Section("Storage") {
+            Section("Storage & offline") {
+                Toggle("Offline mode", isOn: $settings.offlineOnly)
+                Toggle("Data saver", isOn: $settings.dataSaver)
+                Toggle("Stream on mobile data", isOn: $settings.streamOnCellular)
                 Toggle("Download on Wi-Fi only", isOn: $settings.downloadOnWifiOnly)
+                Button("Save library for offline") {
+                    Task { await store.syncLibraryForOffline() }
+                }
             }
 
             Section("Account") {
@@ -146,6 +168,16 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Everything goes back to defaults. Your sign-in is kept.")
+        }
+    }
+
+    private var modeCaption: String {
+        switch settings.playbackMode {
+        case "offline": return "Only downloaded tracks play. The rest of the app uses your saved library."
+        case "data_saver": return "Streams the smallest files and skips extra artwork on mobile data."
+        case "lossless": return "Streams and downloads original FLAC when the server has it."
+        case "high": return "High-bitrate audio. Uses more data than Auto."
+        default: return "Picks a sensible stream for your connection."
         }
     }
 

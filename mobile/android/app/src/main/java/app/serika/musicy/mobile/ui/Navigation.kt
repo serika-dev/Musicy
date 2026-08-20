@@ -15,6 +15,7 @@ object Routes {
 
     const val ALBUM = "album/{id}"
     const val ARTIST = "artist/{id}"
+    const val ARTIST_TRACKS = "artist/{id}/tracks"
     const val PLAYLIST = "playlist/{id}"
     const val MIX = "mix/{id}"
     const val GENRE = "genre/{name}"
@@ -22,6 +23,7 @@ object Routes {
 
     fun album(id: String) = "album/$id"
     fun artist(id: String) = "artist/$id"
+    fun artistTracks(id: String) = "artist/$id/tracks"
     fun playlist(id: String) = "playlist/$id"
     fun mix(id: String) = "mix/$id"
     fun genre(name: String) = "genre/${java.net.URLEncoder.encode(name, "UTF-8")}"
@@ -48,6 +50,7 @@ object CollectionKind {
 class Nav(private val controller: NavHostController) {
     fun album(id: String) = controller.navigate(Routes.album(id))
     fun artist(id: String) = controller.navigate(Routes.artist(id))
+    fun artistTracks(id: String) = controller.navigate(Routes.artistTracks(id))
     fun playlist(id: String) = controller.navigate(Routes.playlist(id))
     fun mix(id: String) = controller.navigate(Routes.mix(id))
     fun genre(name: String) = controller.navigate(Routes.genre(name))

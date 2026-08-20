@@ -29,6 +29,9 @@ data class AppSettings(
     val syncEnabled: Boolean = true,
     val resumeOnLaunch: Boolean = true,
     val downloadOnWifiOnly: Boolean = true,
+    val streamOnCellular: Boolean = true,
+    val dataSaver: Boolean = false,
+    val offlineOnly: Boolean = false,
     val hapticFeedback: Boolean = true,
     val skipSilence: Boolean = false,
     val playbackSpeed: Float = 1f,
@@ -79,6 +82,9 @@ class AppSettingsStore(context: Context) {
         val SYNC_ENABLED = booleanPreferencesKey("sync_enabled")
         val RESUME_ON_LAUNCH = booleanPreferencesKey("resume_on_launch")
         val WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
+        val STREAM_CELLULAR = booleanPreferencesKey("stream_on_cellular")
+        val DATA_SAVER = booleanPreferencesKey("data_saver")
+        val OFFLINE_ONLY = booleanPreferencesKey("offline_only")
         val HAPTICS = booleanPreferencesKey("haptic_feedback")
         val SKIP_SILENCE = booleanPreferencesKey("skip_silence")
         val SPEED = floatPreferencesKey("playback_speed")
@@ -117,6 +123,9 @@ class AppSettingsStore(context: Context) {
             syncEnabled = prefs[SYNC_ENABLED] ?: defaults.syncEnabled,
             resumeOnLaunch = prefs[RESUME_ON_LAUNCH] ?: defaults.resumeOnLaunch,
             downloadOnWifiOnly = prefs[WIFI_ONLY] ?: defaults.downloadOnWifiOnly,
+            streamOnCellular = prefs[STREAM_CELLULAR] ?: defaults.streamOnCellular,
+            dataSaver = prefs[DATA_SAVER] ?: defaults.dataSaver,
+            offlineOnly = prefs[OFFLINE_ONLY] ?: defaults.offlineOnly,
             hapticFeedback = prefs[HAPTICS] ?: defaults.hapticFeedback,
             skipSilence = prefs[SKIP_SILENCE] ?: defaults.skipSilence,
             playbackSpeed = prefs[SPEED] ?: defaults.playbackSpeed,
@@ -164,6 +173,18 @@ class AppSettingsStore(context: Context) {
     suspend fun setSyncEnabled(value: Boolean) = edit { it[SYNC_ENABLED] = value }
     suspend fun setResumeOnLaunch(value: Boolean) = edit { it[RESUME_ON_LAUNCH] = value }
     suspend fun setDownloadOnWifiOnly(value: Boolean) = edit { it[WIFI_ONLY] = value }
+    suspend fun setStreamOnCellular(value: Boolean) = edit { it[STREAM_CELLULAR] = value }
+    suspend fun setDataSaver(value: Boolean) = edit {
+        it[DATA_SAVER] = value
+        if (value) {
+            it[OFFLINE_ONLY] = false
+            it[QUALITY] = "low"
+        }
+    }
+    suspend fun setOfflineOnly(value: Boolean) = edit {
+        it[OFFLINE_ONLY] = value
+        if (value) it[DATA_SAVER] = false
+    }
     suspend fun setHapticFeedback(value: Boolean) = edit { it[HAPTICS] = value }
     suspend fun setSkipSilence(value: Boolean) = edit { it[SKIP_SILENCE] = value }
     suspend fun setPlaybackSpeed(value: Float) = edit { it[SPEED] = value.coerceIn(0.5f, 2f) }
