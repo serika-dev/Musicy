@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -132,6 +133,7 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Recent searches, so the search tab is useful before you type. */
     val recentSearches: StateFlow<List<String>> = repo.searchHistoryStore.recent
+        .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private var searchJob: Job? = null
@@ -341,17 +343,22 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             showToast("Nothing playable here yet")
             return
         }
-        val queue = if (repo.shouldPlayLocalOnly()) {
-            val local = tracks.filter { repo.isDownloaded(it.id) }
-            if (local.isEmpty()) {
-                showToast("Download these tracks to play them offline")
-                return
-            }
-            local
-        } else tracks
-        val startId = tracks.getOrNull(startIndex)?.id
-        val index = startId?.let { id -> queue.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
-        player.play(queue, index, contextId)
+        viewModelScope.launch {
+            // The download index loads in the background at startup; a fast tap
+            // on first launch could otherwise miss files that are on disk.
+            repo.awaitDownloadScan()
+            val queue = if (repo.shouldPlayLocalOnly()) {
+                val local = tracks.filter { repo.isDownloaded(it.id) }
+                if (local.isEmpty()) {
+                    showToast("Download these tracks to play them offline")
+                    return@launch
+                }
+                local
+            } else tracks
+            val startId = tracks.getOrNull(startIndex)?.id
+            val index = startId?.let { id -> queue.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
+            player.play(queue, index, contextId)
+        }
     }
 
     fun playAlbum(album: Album, startIndex: Int = 0) =
@@ -366,12 +373,15 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun shuffle(tracks: List<Track>, contextId: String? = null) {
-        val source = if (repo.shouldPlayLocalOnly()) tracks.filter { repo.isDownloaded(it.id) } else tracks
-        if (source.isEmpty()) {
-            showToast(if (repo.shouldPlayLocalOnly()) "Download these tracks to play them offline" else "Nothing playable here yet")
-            return
+        viewModelScope.launch {
+            repo.awaitDownloadScan()
+            val source = if (repo.shouldPlayLocalOnly()) tracks.filter { repo.isDownloaded(it.id) } else tracks
+            if (source.isEmpty()) {
+                showToast(if (repo.shouldPlayLocalOnly()) "Download these tracks to play them offline" else "Nothing playable here yet")
+                return@launch
+            }
+            player.play(source.shuffled(), 0, contextId)
         }
-        player.play(source.shuffled(), 0, contextId)
     }
 
     fun toggleLike(track: Track) {

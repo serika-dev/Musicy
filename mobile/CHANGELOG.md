@@ -10,6 +10,18 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.7.1]
+
+### Fixed
+- **No more startup freeze with large download libraries.** The download index was scanned on the main thread before the app could draw anything; with a few hundred downloads that stalled startup long enough to trigger system ANR dialogs. The scan now runs in the background and playback paths wait for it instead, so downloaded files are still played from disk.
+- **Offline playback requests no longer crash.** Queue resolution (player, notification, Android Auto) now degrades gracefully offline: catalogue lookups that used to throw out of the media-session callbacks fall back to the already-resolved queue.
+- **A corrupt preferences file no longer kills the app on launch** — settings fall back to defaults and recover on the next good read.
+- **Lock-screen lyrics** no longer race the queue when replacing the current media item.
+- **Synced lyrics with repeated timestamps** (choruses) no longer crash the lyrics list.
+- **Downloads hygiene.** Partial `.part` files are swept instead of showing up as phantom "Offline track" entries; switching download quality now removes the previous rendition instead of leaving an orphaned file; deleting a download removes every saved copy of that track.
+
+---
+
 ## [1.7.0]
 
 ### Added

@@ -114,7 +114,7 @@ class MusicyPlaybackService : MediaLibraryService() {
                 if (player.playbackParameters.speed != settings.playbackSpeed) {
                     player.setPlaybackSpeed(settings.playbackSpeed)
                 }
-                player.volume = settings.defaultVolume
+                player.volume = settings.defaultVolume.coerceIn(0f, 1f)
             }
         }
     }
@@ -212,7 +212,11 @@ class MusicyPlaybackService : MediaLibraryService() {
             if (text.isNullOrBlank()) return@launch
             val index = player.currentMediaItemIndex
             val current = player.currentMediaItem ?: return@launch
+            // The queue can change between picking the index and replacing the
+            // item (autoplay extension, a skip) — replacing a stale index is a
+            // crash instead of a no-op.
             if (current.mediaId != trackId) return@launch
+            if (index !in 0 until player.mediaItemCount) return@launch
             val extras = Bundle(current.mediaMetadata.extras ?: Bundle()).apply {
                 putString("android.media.metadata.LYRICS", text)
             }
@@ -220,7 +224,9 @@ class MusicyPlaybackService : MediaLibraryService() {
                 .setDescription(text.lineSequence().take(6).joinToString("\n"))
                 .setExtras(extras)
                 .build()
-            player.replaceMediaItem(index, current.buildUpon().setMediaMetadata(metadata).build())
+            runCatching {
+                player.replaceMediaItem(index, current.buildUpon().setMediaMetadata(metadata).build())
+            }
         }
     }
 
@@ -295,6 +301,9 @@ class MusicyPlaybackService : MediaLibraryService() {
             if (!repo.settings.value.resumeOnLaunch) return@launch
             if (player.mediaItemCount > 0) return@launch
             val saved = repo.playbackStateStore.load() ?: return@launch
+            // Wait for the download index so restored items bind to the local
+            // file when one exists instead of streaming over the network.
+            repo.awaitDownloadScan()
             val items = saved.tracks.map { MediaItems.fromTrack(it, repo) }
             if (items.isEmpty()) return@launch
             player.setMediaItems(items, saved.index, saved.positionMs)
@@ -424,7 +433,10 @@ class MusicyPlaybackService : MediaLibraryService() {
             }
 
             val children = withContext(Dispatchers.IO) {
-                runCatching { library.children(parentId) }
+                runCatching {
+                    repo.awaitDownloadScan()
+                    library.children(parentId)
+                }
                     .onFailure { Log.w(TAG, "browse failed for $parentId: ${it.message}") }
                     .getOrDefault(emptyList())
             }
@@ -436,7 +448,9 @@ class MusicyPlaybackService : MediaLibraryService() {
             browser: MediaSession.ControllerInfo,
             mediaId: String
         ): ListenableFuture<LibraryResult<MediaItem>> = serviceScope.future {
-            val track = withContext(Dispatchers.IO) { library.trackFor(mediaId) }
+            val track = withContext(Dispatchers.IO) {
+                runCatching { repo.awaitDownloadScan(); library.trackFor(mediaId) }.getOrNull()
+            }
             if (track == null) {
                 LibraryResult.ofError(SessionResult.RESULT_ERROR_BAD_VALUE)
             } else {
@@ -502,7 +516,10 @@ class MusicyPlaybackService : MediaLibraryService() {
             // Resuming from a car or headset with no session: fall back to the
             // user's liked songs so the play button is never a dead end.
             val tracks = withContext(Dispatchers.IO) {
-                runCatching { repo.likedSongs(limit = 50) }.getOrDefault(emptyList())
+                runCatching {
+                    repo.awaitDownloadScan()
+                    repo.likedSongs(limit = 50)
+                }.getOrDefault(emptyList())
             }
             MediaSession.MediaItemsWithStartPosition(
                 tracks.map { MediaItems.fromTrack(it, repo, MusicyLibrary.NODE_LIKED) },
@@ -533,18 +550,29 @@ class MusicyPlaybackService : MediaLibraryService() {
         return LibraryParams.Builder().setExtras(extras).build()
     }
 
-    private suspend fun resolveItems(items: List<MediaItem>): List<MediaItem> = items.map { item ->
-        if (item.localConfiguration != null) {
-            item
-        } else {
-            val track = library.trackFor(item.mediaId)
-            if (track != null) {
-                MediaItems.fromTrack(track, repo, MediaItems.parentIdOf(item))
-            } else {
+    /**
+     * Turns controller-submitted items without a URI into playable ones.
+     *
+     * This is the path that runs when a track was queued with no local file —
+     * offline, that is exactly every non-downloaded track, and the lookups
+     * throw. The failure must end as an empty queue at the player, never as an
+     * exception escaping the session callback.
+     */
+    private suspend fun resolveItems(items: List<MediaItem>): List<MediaItem> = runCatching {
+        repo.awaitDownloadScan()
+        items.map { item ->
+            if (item.localConfiguration != null) {
                 item
+            } else {
+                val track = library.trackFor(item.mediaId)
+                if (track != null) {
+                    MediaItems.fromTrack(track, repo, MediaItems.parentIdOf(item))
+                } else {
+                    item
+                }
             }
         }
-    }
+    }.getOrElse { emptyList() }
 
     private suspend fun expand(
         items: List<MediaItem>,
@@ -552,7 +580,26 @@ class MusicyPlaybackService : MediaLibraryService() {
         startPositionMs: Long
     ): MediaSession.MediaItemsWithStartPosition {
         val resolved = resolveItems(items)
+        if (resolved.isEmpty()) {
+            return MediaSession.MediaItemsWithStartPosition(emptyList(), 0, C.TIME_UNSET)
+        }
+        // Expanding a tap into its sibling tracks needs catalogue lookups, which
+        // fail without a connection; falling back to the resolved queue keeps
+        // the request alive offline.
+        return runCatching { expandQueue(resolved, startIndex, startPositionMs) }.getOrElse {
+            MediaSession.MediaItemsWithStartPosition(
+                resolved,
+                startIndex.coerceIn(0, (resolved.size - 1).coerceAtLeast(0)),
+                startPositionMs
+            )
+        }
+    }
 
+    private suspend fun expandQueue(
+        resolved: List<MediaItem>,
+        startIndex: Int,
+        startPositionMs: Long
+    ): MediaSession.MediaItemsWithStartPosition {
         if (resolved.size == 1) {
             val single = resolved.first()
             val parentId = MediaItems.parentIdOf(single)

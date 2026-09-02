@@ -175,7 +175,9 @@ private fun SyncedLyrics(
         contentPadding = if (fillHeight) PaddingValues(vertical = 160.dp) else PaddingValues(vertical = 120.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        items(lines.size, key = { "${it}_${lines[it].timeMs}" }) { index ->
+        // Keys are positional: LRC files legitimately repeat a timestamp (think
+        // choruses), and duplicate keys crash LazyColumn.
+        items(lines.size, key = { it }) { index ->
             val line = lines[index]
             val active = index == activeIndex
             val romanizedText = romanizedByTime[line.timeMs]?.takeIf { it.isNotBlank() && it != line.text }

@@ -19,10 +19,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
@@ -60,14 +60,27 @@ class MusicyRepository private constructor(context: Context) {
     private var likedLoaded = false
 
     init {
-        scope.launch { serverConfigStore.config.collect { _config.value = it } }
-        scope.launch { settingsStore.settings.collect { _settings.value = it } }
-        // Blocking but one-time and cheap (a single directory listing): callers
-        // that skip the UI entirely (Android Auto, a restored playback service)
-        // must not build a queue before this finishes, or playbackUrl() reads an
-        // empty index and streams tracks that are already downloaded.
-        runBlocking(Dispatchers.IO) { downloadStore.warmUp() }
+        // A corrupt preferences file must not take the app down on launch: the
+        // catch falls back to defaults for that emission and lets the store
+        // recover on its next good read.
+        scope.launch {
+            serverConfigStore.config.catch { }.collect { _config.value = it }
+        }
+        scope.launch {
+            settingsStore.settings.catch { }.collect { _settings.value = it }
+        }
+        // The download index is scanned off the main thread. This used to be a
+        // runBlocking here, which blocked startup for the whole scan — with a
+        // few hundred downloads that froze the app long enough to trigger ANR
+        // dialogs. Playback paths that must not stream an already-downloaded
+        // file await the scan via [awaitDownloadScan] instead.
+        scope.launch {
+            runCatching { downloadStore.warmUp() }
+        }
     }
+
+    /** Suspends until the download index has been read from disk. */
+    suspend fun awaitDownloadScan() = downloadStore.ensureScanned()
 
     val api: MusicyApi get() = ApiClient.create(_config.value)
 

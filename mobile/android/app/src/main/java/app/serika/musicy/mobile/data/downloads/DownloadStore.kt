@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -65,46 +67,75 @@ class DownloadStore(context: Context) {
     @Volatile
     private var scanned = false
 
+    /** Serialises [warmUp] runs so a background scan and an [ensureScanned] caller cannot interleave. */
+    private val scanMutex = Mutex()
+
     suspend fun current(): List<DownloadedTrack> = withContext(Dispatchers.IO) {
         if (!scanned) warmUp()
         _items.value
     }
 
+    /** Waits for the index scan; a no-op once [warmUp] has completed. */
+    suspend fun ensureScanned() {
+        if (!scanned) warmUp()
+    }
+
     /** Rebuilds the in-memory index from disk. Safe to call repeatedly. */
-    suspend fun warmUp() = withContext(Dispatchers.IO) {
-        directory.mkdirs()
-        val audioFiles = directory.listFiles().orEmpty()
-            .filter { it.isFile && it.length() > 0L && !it.name.endsWith(".json", ignoreCase = true) }
+    suspend fun warmUp() = scanMutex.withLock {
+        withContext(Dispatchers.IO) {
+            directory.mkdirs()
+            // A killed download leaves a .part file behind. It is not playable,
+            // so sweep it instead of letting the scan below surface a phantom
+            // "Offline track" entry that then fails to play.
+            directory.listFiles().orEmpty()
+                .filter { it.isFile && it.name.endsWith(".part", ignoreCase = true) }
+                .forEach { it.delete() }
 
-        val fromFile = readFileIndex()
-        val fromStore = readDataStoreIndex()
-        val merged = LinkedHashMap<String, DownloadedTrack>()
-        fromStore.forEach { merged[it.track.id] = it }
-        fromFile.forEach { merged[it.track.id] = it }
+            val audioFiles = directory.listFiles().orEmpty().filter {
+                it.isFile && it.length() > 0L &&
+                    !it.name.endsWith(".json", ignoreCase = true) &&
+                    !it.name.endsWith(".part", ignoreCase = true)
+            }
 
-        localFiles.clear()
-        audioFiles.forEach { file ->
-            val id = file.nameWithoutExtension
-            val sidecar = readSidecar(id)
-            val known = sidecar ?: merged[id]
-            val entry = (known ?: DownloadedTrack(
-                track = Track(id = id, title = "Offline track", format = file.extension.uppercase().ifBlank { null }),
-                fileName = file.name,
-                sizeBytes = file.length(),
-                downloadedAt = file.lastModified()
-            )).copy(fileName = file.name, sizeBytes = file.length())
-            merged[id] = entry
-            localFiles[id] = file.absolutePath
-            if (sidecar == null) writeSidecar(entry)
+            val fromFile = readFileIndex()
+            val fromStore = readDataStoreIndex()
+            val merged = LinkedHashMap<String, DownloadedTrack>()
+            fromStore.forEach { merged[it.track.id] = it }
+            fromFile.forEach { merged[it.track.id] = it }
+
+            localFiles.clear()
+            audioFiles.forEach { file ->
+                val id = file.nameWithoutExtension
+                // Trust the merged index when it already describes this exact
+                // file. Reading (and re-writing) a sidecar for every track made
+                // warm-up crawl once users had a few hundred downloads — enough
+                // to stall app startup. The sidecar is only consulted when the
+                // index disagrees with what is on disk.
+                val known = merged[id]
+                    ?.takeIf { it.fileName == file.name && it.sizeBytes == file.length() }
+                    ?: readSidecar(id)?.copy(fileName = file.name, sizeBytes = file.length())
+                    ?: DownloadedTrack(
+                        track = Track(id = id, title = "Offline track", format = file.extension.uppercase().ifBlank { null }),
+                        fileName = file.name,
+                        sizeBytes = file.length(),
+                        downloadedAt = file.lastModified()
+                    )
+                merged[id] = known
+                localFiles[id] = file.absolutePath
+            }
+
+            val kept = merged.values
+                .filter { localFiles.containsKey(it.track.id) }
+                .sortedBy { it.downloadedAt }
+            _items.value = kept
+            // Only rewrite the on-disk copies when something actually changed;
+            // this is also what back-fills missing sidecars after a wiped store.
+            if (fromFile != kept || fromStore != kept) {
+                persistIndex(kept)
+                persistIndexToStore(kept)
+            }
+            scanned = true
         }
-
-        val kept = merged.values
-            .filter { localFiles.containsKey(it.track.id) }
-            .sortedBy { it.downloadedAt }
-        _items.value = kept
-        persistIndex(kept)
-        persistIndexToStore(kept)
-        scanned = true
     }
 
     fun fileFor(trackId: String): File? = localFiles[trackId]?.let(::File)?.takeIf { it.length() > 0 }
@@ -158,6 +189,17 @@ class DownloadStore(context: Context) {
                     error("Empty download")
                 }
                 if (target.exists()) target.delete()
+                // A quality switch changes the extension (mp3 → flac); delete the
+                // previous rendition or it lingers forever and the next scan
+                // re-adopts whichever copy it finds first.
+                directory.listFiles().orEmpty()
+                    .filter {
+                        it.name != target.name &&
+                            it.nameWithoutExtension == track.id &&
+                            !it.name.endsWith(".json", ignoreCase = true) &&
+                            !it.name.endsWith(".part", ignoreCase = true)
+                    }
+                    .forEach { it.delete() }
                 if (!tmp.renameTo(target)) {
                     tmp.copyTo(target, overwrite = true)
                     tmp.delete()
@@ -180,7 +222,15 @@ class DownloadStore(context: Context) {
         }
 
     suspend fun remove(trackId: String) = withContext(Dispatchers.IO) {
-        fileFor(trackId)?.delete()
+        // The audio extension depends on the quality it was saved at, so sweep
+        // every rendition of this track, not just the one the index knows.
+        directory.listFiles().orEmpty()
+            .filter {
+                it.nameWithoutExtension == trackId &&
+                    !it.name.endsWith(".json", ignoreCase = true) &&
+                    !it.name.endsWith(".part", ignoreCase = true)
+            }
+            .forEach { it.delete() }
         File(directory, "$trackId.json").delete()
         localFiles.remove(trackId)
         updateItems { items -> items.filterNot { it.track.id == trackId } }

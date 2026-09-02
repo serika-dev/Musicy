@@ -219,7 +219,7 @@ class AppSettingsStore(context: Context) {
         prefs[COMPACT] = remote.compactMode
         prefs[QUALITY] = remote.audioQuality
         prefs[NORMALIZE] = remote.normalizeVolume
-        prefs[VOLUME] = remote.defaultVolume
+        prefs[VOLUME] = remote.defaultVolume.coerceIn(0f, 1f)
         prefs[AUTOPLAY] = remote.autoplayRecommendations
         prefs[GAPLESS] = remote.gaplessPlayback
         prefs[NOW_PLAYING_NOTIF] = remote.showNowPlayingNotifications
