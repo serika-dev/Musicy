@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { setAlbumTags } from '@/lib/genres'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -45,7 +46,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       ...(title !== undefined && { title: title?.trim() || undefined }),
       ...(description !== undefined && { description: description || null }),
       ...(coverImageUrl !== undefined && { coverImageUrl: coverImageUrl || null }),
-      ...(genre !== undefined && { genre: genre || null }),
       ...(typeof isPublic === 'boolean' && { isPublic }),
       ...(albumType && { albumType }),
       ...(artistId !== undefined && { artistId: artistId || undefined }),
@@ -56,9 +56,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       updateData.releaseDate = releaseDate ? new Date(releaseDate) : null
     }
 
-    const updatedAlbum = await prisma.album.update({
-      where: { id },
-      data: updateData,
+    const updatedAlbum = await prisma.$transaction(async (tx) => {
+      // Tags first so the returned row already carries the new primary genre.
+      if (genre !== undefined) await setAlbumTags(tx, id, genre)
+      return tx.album.update({
+        where: { id },
+        data: updateData,
+      })
     })
 
     return NextResponse.json(updatedAlbum)

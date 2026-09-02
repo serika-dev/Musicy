@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { validateApiKey } from "@/lib/api-utils"
+import { genreTagFilter } from "@/lib/genres"
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +29,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (genre) {
-      whereClause.genre = genre
+      // A track is a match when any of its genre tags equals the filter; the
+      // legacy column check keeps pre-tag data and raw SQL tweaks working.
+      whereClause.AND = [...(whereClause.AND ?? []), genreTagFilter(genre)]
     }
 
     if (search) {

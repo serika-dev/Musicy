@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { setTrackTags } from '@/lib/genres'
 
 // POST: Merge duplicate tracks into one
 // Body: { sourceTrackId: string, targetTrackId: string }
@@ -62,6 +63,11 @@ export async function POST(request: NextRequest) {
 
     if (Object.keys(updateData).length > 0) {
       await prisma.track.update({ where: { id: targetTrackId }, data: updateData })
+    }
+    // The genre column only carries the primary tag, so adopt the source's
+    // full tag set when the target had none of its own.
+    if (!targetTrack.genre && sourceTrack.genre) {
+      await setTrackTags(prisma, targetTrackId, sourceTrack.genre)
     }
 
     // Merge featured artists (skip any already connected to target)

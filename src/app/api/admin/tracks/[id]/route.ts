@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { setTrackTags } from '@/lib/genres'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -45,7 +46,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const updateData: any = {
       ...(typeof isPublic === 'boolean' && { isPublic }),
       ...(title !== undefined && { title: title?.trim() || undefined }),
-      ...(genre !== undefined && { genre: genre || null }),
       ...(year !== undefined && { year: year ? parseInt(String(year)) : null }),
       ...(trackNumber !== undefined && { trackNumber: trackNumber ? parseInt(String(trackNumber)) : null }),
       ...(artistId !== undefined && { artistId: artistId || undefined }),
@@ -57,20 +57,24 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       updateData.albumId = albumId || null
     }
 
-    const updatedTrack = await prisma.track.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        title: true,
-        isPublic: true,
-        genre: true,
-        year: true,
-        trackNumber: true,
-        artistId: true,
-        albumId: true,
-        coverImageUrl: true,
-      },
+    const updatedTrack = await prisma.$transaction(async (tx) => {
+      // Tags first so the returned row already carries the new primary genre.
+      if (genre !== undefined) await setTrackTags(tx, id, genre)
+      return tx.track.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          title: true,
+          isPublic: true,
+          genre: true,
+          year: true,
+          trackNumber: true,
+          artistId: true,
+          albumId: true,
+          coverImageUrl: true,
+        },
+      })
     })
 
     return NextResponse.json(updatedTrack)

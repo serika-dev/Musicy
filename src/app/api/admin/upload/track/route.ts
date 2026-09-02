@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { uploadFileToR2, generateAudioFileKey } from '@/lib/r2-client'
 import { ensureRenditions } from '@/lib/rendition-service'
+import { setAlbumTags, setTrackTags } from '@/lib/genres'
 
 export async function POST(request: NextRequest) {
   try {
@@ -125,6 +126,8 @@ export async function POST(request: NextRequest) {
             isPublic: isPublic,
           }
         })
+        // "Pop, Rock" becomes two tags; the column keeps the primary one.
+        await setAlbumTags(prisma, album.id, genre)
       }
     }
 
@@ -198,6 +201,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Now upload audio file using the actual track ID
+    await setTrackTags(prisma, track.id, genre)
     const audioBytes = await audioFile.arrayBuffer()
     const audioBuffer = Buffer.from(audioBytes)
     const audioFileExtension = audioFile.name.split('.').pop() || 'flac'

@@ -168,6 +168,7 @@ model Album {
   artist       Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
   featuredArtists Artist[] @relation("AlbumFeatures")
   tracks       Track[]
+  tags         AlbumTag[]
 
   @@unique([title, artistId])
   @@map("albums")
@@ -194,6 +195,9 @@ model Track {
   // Streaming quality renditions (transcoded variants)
   renditionStatus String?          // null | "pending" | "processing" | "ready" | "failed"
   renditions      TrackRendition[]
+
+  // Proper genre tags; the genre column mirrors the first (primary) tag
+  tags            TrackTag[]
 
   // Lyrics support
   lrcId         Int?     // LRCLib ID
@@ -474,4 +478,46 @@ model ApiKey {
 enum UserRole {
   ADMIN
   USER
+}
+
+// ---------------------------------------------------------------------------
+// Genre tags
+// ---------------------------------------------------------------------------
+
+// A single genre tag. Tracks and albums carry any number of these; the legacy
+// `genre` string columns mirror the first (primary) tag so existing clients
+// and queries keep working.
+model Genre {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  tracks TrackTag[]
+  albums AlbumTag[]
+
+  @@map("genres")
+}
+
+model TrackTag {
+  trackId  String
+  track    Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  genreId  String
+  genre    Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  position Int    @default(0)
+
+  @@id([trackId, genreId])
+  @@index([genreId])
+  @@map("track_tags")
+}
+
+model AlbumTag {
+  albumId  String
+  album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  genreId  String
+  genre    Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  position Int    @default(0)
+
+  @@id([albumId, genreId])
+  @@index([genreId])
+  @@map("album_tags")
 }

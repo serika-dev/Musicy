@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { uploadFileToR2, uploadFileToR2Direct, uploadLargeFileToR2, generateAudioFileKey } from '@/lib/r2-client'
 import { ensureRenditions } from '@/lib/rendition-service'
+import { setAlbumTags, setTrackTags } from '@/lib/genres'
 import * as musicMetadata from 'music-metadata'
 
 // Configure Next.js for large file uploads
@@ -261,6 +262,8 @@ export async function POST(request: NextRequest) {
             } : undefined
           }
         })
+        // "Pop, Rock" becomes two tags; the column keeps the primary one.
+        await setAlbumTags(prisma, album.id, finalData.genre)
         console.log(`✅ Created new album: ${normalizedTitle}${validReleaseDate ? ` (Year: ${parsedYear})` : ''}`)
       } else {
         console.log(`✅ Using existing album: ${album.title} (ID: ${album.id})`)
@@ -359,6 +362,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Now upload audio file using the actual track ID
+    await setTrackTags(prisma, track.id, finalData.genre)
     const audioBytes = await audioFile.arrayBuffer()
     const audioBuffer = Buffer.from(audioBytes)
     const audioFileExtension = audioFile.name.split('.').pop() || 'flac'

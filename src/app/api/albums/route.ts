@@ -15,10 +15,23 @@ export async function GET(request: NextRequest) {
     }
     
     if (genre) {
-      whereClause.genre = {
-        contains: genre,
-        mode: 'insensitive',
-      }
+      // Tag match first; the legacy contains check still catches anything
+      // that never got split into tags.
+      whereClause.AND = [
+        ...(whereClause.AND ?? []),
+        {
+          OR: [
+            {
+              tags: {
+                some: {
+                  genre: { name: { equals: genre, mode: 'insensitive' } },
+                },
+              },
+            },
+            { genre: { contains: genre, mode: 'insensitive' } },
+          ],
+        },
+      ]
     }
     
     if (search) {
