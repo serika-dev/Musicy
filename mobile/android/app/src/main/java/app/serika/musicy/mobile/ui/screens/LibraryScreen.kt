@@ -54,7 +54,7 @@ private enum class LibraryTab(val label: String) {
 fun LibraryScreen(vm: MusicyViewModel, nav: Nav) {
     val library by vm.library.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     val refreshing by vm.libraryRefreshing.collectAsState()
     var tab by remember { mutableStateOf(LibraryTab.PLAYLISTS) }
     var actionTrack by remember { mutableStateOf<Track?>(null) }

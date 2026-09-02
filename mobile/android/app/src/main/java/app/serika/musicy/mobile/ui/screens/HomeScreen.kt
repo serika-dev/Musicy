@@ -50,7 +50,7 @@ import java.util.Calendar
 fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
     val home by vm.home.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     val refreshing by vm.homeRefreshing.collectAsState()
     val continueQueue by vm.continueQueue.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }

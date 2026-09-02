@@ -91,10 +91,10 @@ private fun MainScaffold(config: ServerConfig) {
     val navController = rememberNavController()
     val nav = remember(navController) { Nav(navController) }
 
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     // Separate flow: the mini-player's progress bar is the only thing here
     // that needs to redraw on the position tick.
-    val progress by vm.player.position.collectAsState()
+    val progress by vm.position.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
     val settings by vm.settings.collectAsState()
     val haptics = settings.hapticFeedback

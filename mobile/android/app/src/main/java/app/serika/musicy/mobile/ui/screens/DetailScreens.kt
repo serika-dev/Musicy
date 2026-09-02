@@ -235,7 +235,7 @@ private fun rememberHeroScrolled(state: LazyListState): Boolean {
 fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
     val album by loadAsync(albumId) { vm.repo.album(albumId) }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val listState = rememberLazyListState()
     val scrolled = rememberHeroScrolled(listState)
@@ -315,7 +315,7 @@ fun ArtistScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     val tracks by loadAsync("tracks-$artistId") { vm.repo.artistTracks(artistId) }
     val albums by loadAsync("albums-$artistId") { vm.repo.artistAlbums(artistId) }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     var following by remember(artistId) { mutableStateOf<Boolean?>(null) }
     var albumFilter by remember { mutableStateOf("all") }
@@ -476,7 +476,7 @@ fun ArtistTracksScreen(vm: MusicyViewModel, nav: Nav, artistId: String) {
     val artist by loadAsync("name-$artistId") { vm.repo.artist(artistId) }
     val tracks by loadAsync("all-tracks-$artistId") { vm.repo.artistTracks(artistId) }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val name = artist.valueOrNull?.name ?: "Artist"
     val list = tracks.valueOrNull.orEmpty()
@@ -606,7 +606,7 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
     var reloadKey by remember(playlistId) { mutableIntStateOf(0) }
     val playlist by loadAsync("$playlistId-$reloadKey") { vm.repo.playlist(playlistId) }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val listState = rememberLazyListState()
     val scrolled = rememberHeroScrolled(listState)
@@ -677,7 +677,7 @@ fun PlaylistScreen(vm: MusicyViewModel, nav: Nav, playlistId: String) {
 fun DailyMixScreen(vm: MusicyViewModel, nav: Nav, mixId: String) {
     val mix by loadAsync(mixId) { vm.repo.dailyMix(mixId) }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val listState = rememberLazyListState()
     val scrolled = rememberHeroScrolled(listState)
@@ -733,7 +733,7 @@ fun GenreScreen(vm: MusicyViewModel, nav: Nav, genre: String) {
     val tracks by loadAsync("genre-tracks-$genre") { vm.repo.tracks(limit = 100, genre = genre).tracks }
     val albums by loadAsync("genre-albums-$genre") { vm.repo.albums(limit = 30, genre = genre).albums }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
     DetailScaffold(titleWhenScrolled = genre, nav = nav) { padding ->
@@ -816,7 +816,7 @@ fun GenreScreen(vm: MusicyViewModel, nav: Nav, genre: String) {
 fun LikedSongsScreen(vm: MusicyViewModel, nav: Nav) {
     val library by vm.library.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val tracks = library.valueOrNull?.likedSongs.orEmpty()
     val chrome = rememberTrackListChrome(vm, tracks)
@@ -885,7 +885,7 @@ fun CollectionScreen(vm: MusicyViewModel, nav: Nav, kind: String) {
         else -> "Browse"
     }
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
 
     val content by loadAsync(kind) {

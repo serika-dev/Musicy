@@ -11,7 +11,10 @@ import app.serika.musicy.mobile.data.model.*
 import app.serika.musicy.mobile.data.preferences.SavedQueue
 import app.serika.musicy.mobile.player.AudioEngineState
 import app.serika.musicy.mobile.player.MusicyLibrary
+import app.serika.musicy.mobile.player.PlaybackPosition
+import app.serika.musicy.mobile.player.PlaybackUiState
 import app.serika.musicy.mobile.player.PlayerConnection
+import app.serika.musicy.mobile.player.RepeatMode
 import app.serika.musicy.mobile.player.SyncHolder
 import app.serika.musicy.mobile.widget.WidgetActions
 import app.serika.musicy.mobile.widget.WidgetSnapshotStore
@@ -131,6 +134,13 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
     private val _thisDeviceId = MutableStateFlow("")
     val thisDeviceId: StateFlow<String> = _thisDeviceId.asStateFlow()
 
+    /** Last playback state broadcast by the device holding Musicy Connect. */
+    private val _syncRemoteState = MutableStateFlow<SyncStatePayload?>(null)
+    val syncRemoteState: StateFlow<SyncStatePayload?> = _syncRemoteState.asStateFlow()
+
+    /** The remote playhead, snapshotted when its state frame arrived. */
+    private val _syncRemotePosition = MutableStateFlow<PlaybackPosition?>(null)
+
     /** Recent searches, so the search tab is useful before you type. */
     val recentSearches: StateFlow<List<String>> = repo.searchHistoryStore.recent
         .catch { emit(emptyList()) }
@@ -193,6 +203,22 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
                 launch { bound.activeDeviceId.collect { _syncActiveDeviceId.value = it } }
                 launch { bound.connected.collect { _syncConnected.value = it } }
                 launch { bound.deviceId.collect { _thisDeviceId.value = it } }
+                launch {
+                    bound.remoteState.collect { payload ->
+                        _syncRemoteState.value = payload
+                        _syncRemotePosition.value = payload?.let {
+                            PlaybackPosition(
+                                positionMs = (it.currentTime * 1000).toLong().coerceAtLeast(0L),
+                                durationMs = (it.duration * 1000).toLong().coerceAtLeast(0L),
+                                isPlaying = it.isPlaying,
+                                // The payload carries no speed; 1x stays close enough
+                                // between the one-second heartbeats.
+                                speed = 1f,
+                                capturedRealtimeMs = android.os.SystemClock.elapsedRealtime()
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -601,6 +627,22 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
         SyncHolder.client?.sendCommand(action, seconds = seconds, mode = mode)
     }
 
+    /**
+     * Jumps the device holding Connect playback to one of its queued tracks.
+     * The web honours `playTrack` with a queue payload, which doubles as
+     * "seek to queue index" for the remote.
+     */
+    fun remoteSkipTo(index: Int) {
+        val state = _syncRemoteState.value ?: return
+        val track = state.queue.getOrNull(index) ?: return
+        SyncHolder.client?.sendCommand(
+            "playTrack",
+            trackId = track.id,
+            queue = state.queue,
+            currentIndex = index
+        )
+    }
+
     /** True when another device holds playback and we are acting as a remote. */
     val isRemoteControlling: Boolean
         get() {
@@ -608,6 +650,45 @@ class MusicyViewModel(app: Application) : AndroidViewModel(app) {
             val us = _thisDeviceId.value
             return us.isNotBlank() && active != us
         }
+
+    /**
+     * What the playback surfaces should show: this device's player, or — when
+     * another device holds Connect playback and is broadcasting state — that
+     * device's track, queue and transport flags, so the app works as a real
+     * remote instead of only sending blind commands.
+     */
+    val playback: StateFlow<PlaybackUiState> = combine(
+        player.state, _syncActiveDeviceId, _thisDeviceId, _syncRemoteState
+    ) { local, activeId, us, remote ->
+        val remoteHolds = us.isNotBlank() && activeId != null && activeId != us
+        val track = remote?.currentTrack
+        if (remoteHolds && track != null) {
+            PlaybackUiState(
+                currentTrack = track,
+                queue = remote.queue,
+                currentIndex = remote.currentIndex.coerceAtLeast(0),
+                isPlaying = remote.isPlaying,
+                durationMs = (remote.duration * 1000).toLong().coerceAtLeast(0L),
+                shuffle = remote.shuffle,
+                repeatMode = when (remote.repeatMode) {
+                    "one", "track" -> RepeatMode.ONE
+                    "all", "playlist" -> RepeatMode.ALL
+                    else -> RepeatMode.OFF
+                },
+                hasNext = remote.currentIndex < remote.queue.lastIndex,
+                hasPrevious = remote.currentIndex > 0
+            )
+        } else {
+            local
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, player.state.value)
+
+    /** [playback]'s playhead, with the same local-or-remote rule. */
+    val position: StateFlow<PlaybackPosition> = combine(
+        player.position, _syncActiveDeviceId, _thisDeviceId, _syncRemotePosition
+    ) { local, activeId, us, remote ->
+        if (us.isNotBlank() && activeId != null && activeId != us && remote != null) remote else local
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, player.position.value)
 
     // -- settings -----------------------------------------------------------
 

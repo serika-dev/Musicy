@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 fun DownloadsScreen(vm: MusicyViewModel, nav: Nav) {
     val downloads by vm.repo.downloads.collectAsState(initial = emptyList())
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     var actionTrack by remember { mutableStateOf<Track?>(null) }
     val scope = rememberCoroutineScope()
 

@@ -63,7 +63,7 @@ fun SearchScreen(vm: MusicyViewModel, nav: Nav) {
     val home by vm.home.collectAsState()
     val recents by vm.recentSearches.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
-    val playback by vm.player.state.collectAsState()
+    val playback by vm.playback.collectAsState()
     val keyboard = LocalSoftwareKeyboardController.current
 
     Column(modifier = Modifier.fillMaxSize()) {

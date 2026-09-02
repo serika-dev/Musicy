@@ -54,10 +54,10 @@ private const val ARTWORK_SWIPE_THRESHOLD = 120f
 
 @Composable
 fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
-    val state by vm.player.state.collectAsState()
+    val state by vm.playback.collectAsState()
     // Position lives in its own flow so the scrubber and lyrics can tick
     // without dragging the rest of the screen through a recomposition.
-    val position by vm.player.position.collectAsState()
+    val position by vm.position.collectAsState()
     val liked by vm.likedTrackIds.collectAsState()
     val settings by vm.settings.collectAsState()
     val devices by vm.syncDevices.collectAsState()
@@ -420,7 +420,10 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    TextButton(onClick = { vm.player.skipTo(state.currentIndex + 1 + offset) }) {
+                    TextButton(onClick = {
+                        val target = state.currentIndex + 1 + offset
+                        if (remote) vm.remoteSkipTo(target) else vm.player.skipTo(target)
+                    }) {
                         Text("Play")
                     }
                 }
@@ -436,8 +439,10 @@ fun PlayerScreen(vm: MusicyViewModel, nav: Nav) {
             currentIndex = state.currentIndex,
             resolveArtwork = { vm.repo.resolveUrl(it.artworkUrl) },
             onDismiss = { showQueue = false },
-            onSkipTo = { vm.player.skipTo(it) },
-            onRemove = { vm.player.removeFromQueue(it) }
+            // The other device owns its queue: taps become playTrack commands
+            // and removal is a no-op rather than a lie.
+            onSkipTo = { if (remote) vm.remoteSkipTo(it) else vm.player.skipTo(it) },
+            onRemove = { if (!remote) vm.player.removeFromQueue(it) }
         )
     }
 
@@ -529,8 +534,8 @@ private fun Modifier.nudge(value: Float): Modifier = layout { measurable, constr
  */
 @Composable
 private fun FullscreenLyrics(vm: MusicyViewModel, onClose: () -> Unit) {
-    val state by vm.player.state.collectAsState()
-    val position by vm.player.position.collectAsState()
+    val state by vm.playback.collectAsState()
+    val position by vm.position.collectAsState()
     val settings by vm.settings.collectAsState()
     val track = state.currentTrack
 

@@ -10,6 +10,13 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.7.2]
+
+### Fixed
+- **Musicy Connect now actually mirrors on Android.** The app received other devices' playback state but never showed it: with the web (or another device) playing, the app's player stayed empty and only the blind remote commands worked. The mini player, full player, queue, slider, shuffle/repeat and track lists now show the active device's song, playhead (smoothly extrapolated between heartbeats) and transport state, and fall back to the local player the moment this device holds playback again. A departed device's stale state is discarded instead of freezing on screen.
+
+---
+
 ## [1.7.1]
 
 ### Fixed

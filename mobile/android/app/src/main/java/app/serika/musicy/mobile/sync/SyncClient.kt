@@ -198,7 +198,13 @@ class SyncClient(
                     val gone = json.decodeFromString<SyncClaimEvent>(payload).fromDeviceId
                     if (gone != null) {
                         _devices.value = _devices.value.filterNot { it.id == gone }
-                        if (_activeDeviceId.value == gone) _activeDeviceId.value = null
+                        if (_activeDeviceId.value == gone) {
+                            _activeDeviceId.value = null
+                            // Drop the departed device's last state so the UI
+                            // falls back to this player instead of showing a
+                            // frozen snapshot of playback that no longer exists.
+                            _remoteState.value = null
+                        }
                     }
                 }
             }
