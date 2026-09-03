@@ -26,6 +26,41 @@ function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => Math.random() - 0.5)
 }
 
+/** How many tracks one artist may contribute to a shared mix. */
+const MAX_PER_ARTIST = 3
+
+/**
+ * Picks up to `limit` tracks with at most [MAX_PER_ARTIST] per artist, so a
+ * prolific artist (or one bulk import) can't own an entire mix. The pool is
+ * shuffled first, then picked round-robin; if the cap leaves the mix short
+ * (small catalogue), leftovers top it up.
+ */
+function diversify<T extends { id: string; artist?: { id: string } | null }>(
+  tracks: T[],
+  limit: number = MIX_SIZE
+): T[] {
+  const perArtist = new Map<string, number>()
+  const picked: T[] = []
+  const chosen = new Set<string>()
+  for (const track of shuffle(tracks)) {
+    if (picked.length >= limit) break
+    const artistId = track.artist?.id ?? 'none'
+    const used = perArtist.get(artistId) ?? 0
+    if (used >= MAX_PER_ARTIST) continue
+    perArtist.set(artistId, used + 1)
+    picked.push(track)
+    chosen.add(track.id)
+  }
+  for (const track of tracks) {
+    if (picked.length >= limit) break
+    if (!chosen.has(track.id)) {
+      picked.push(track)
+      chosen.add(track.id)
+    }
+  }
+  return shuffle(picked)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -97,7 +132,7 @@ export async function GET(request: NextRequest) {
           album: { select: { id: true, title: true, coverImageUrl: true } },
         },
         orderBy: { playCount: 'desc' },
-        take: 100,
+        take: 200,
       }),
     ])
 
@@ -136,7 +171,7 @@ export async function GET(request: NextRequest) {
 
     // Mix 1: Liked Songs Mix
     if (likedTracks.length > 0) {
-      const shuffled = shuffle(likedTracks).slice(0, MIX_SIZE).map(l => l.track)
+      const shuffled = diversify(likedTracks.map(l => l.track))
       mixesToCreate.push({
         mixType: 'liked',
         name: 'Your Liked Songs Mix',
@@ -148,7 +183,7 @@ export async function GET(request: NextRequest) {
 
     // Mix 2: Discovery Mix
     {
-      const shuffled = shuffle(popularTracks).slice(0, MIX_SIZE)
+      const shuffled = diversify(popularTracks)
       mixesToCreate.push({
         mixType: 'discovery',
         name: 'Discovery Mix',
@@ -167,15 +202,16 @@ export async function GET(request: NextRequest) {
           album: { select: { id: true, title: true, coverImageUrl: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: MIX_SIZE,
+        take: 200,
       })
       if (newReleases.length > 0) {
+        const picked = diversify(newReleases)
         mixesToCreate.push({
           mixType: 'new-releases',
           name: 'New Releases',
           description: 'Fresh tracks just added to Musicy',
-          coverImageUrl: newReleases[0]?.album?.coverImageUrl || null,
-          tracks: newReleases,
+          coverImageUrl: picked[0]?.album?.coverImageUrl || null,
+          tracks: picked,
         })
       }
     }
@@ -189,10 +225,10 @@ export async function GET(request: NextRequest) {
           album: { select: { id: true, title: true, coverImageUrl: true } },
         },
         orderBy: { playCount: 'desc' },
-        take: MIX_SIZE,
+        take: 200,
       })
       if (genreTracks.length >= 5) {
-        const shuffled = shuffle(genreTracks).slice(0, MIX_SIZE)
+        const shuffled = diversify(genreTracks)
         mixesToCreate.push({
           mixType: `genre-${genre.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
           name: `${genre} Mix`,
@@ -238,10 +274,10 @@ export async function GET(request: NextRequest) {
           album: { select: { id: true, title: true, coverImageUrl: true } },
         },
         orderBy: { playCount: 'desc' },
-        take: MIX_SIZE,
+        take: 200,
       })
       if (chillTracks.length >= 5) {
-        const shuffled = shuffle(chillTracks).slice(0, MIX_SIZE)
+        const shuffled = diversify(chillTracks)
         mixesToCreate.push({
           mixType: 'chill',
           name: 'Chill Mix',
@@ -353,7 +389,7 @@ async function getOrCreatePopularMixes() {
           album: { select: { id: true, title: true, coverImageUrl: true } },
         },
         orderBy: { playCount: 'desc' },
-        take: MIX_SIZE,
+        take: 200,
       }),
       prisma.track.findMany({
         where: { isPublic: true },
@@ -362,9 +398,12 @@ async function getOrCreatePopularMixes() {
           album: { select: { id: true, title: true, coverImageUrl: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: MIX_SIZE,
+        take: 200,
       }),
     ])
+
+    const popularPicked = diversify(popularTracks)
+    const recentPicked = diversify(recentTracks)
 
     const expiresAt = tomorrowDate()
     const mixesToCreate = [
@@ -372,32 +411,32 @@ async function getOrCreatePopularMixes() {
         mixType: 'popular',
         name: 'Popular Right Now',
         description: 'The most played tracks on Musicy',
-        coverImageUrl: popularTracks[0]?.album?.coverImageUrl || null,
-        tracks: popularTracks,
+        coverImageUrl: popularPicked[0]?.album?.coverImageUrl || null,
+        tracks: popularPicked,
       },
       {
         mixType: 'new-releases',
         name: 'New Releases',
         description: 'Fresh tracks just added to Musicy',
-        coverImageUrl: recentTracks[0]?.album?.coverImageUrl || null,
-        tracks: recentTracks,
+        coverImageUrl: recentPicked[0]?.album?.coverImageUrl || null,
+        tracks: recentPicked,
       },
       {
         mixType: 'j-pop',
         name: 'J-Pop Mix',
         description: 'The best of Japanese pop',
         coverImageUrl: popularTracks.find(t => t.genre?.toLowerCase().includes('j-pop'))?.album?.coverImageUrl || popularTracks[0]?.album?.coverImageUrl || null,
-        tracks: popularTracks.filter(t => t.genre?.toLowerCase().includes('j-pop')).slice(0, MIX_SIZE),
+        tracks: diversify(popularTracks.filter(t => t.genre?.toLowerCase().includes('j-pop'))),
       },
       {
         mixType: 'chill',
         name: 'Chill Mix',
         description: 'Relaxing and ambient sounds',
         coverImageUrl: popularTracks.find(t => t.genre?.toLowerCase().includes('ambient') || t.genre?.toLowerCase().includes('score'))?.album?.coverImageUrl || null,
-        tracks: popularTracks.filter(t =>
+        tracks: diversify(popularTracks.filter(t =>
           t.genre?.toLowerCase().includes('ambient') ||
           t.genre?.toLowerCase().includes('score')
-        ).slice(0, MIX_SIZE),
+        )),
       },
     ].filter(m => m.tracks.length >= 5)
 
