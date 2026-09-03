@@ -15,6 +15,12 @@ import coil.memory.MemoryCache
  * a global crossfade means art fades in rather than popping.
  */
 class MusicyApplication : Application(), ImageLoaderFactory {
+
+    override fun onCreate() {
+        super.onCreate()
+        CrashReporter.install(this)
+    }
+
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .crossfade(true)

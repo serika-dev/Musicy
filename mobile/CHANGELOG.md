@@ -10,6 +10,13 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.7.3]
+
+### Added
+- **On-device crash reports.** Uncaught exceptions are now written to app-private storage (last 10 kept, 7 days), and Settings → Diagnostics → Crash reports shows them with a Share button — so a crash on your phone produces a readable trace instead of vanishing with the process.
+
+---
+
 ## [1.7.2]
 
 ### Fixed

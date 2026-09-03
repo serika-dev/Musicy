@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -12,10 +13,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -26,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.serika.musicy.mobile.CrashReporter
 import app.serika.musicy.mobile.data.api.ApiClient
 import app.serika.musicy.mobile.player.SleepTimerState
 import app.serika.musicy.mobile.ui.Nav
@@ -60,6 +65,7 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
     var showAutoHelp by remember { mutableStateOf(false) }
     var showReset by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -437,6 +443,19 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
                     OutlinedButton(onClick = { vm.signOut() }) { Text("Sign out") }
                 }
             }
+
+            // -- diagnostics -------------------------------------------------
+            item { MusicyDivider(Modifier.padding(vertical = 8.dp)) }
+            item { SettingsHeader("Diagnostics") }
+            item {
+                val reports = remember { CrashReporter.reports(context) }
+                SettingsRow(
+                    "Crash reports",
+                    if (reports.isEmpty()) "No crashes recorded on this device."
+                    else "${reports.size} recorded · latest ${reports.first().name.removePrefix("crash-").removeSuffix(".txt")}",
+                    onClick = { if (reports.isNotEmpty()) showDiagnostics = true }
+                )
+            }
         }
     }
 
@@ -478,6 +497,57 @@ fun SettingsScreen(vm: MusicyViewModel, nav: Nav) {
                 if (!opened) vm.showToast("Couldn't open Android Auto settings")
                 showAutoHelp = false
             }
+        )
+    }
+
+    if (showDiagnostics) {
+        val reports = remember { CrashReporter.reports(context) }
+        var selected by remember { mutableStateOf(reports.firstOrNull()) }
+        AlertDialog(
+            onDismissRequest = { showDiagnostics = false },
+            title = { Text("Crash reports") },
+            text = {
+                Column {
+                    if (reports.size > 1) {
+                        Row(
+                            modifier = Modifier
+                                .padding(bottom = 8.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            reports.forEach { file ->
+                                MusicyChip(
+                                    label = file.name.removePrefix("crash-").removeSuffix(".txt"),
+                                    selected = file == selected,
+                                    onClick = { selected = file }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        selected?.readText() ?: "No report selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+            },
+            confirmButton = {
+                selected?.let { file ->
+                    TextButton(onClick = {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Musicy ${file.name.removeSuffix(".txt")}")
+                            putExtra(Intent.EXTRA_TEXT, file.readText())
+                        }
+                        runCatching {
+                            context.startActivity(Intent.createChooser(send, "Share crash report"))
+                        }
+                    }) { Text("Share") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { showDiagnostics = false }) { Text("Close") } }
         )
     }
 

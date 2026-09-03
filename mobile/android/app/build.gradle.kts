@@ -12,8 +12,8 @@ android {
         applicationId = "app.serika.musicy.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 6
-        versionName = "1.7.2"
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 7
+        versionName = "1.7.3"
     }
 
     signingConfigs {
@@ -58,6 +58,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
