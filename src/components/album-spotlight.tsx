@@ -32,6 +32,25 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
 
   const tracks = currentAlbum?.tracks || []
 
+  // Compilations hold many performers; credit the top few instead of the one
+  // album artist ("Various Artists"), which alone reads like a bug.
+  const performerCounts = new Map<string, { name: string; count: number }>()
+  for (const track of tracks) {
+    if (!track.artist?.id) continue;
+    const entry = performerCounts.get(track.artist.id);
+    if (entry) entry.count += 1;
+    else performerCounts.set(track.artist.id, { name: track.artist.name, count: 1 });
+  }
+  const performers = [...performerCounts.entries()]
+    .map(([id, { name, count }]) => ({ id, name, count }))
+    .sort((a, b) => b.count - a.count);
+  const isMultiPerformer = performers.length > 1;
+  const performerLine =
+    performers
+      .slice(0, 2)
+      .map((p) => p.name)
+      .join(", ") + (performers.length > 2 ? ` +${performers.length - 2} more` : "");
+
   // Check if track playing is from this active album
   const isPlayingThisAlbum = Boolean(
     isPlaying &&
@@ -138,12 +157,16 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
             </h1>
 
             <p className="text-base sm:text-xl font-bold text-muted-foreground truncate">
-              <Link
-                href={`/artists/${currentAlbum.artist.id}`}
-                className="hover:text-primary transition-colors"
-              >
-                {currentAlbum.artist.name}
-              </Link>
+              {isMultiPerformer ? (
+                <span>{performerLine}</span>
+              ) : (
+                <Link
+                  href={`/artists/${currentAlbum.artist.id}`}
+                  className="hover:text-primary transition-colors"
+                >
+                  {currentAlbum.artist.name}
+                </Link>
+              )}
               {tracks.length > 0 && (
                 <span className="text-xs sm:text-sm font-semibold text-muted-foreground/70 ml-2">
                   • {tracks.length} {tracks.length === 1 ? "track" : "tracks"}

@@ -64,9 +64,33 @@ export default function Home() {
   };
 
   if (session) {
-    const spotlightAlbum =
-      feedData?.followedAlbums?.find((a) => a.coverImageUrl) ||
-      feedData?.followedAlbums?.[0];
+    // The spotlight rotates through followed albums; cap it at one album per
+    // artist so a prolific artist's bulk uploads don't own the whole banner.
+    const spotlightAlbums = (() => {
+      const albums = (feedData?.followedAlbums ?? []).filter(
+        (a) => a.coverImageUrl
+      );
+      const perArtist = new Map<string, number>();
+      const picked: typeof albums = [];
+      for (const album of albums) {
+        const artistId = album.artist?.id ?? "none";
+        const used = perArtist.get(artistId) ?? 0;
+        if (used >= 1) continue;
+        perArtist.set(artistId, used + 1);
+        picked.push(album);
+        if (picked.length >= 6) break;
+      }
+      if (picked.length < 2) {
+        for (const album of albums) {
+          if (picked.includes(album)) continue;
+          picked.push(album);
+          if (picked.length >= 3) break;
+        }
+      }
+      return picked;
+    })();
+
+    const spotlightAlbum = spotlightAlbums[0];
 
     const followedArtists = followedArtistsData?.artists || [];
     const recentlyPlayed = feedData?.recentlyPlayed || [];
@@ -80,7 +104,7 @@ export default function Home() {
           <section className="animate-in fade-in duration-700 -mx-3 -mt-4 md:-mx-6 md:-mt-6 lg:-mx-8 lg:-mt-6 mb-8">
             <AlbumSpotlight
               album={spotlightAlbum as any}
-              albums={feedData?.followedAlbums as any}
+              albums={spotlightAlbums as any}
             />
           </section>
         )}
