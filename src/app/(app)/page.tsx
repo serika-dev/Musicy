@@ -64,27 +64,32 @@ export default function Home() {
   };
 
   if (session) {
-    // The spotlight rotates through followed albums; cap it at one album per
-    // artist so a prolific artist's bulk uploads don't own the whole banner.
+    // The spotlight draws from catalogue-wide new releases (not just followed
+    // artists), capped at one album per artist so a prolific artist's bulk
+    // uploads don't own the whole banner. Falls back to followed albums.
     const spotlightAlbums = (() => {
-      const albums = (feedData?.followedAlbums ?? []).filter(
-        (a) => a.coverImageUrl
-      );
+      const pool = (feedData?.newReleases ?? []).filter((a) => a.coverImageUrl);
       const perArtist = new Map<string, number>();
-      const picked: typeof albums = [];
-      for (const album of albums) {
+      const picked: typeof pool = [];
+      for (const album of pool) {
         const artistId = album.artist?.id ?? "none";
         const used = perArtist.get(artistId) ?? 0;
         if (used >= 1) continue;
         perArtist.set(artistId, used + 1);
         picked.push(album);
-        if (picked.length >= 6) break;
+        if (picked.length >= 12) break;
       }
-      if (picked.length < 2) {
-        for (const album of albums) {
-          if (picked.includes(album)) continue;
+      if (picked.length < 3) {
+        const followed = (feedData?.followedAlbums ?? []).filter(
+          (a) => a.coverImageUrl
+        );
+        const perFollowedArtist = new Map<string, number>();
+        for (const album of followed) {
+          if (picked.length >= 6) break;
+          const artistId = album.artist?.id ?? "none";
+          if (perFollowedArtist.has(artistId)) continue;
+          perFollowedArtist.set(artistId, 1);
           picked.push(album);
-          if (picked.length >= 3) break;
         }
       }
       return picked;
