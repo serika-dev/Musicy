@@ -367,7 +367,7 @@ export async function GET(request: NextRequest) {
             _count: { select: { tracks: { where: { isPublic: true } } } },
           },
           orderBy: { releaseDate: "desc" },
-          take: 12,
+          take: 48,
         }),
         recommendedTracks: [...recommendedTracks, ...recentTracks, ...popularTracks],
         discoverAlbums,
