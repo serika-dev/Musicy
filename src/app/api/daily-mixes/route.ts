@@ -28,15 +28,17 @@ function shuffle<T>(arr: T[]): T[] {
 
 /** How many tracks one artist may contribute to a shared mix. */
 const MAX_PER_ARTIST = 3
-/** Soft ceiling for the top-up pass, so a sparse pool can still fill the mix
- *  without handing it back to a single artist. */
+/** Soft ceilings for the rescue passes, so a sparse or lopsided pool still
+ *  fills the mix without handing it back to a single artist. */
 const MAX_PER_ARTIST_TOPUP = 8
+const MAX_PER_ARTIST_LAST_RESORT = 10
 
 /**
  * Picks up to `limit` tracks with at most [MAX_PER_ARTIST] per artist, so a
  * prolific artist (or one bulk import) can't own an entire mix. The pool is
- * shuffled first, then picked round-robin; if the cap leaves the mix short,
- * a second pass tops it up to a soft ceiling, and only then fills freely.
+ * shuffled first, then picked round-robin; if that leaves the mix short, two
+ * wider passes top it up — and a catalogue that is genuinely one artist just
+ * gets a shorter mix instead of a flooded one.
  */
 function diversify<T extends { id: string; artist?: { id: string } | null }>(
   tracks: T[],
@@ -44,26 +46,19 @@ function diversify<T extends { id: string; artist?: { id: string } | null }>(
 ): T[] {
   const picked: T[] = []
   const chosen = new Set<string>()
-  const fill = (maxPerArtist: number) => {
-    const perArtist = new Map<string, number>()
+  const perArtist = new Map<string, number>()
+  for (const cap of [MAX_PER_ARTIST, MAX_PER_ARTIST_TOPUP, MAX_PER_ARTIST_LAST_RESORT]) {
     for (const track of shuffle(tracks)) {
       if (picked.length >= limit) break
+      if (chosen.has(track.id)) continue
       const artistId = track.artist?.id ?? 'none'
       const used = perArtist.get(artistId) ?? 0
-      if (used >= maxPerArtist) continue
+      if (used >= cap) continue
       perArtist.set(artistId, used + 1)
       picked.push(track)
       chosen.add(track.id)
     }
-  }
-  fill(MAX_PER_ARTIST)
-  fill(MAX_PER_ARTIST_TOPUP)
-  for (const track of tracks) {
     if (picked.length >= limit) break
-    if (!chosen.has(track.id)) {
-      picked.push(track)
-      chosen.add(track.id)
-    }
   }
   return shuffle(picked)
 }
