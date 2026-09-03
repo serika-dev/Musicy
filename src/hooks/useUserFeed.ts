@@ -32,6 +32,7 @@ interface FeedArtist {
 
 interface FeedResponse {
   followedAlbums: FeedAlbum[]
+  newReleases?: FeedAlbum[]
   recommendedTracks: Track[]
   discoverAlbums: FeedAlbum[]
   likedGenres: string[]

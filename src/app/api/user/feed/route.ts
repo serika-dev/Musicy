@@ -350,6 +350,25 @@ export async function GET(request: NextRequest) {
     const serialized = JSON.parse(
       JSON.stringify({
         followedAlbums,
+        // Catalogue-wide latest albums, so surfaces like the home spotlight
+        // aren't limited to whoever the user happens to follow.
+        newReleases: await prisma.album.findMany({
+          where: { isPublic: true },
+          select: {
+            id: true,
+            title: true,
+            coverImageUrl: true,
+            releaseDate: true,
+            albumType: true,
+            genre: true,
+            artist: {
+              select: { id: true, name: true, verified: true, imageUrl: true },
+            },
+            _count: { select: { tracks: { where: { isPublic: true } } } },
+          },
+          orderBy: { releaseDate: "desc" },
+          take: 12,
+        }),
         recommendedTracks: [...recommendedTracks, ...recentTracks, ...popularTracks],
         discoverAlbums,
         likedGenres,
