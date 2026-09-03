@@ -103,6 +103,14 @@ data class Artist(
     @SerialName("_count") val count: Count? = null
 )
 
+/** A performer credited on an album (distinct track artist with play share). */
+@Serializable
+data class AlbumArtist(
+    val id: String,
+    val name: String,
+    val trackCount: Int? = null
+)
+
 @Serializable
 data class Album(
     val id: String,
@@ -113,11 +121,28 @@ data class Album(
     val albumType: String? = null,
     val description: String? = null,
     val artist: Artist? = null,
+    val artists: List<AlbumArtist>? = null,
+    val artistCount: Int? = null,
     val tracks: List<Track>? = null,
     @SerialName("_count") val count: Count? = null
 ) {
     val trackCount: Int get() = tracks?.size ?: count?.tracks ?: 0
     val year: String? get() = releaseDate?.take(4)?.takeIf { it.length == 4 }
+
+    /**
+     * Credit line for heroes and cards: on a multi-performer album, name the
+     * top few track artists and count the rest; otherwise the album artist.
+     */
+    fun heroArtistLine(top: Int = 2): String? {
+        val listed = artists.orEmpty()
+        val total = artistCount ?: listed.size
+        return when {
+            total > 1 && listed.isNotEmpty() ->
+                listed.take(top).joinToString(", ") { it.name } + " +${total - top} more"
+            listed.isNotEmpty() -> listed.first().name
+            else -> artist?.name
+        }
+    }
 
     fun looksLikeSingle(): Boolean {
         val type = albumType?.uppercase().orEmpty()

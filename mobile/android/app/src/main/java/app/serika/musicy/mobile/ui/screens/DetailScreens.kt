@@ -249,11 +249,32 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
                 val tracks = data.tracks.orEmpty()
                 val contextId = MusicyLibrary.albumId(data.id)
                 val chrome = rememberTrackListChrome(vm, tracks)
+                // A compilation credits one album artist but holds many
+                // performers — the hero credits the actual track artists.
+                val performerCounts = tracks.mapNotNull { it.artist }
+                    .groupingBy { it.id }
+                    .eachCount()
+                    .entries
+                    .sortedByDescending { it.value }
+                val performerNames = tracks.mapNotNull { it.artist }
+                    .associate { it.id to it.name }
+                val heroSubtitle = when (performerCounts.size) {
+                    0 -> data.artist?.name.orEmpty()
+                    1 -> performerNames[performerCounts.first().key].orEmpty()
+                    else -> performerCounts.take(3)
+                        .mapNotNull { performerNames[it.key] }
+                        .joinToString(", ") + " +${performerCounts.size - 3} more"
+                }
+                // "Go to artist" only makes sense when the album really is one
+                // performer's work.
+                val singlePerformer = performerCounts.singleOrNull()
+                    ?.let { performerNames[it.key] }
+                    ?: data.artist?.takeIf { performerCounts.isEmpty() }?.name
                 LazyColumn(state = listState, contentPadding = padding) {
                     item {
                         DetailHero(
                             title = data.title,
-                            subtitle = data.artist?.name.orEmpty(),
+                            subtitle = heroSubtitle,
                             meta = listOfNotNull(
                                 data.albumType?.lowercase()?.replaceFirstChar { it.uppercase() },
                                 data.year,
@@ -283,16 +304,16 @@ fun AlbumScreen(vm: MusicyViewModel, nav: Nav, albumId: String) {
                         onToggleLike = { vm.toggleLike(it) },
                         onMore = { actionTrack = it }
                     )
-                    data.artist?.let { artist ->
+                    if (singlePerformer != null) {
                         item {
                             MusicyDivider(Modifier.padding(vertical = 8.dp))
                             ListRow(
-                                title = artist.name,
+                                title = singlePerformer,
                                 subtitle = "Go to artist",
-                                imageUrl = vm.repo.resolveUrl(artist.imageUrl),
+                                imageUrl = vm.repo.resolveUrl(data.artist?.imageUrl),
                                 icon = Icons.Default.Person,
                                 circular = true,
-                                onClick = { nav.artist(artist.id) }
+                                onClick = { data.artist?.id?.let { nav.artist(it) } }
                             )
                         }
                     }

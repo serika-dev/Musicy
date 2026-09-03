@@ -117,6 +117,7 @@ fun HomeScreen(vm: MusicyViewModel, nav: Nav, userName: String) {
                         FeaturedAlbum(
                             album = album,
                             coverUrl = vm.repo.resolveUrl(album.coverImageUrl),
+                            artistLine = album.heroArtistLine(),
                             onOpen = { nav.album(album.id) },
                             onPlay = {
                                 vm.play(
@@ -360,7 +361,7 @@ private fun QuickTile(label: String, icon: ImageVector, modifier: Modifier = Mod
 }
 
 @Composable
-private fun FeaturedAlbum(album: Album, coverUrl: String?, onOpen: () -> Unit, onPlay: () -> Unit) {
+private fun FeaturedAlbum(album: Album, coverUrl: String?, artistLine: String?, onOpen: () -> Unit, onPlay: () -> Unit) {
     Box(
         modifier = Modifier
             .padding(horizontal = 16.dp)
@@ -398,7 +399,7 @@ private fun FeaturedAlbum(album: Album, coverUrl: String?, onOpen: () -> Unit, o
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                album.artist?.name.orEmpty(),
+                artistLine ?: album.artist?.name.orEmpty(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.75f)
             )

@@ -128,6 +128,21 @@ export default function AlbumPage() {
   const totalDuration =
     album.tracks?.reduce((acc, track) => acc + (track.duration || 0), 0) || 0;
   const releaseDate = album.releaseDate ? new Date(album.releaseDate) : null;
+
+  // Compilations credit one album artist but hold many performers — the hero
+  // credits the actual track artists, top few by track count.
+  const performerCounts = new Map<string, { name: string; count: number }>();
+  for (const track of album.tracks ?? []) {
+    if (!track.artist?.id) continue;
+    const entry = performerCounts.get(track.artist.id);
+    if (entry) entry.count += 1;
+    else performerCounts.set(track.artist.id, { name: track.artist.name, count: 1 });
+  }
+  const performers = [...performerCounts.entries()]
+    .map(([id, { name, count }]) => ({ id, name, count }))
+    .sort((a, b) => b.count - a.count);
+  const heroArtistNames = performers.slice(0, 3).map((p) => p.name);
+  const isMultiPerformer = performers.length > 1;
   const isAlbumPlaying =
     isPlaying &&
     !!currentTrack &&
@@ -172,15 +187,23 @@ export default function AlbumPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:justify-start">
-            <Link
-              href={`/artists/${album.artist.id}`}
-              className="inline-flex items-center font-semibold text-foreground hover:underline"
-            >
-              {album.artist.name}
-              {album.artist.verified && (
-                <BadgeCheck className="ml-1 h-4 w-4 text-primary" />
-              )}
-            </Link>
+            {isMultiPerformer ? (
+              <span className="font-semibold text-foreground">
+                {heroArtistNames.join(", ")}
+                {performers.length > heroArtistNames.length &&
+                  ` +${performers.length - heroArtistNames.length} more`}
+              </span>
+            ) : (
+              <Link
+                href={`/artists/${album.artist.id}`}
+                className="inline-flex items-center font-semibold text-foreground hover:underline"
+              >
+                {album.artist.name}
+                {album.artist.verified && (
+                  <BadgeCheck className="ml-1 h-4 w-4 text-primary" />
+                )}
+              </Link>
+            )}
             {releaseDate && (
               <>
                 <span>•</span>

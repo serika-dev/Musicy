@@ -354,10 +354,40 @@ export async function GET(request: NextRequest) {
       ? followedAlbums.find((a) => a.coverImageUrl) || newReleases[0] || null
       : null;
 
+    // Compilations credit one album artist but contain many performers; ship
+    // the distinct track artists so clients can show them in the hero.
+    let featuredAlbumArtists: { id: string; name: string; trackCount: number }[] = [];
+    if (featuredAlbum) {
+      const grouped = await prisma.track.groupBy({
+        by: ["artistId"],
+        where: { albumId: featuredAlbum.id, isPublic: true },
+        _count: { id: true },
+        orderBy: { _count: { id: "desc" } },
+      });
+      const ids = grouped.map((g) => g.artistId).filter((v): v is string => Boolean(v));
+      const rows = ids.length
+        ? await prisma.artist.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+        : [];
+      const nameById = new Map(rows.map((r) => [r.id, r.name]));
+      featuredAlbumArtists = grouped
+        .map((g) => ({
+          id: g.artistId ?? "",
+          name: (g.artistId && nameById.get(g.artistId)) || "",
+          trackCount: g._count.id,
+        }))
+        .filter((a) => a.name && a.id);
+    }
+
     const serialized = JSON.parse(
       JSON.stringify(
         {
-          featuredAlbum,
+          featuredAlbum: featuredAlbum
+            ? {
+                ...featuredAlbum,
+                artists: featuredAlbumArtists.slice(0, 6),
+                artistCount: featuredAlbumArtists.length,
+              }
+            : null,
           followedAlbums,
           recommendedTracks: [
             ...recommendedTracks,

@@ -10,6 +10,13 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.7.4]
+
+### Fixed
+- **Multi-performer albums credit everyone.** After compilations were merged, the album hero and Home featured card still showed a single album artist ("Various Artists"). The album hero now names the actual track artists — top three plus "+N more" — the Home featured card does the same using the feed's new artist list, and the "Go to artist" row only appears on genuinely single-performer albums. The web album page got the same hero treatment.
+
+---
+
 ## [1.7.3]
 
 ### Added

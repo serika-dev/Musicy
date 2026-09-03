@@ -12,8 +12,8 @@ android {
         applicationId = "app.serika.musicy.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 7
-        versionName = "1.7.3"
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 8
+        versionName = "1.7.4"
     }
 
     signingConfigs {
