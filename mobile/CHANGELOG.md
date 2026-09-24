@@ -10,6 +10,24 @@ wrapper, which has been removed from the repository.
 
 ---
 
+## [1.8.0]
+
+The apps are rebuilt at 1.8.0 alongside the web and server release of the
+same number. No native code changed; these server changes reach the apps:
+
+### Changed
+- **Default streaming quality comes from the server.** Until you pick a
+  quality yourself, the apps now use the instance's default (set by admins in
+  the new admin console) instead of always starting on Auto.
+
+### Fixed
+- **Settings saves no longer pin every default.** The first time any setting
+  was saved, the server stored every default value alongside it, so later
+  changes to the defaults never reached that account. Only values you actually
+  set are stored now.
+
+---
+
 ## [1.7.4]
 
 ### Fixed

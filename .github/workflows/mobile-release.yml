@@ -99,8 +99,10 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Passed through the environment, never pasted into the script, so
+          # quotes, backticks or $ in the notes can't break or inject shell.
+          NOTES: ${{ inputs.notes }}
         run: |
-          NOTES="${{ inputs.notes }}"
           [ -z "$NOTES" ] && NOTES="Musicy Mobile ${{ inputs.version }}."
           # Idempotent: create the release if it's new, otherwise (re-run of the
           # same version) just (re)upload the assets to the existing one.
