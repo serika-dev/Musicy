@@ -240,7 +240,7 @@ export default function PlaylistPage() {
 
         {/* Content Overlay */}
         <div className="relative w-full p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
-          <div className="group relative mb-6 h-48 w-48 overflow-hidden rounded-3xl border-4 border-background/20 shadow-2xl lg:mb-0 lg:h-64 lg:w-64">
+          <div className="shrink-0 group relative mb-6 h-48 w-48 overflow-hidden rounded-3xl border-4 border-background/20 shadow-2xl lg:mb-0 lg:h-64 lg:w-64">
             {playlist.coverImageUrl ? (
               <img
                 src={playlist.coverImageUrl}

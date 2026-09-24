@@ -199,7 +199,7 @@ export default function DailyMixPage() {
 
         {/* Content Overlay */}
         <div className="absolute inset-x-0 bottom-0 p-6 lg:p-12 flex flex-col items-start lg:flex-row lg:items-end lg:gap-10">
-          <div className="w-48 h-48 lg:w-64 lg:h-64 rounded-3xl overflow-hidden shadow-2xl border-4 border-background/20 mb-6 lg:mb-0 relative group">
+          <div className="shrink-0 w-48 h-48 lg:w-64 lg:h-64 rounded-3xl overflow-hidden shadow-2xl border-4 border-background/20 mb-6 lg:mb-0 relative group">
             {dailyMix.coverImageUrl ? (
               <Image
                 src={dailyMix.coverImageUrl}

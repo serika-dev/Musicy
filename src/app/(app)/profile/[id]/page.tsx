@@ -247,7 +247,7 @@ export default function UserProfilePage() {
                         href={`/playlists/${playlist.id}`}
                       >
                         <div className="flex items-center space-x-4 p-3 rounded-md hover:bg-accent transition-colors cursor-pointer">
-                          <div className="w-12 h-12 bg-gradient-to-br from-primary/30 to-primary/60 rounded-md flex items-center justify-center overflow-hidden">
+                          <div className="shrink-0 w-12 h-12 bg-gradient-to-br from-primary/30 to-primary/60 rounded-md flex items-center justify-center overflow-hidden">
                             {playlist.coverImageUrl ? (
                               <img
                                 src={playlist.coverImageUrl}

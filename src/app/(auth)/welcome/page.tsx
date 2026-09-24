@@ -510,7 +510,7 @@ export default function WelcomePage() {
                 return (
                   <span
                     key={id}
-                    className="relative h-20 w-20 overflow-hidden rounded-full border-4 border-background bg-secondary shadow-xl animate-pop-in"
+                    className="shrink-0 relative h-20 w-20 overflow-hidden rounded-full border-4 border-background bg-secondary shadow-xl animate-pop-in"
                     style={{ animationDelay: `${i * 80}ms` }}
                   >
                     {a && (

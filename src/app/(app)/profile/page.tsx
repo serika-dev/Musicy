@@ -208,7 +208,7 @@ export default function ProfilePage() {
 
         {/* Avatar + Name overlay */}
         <div className="absolute -bottom-16 left-6 md:left-10 flex items-end gap-6">
-          <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-2xl">
+          <Avatar className="shrink-0 h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-2xl">
             <AvatarImage
               src={profile.avatarUrl || ""}
               alt={profile.displayName || "Profile"}

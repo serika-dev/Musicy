@@ -143,7 +143,7 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
           className="group relative shrink-0"
           aria-label={`Open ${currentAlbum.title}`}
         >
-          <div className="h-36 w-36 overflow-hidden rounded-md shadow-[0_8px_40px_rgba(0,0,0,0.6)] transition-transform duration-500 group-hover:scale-[1.02] sm:h-48 sm:w-48 lg:h-56 lg:w-56">
+          <div className="shrink-0 h-36 w-36 overflow-hidden rounded-md shadow-[0_8px_40px_rgba(0,0,0,0.6)] transition-transform duration-500 group-hover:scale-[1.02] sm:h-48 sm:w-48 lg:h-56 lg:w-56">
             <img
               src={coverUrl}
               alt={currentAlbum.title}

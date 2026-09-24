@@ -27,6 +27,27 @@ interface NowPlayingProps {
 
 type Panel = "lyrics" | "queue";
 
+/**
+ * Fills the free space and centres a cover that is always exactly square.
+ * The slot is a size container, so the cover is min(slot width, slot height):
+ * it shrinks to fit a short or narrow window instead of being squashed.
+ */
+function CoverSlot({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn("flex min-h-0 min-w-0 flex-1 items-center justify-center", className)}
+      style={{ containerType: "size" }}
+    >
+      <div
+        className="relative aspect-square shrink-0 overflow-hidden rounded-lg shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+        style={{ width: "min(100cqw, 100cqh)", height: "min(100cqw, 100cqh)" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
   const { currentTrack, playbackContext, queue, currentIndex, playTrack } = useMusicPlayer();
   // Phones: artwork view or lyrics view. Desktop: which side panel is shown.
@@ -204,16 +225,13 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
                 </div>
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 flex-col">
-                <div className="flex min-h-0 flex-1 items-center justify-center py-6">
-                  <div
-                    className="relative aspect-square w-full overflow-hidden rounded-lg shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
-                    style={{ maxWidth: "min(100%, 48vh)" }}
-                  >
-                    {cover("(max-width: 1024px) 90vw, 480px")}
-                  </div>
-                </div>
-                <div className="shrink-0">
+              // Short screens (phones in landscape) put the cover beside the
+              // controls, so it keeps real space instead of shrinking to nothing.
+              <div className="flex min-h-0 flex-1 flex-col [@media(max-height:520px)]:flex-row [@media(max-height:520px)]:items-center [@media(max-height:520px)]:gap-6">
+                <CoverSlot className="py-6 [@media(max-height:520px)]:h-full [@media(max-height:520px)]:py-3">
+                  {cover("(max-width: 1024px) 90vw, 480px")}
+                </CoverSlot>
+                <div className="shrink-0 [@media(max-height:520px)]:min-w-0 [@media(max-height:520px)]:flex-1">
                   {titleBlock("md")}
                   <SeekBar variant="immersive" showTimes remaining className="mt-5" />
                   <PlayerControls variant="immersive" size="lg" showToggles className="mt-3 justify-between" />
@@ -243,14 +261,12 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
             {header}
             <div className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 grid-cols-[minmax(0,26rem)_minmax(0,1fr)] gap-16 pt-6 xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
               {/* Player column */}
-              <div className="flex min-h-0 flex-col justify-center">
-                <div className="relative aspect-square w-full overflow-hidden rounded-lg shadow-[0_24px_60px_rgba(0,0,0,0.55)]">
-                  {cover("480px")}
-                </div>
-                <div className="mt-7">{titleBlock("lg")}</div>
-                <SeekBar variant="immersive" showTimes className="mt-5" />
-                <PlayerControls variant="immersive" size="lg" showToggles className="mt-2 justify-between" />
-                <div className="mt-4 flex items-center justify-between">
+              <div className="flex min-h-0 flex-col">
+                <CoverSlot className="pb-7">{cover("480px")}</CoverSlot>
+                <div className="shrink-0">{titleBlock("lg")}</div>
+                <SeekBar variant="immersive" showTimes className="mt-5 shrink-0" />
+                <PlayerControls variant="immersive" size="lg" showToggles className="mt-2 shrink-0 justify-between" />
+                <div className="mt-4 flex shrink-0 items-center justify-between">
                   <div className="flex items-center gap-1">
                     <DeviceSwitcher variant="immersive" />
                     <DownloadButton track={currentTrack} />

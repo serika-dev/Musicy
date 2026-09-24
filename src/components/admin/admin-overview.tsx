@@ -464,7 +464,7 @@ export function AdminOverview({
                   onClick={() => onEditUser(user)}
                   className="flex w-full items-center gap-3 rounded-md p-1.5 text-left transition-colors hover:bg-panel-hover"
                 >
-                  <Avatar className="h-9 w-9">
+                  <Avatar className="shrink-0 h-9 w-9">
                     <AvatarImage src={user.avatarUrl ?? undefined} alt="" />
                     <AvatarFallback className="bg-secondary text-xs font-semibold">
                       {(
