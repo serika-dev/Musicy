@@ -121,7 +121,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    // Font variables live on <html> so every font-family rule (including the
+    // root one) can resolve them; on <body> the root fell back to system fonts.
+    <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable}`}>
       <head>
         <Script
           src="/web-scrobbler-connector.js"
@@ -142,7 +144,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary/30`}
+        className="antialiased selection:bg-primary/30"
       >
         <JsonLd data={websiteJsonLd()} />
         <Providers>

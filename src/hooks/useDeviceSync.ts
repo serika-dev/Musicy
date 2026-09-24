@@ -65,7 +65,7 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
   onEventRef.current = onEvent;
 
   // Cross-tab leader election for same-device multi-tab support
-  const { tabId, isLeader, otherTabs } = useTabSync(deviceId);
+  const { tabId, isLeader, otherTabs, claimLeadership } = useTabSync(deviceId);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -248,6 +248,7 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
     tabId,
     isLeader,
     otherTabs,
+    claimLeadership,
     tabCount: otherTabs.length + 1,
   };
 }

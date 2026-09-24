@@ -23,6 +23,8 @@ interface PlayerControlsProps {
   /** "bar" = bottom bar (primary tinted), "immersive" = fullscreen (white). */
   variant?: "bar" | "immersive";
   size?: "sm" | "md" | "lg";
+  /** Show shuffle/repeat at every width (they hide on phones by default). */
+  showToggles?: boolean;
   className?: string;
 }
 
@@ -35,6 +37,7 @@ const sizeMap = {
 export function PlayerControls({
   variant = "bar",
   size = "sm",
+  showToggles = false,
   className,
 }: PlayerControlsProps) {
   const {
@@ -75,7 +78,7 @@ export function PlayerControls({
             variant="ghost"
             size="icon"
             onClick={toggleShuffle}
-            className={cn("relative hidden sm:flex", ghost, isShuffle && active)}
+            className={cn("relative", showToggles ? "flex" : "hidden sm:flex", ghost, isShuffle && active)}
             aria-label="Shuffle"
             aria-pressed={isShuffle}
           >
@@ -131,7 +134,7 @@ export function PlayerControls({
             variant="ghost"
             size="icon"
             onClick={toggleRepeat}
-            className={cn("relative hidden sm:flex", ghost, isRepeat && active)}
+            className={cn("relative", showToggles ? "flex" : "hidden sm:flex", ghost, isRepeat && active)}
             aria-label="Repeat"
             aria-pressed={isRepeat}
           >

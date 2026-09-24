@@ -146,6 +146,10 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const shouldAutoPlayRef = useRef<boolean>(false);
   const loadedTrackIdRef = useRef<string | null>(null);
+  // Bumped to re-run the source loader when nothing else it depends on changed:
+  // this tab just became the audio leader, or play was pressed on a current
+  // track whose audio never loaded (e.g. state mirrored while another tab led).
+  const [sourceReload, setSourceReload] = useState(0);
   const loadedObjectUrlRef = useRef<string | null>(null);
 
   // Multi-device sync state (declared early so effects can reference it)
@@ -537,7 +541,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       audio.removeEventListener("canplay", handleCanPlay);
     };
-  }, [currentTrack, activeDeviceId, clearLoadedObjectUrl, handleAutoplayBlock]);
+  }, [currentTrack, activeDeviceId, clearLoadedObjectUrl, handleAutoplayBlock, sourceReload]);
 
   useEffect(() => {
     return () => clearLoadedObjectUrl();
@@ -602,6 +606,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     activeDeviceId,
     handleAutoplayBlock,
     handleAutoplayResolved,
+    sourceReload,
   ]);
 
   // Handle volume changes
@@ -859,6 +864,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     publish: syncPublish,
     connected: syncConnected,
     isLeader,
+    claimLeadership,
     tabId,
     tabCount,
   } = useDeviceSync(handleSyncEvent);
@@ -867,6 +873,17 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   syncPublishRef.current = syncPublish;
   tabIdRef.current = tabId;
   isLeaderRef.current = isLeader;
+
+  // Leadership moved: the new leader loads whatever is current (the loader
+  // skipped it while it wasn't leader) and the old one releases its audio.
+  useEffect(() => {
+    setSourceReload((n) => n + 1);
+  }, [isLeader]);
+
+  /** The tab the listener is using takes over audio from any other tab. */
+  const takeOverTab = useCallback(() => {
+    if (!isLeaderRef.current) claimLeadership();
+  }, [claimLeadership]);
 
   const isActiveDevice = activeDeviceId === deviceId && !!deviceId;
   isActiveRef.current = isActiveDevice;
@@ -891,7 +908,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const currentTrackRef = useRef<Track | null>(null);
   currentTrackRef.current = currentTrack;
   useEffect(() => {
-    if (!isActiveDevice || !deviceId) return;
+    // Only the tab that actually outputs audio speaks for this device.
+    if (!isActiveDevice || !deviceId || !isLeader) return;
     const broadcast = () => {
       syncPublish({
         type: "state",
@@ -925,6 +943,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [
     isActiveDevice,
+    isLeader,
     deviceId,
     isPlaying,
     currentTime,
@@ -1101,7 +1120,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       }
 
       if (currentTrack?.id === track.id) {
-        // If it's the same track, toggle play/pause
+        // If it's the same track, toggle play/pause — unless its audio never
+        // loaded here, in which case "play" has to load it first.
+        if (!isPlaying && loadedTrackIdRef.current !== track.id) {
+          shouldAutoPlayRef.current = true;
+          setSourceReload((n) => n + 1);
+        }
         setIsPlaying(!isPlaying);
       } else {
         // New track - set up queue if provided
@@ -1153,8 +1177,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   );
 
   const togglePlayPauseLocal = useCallback(() => {
+    if (!isPlaying && currentTrack && loadedTrackIdRef.current !== currentTrack.id) {
+      shouldAutoPlayRef.current = true;
+      setSourceReload((n) => n + 1);
+    }
     setIsPlaying(!isPlaying);
-  }, [isPlaying]);
+  }, [isPlaying, currentTrack]);
 
   const stopPlayback = useCallback(() => {
     setIsPlaying(false);
@@ -1249,9 +1277,10 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         });
         return;
       }
+      takeOverTab();
       playTrackLocal(track, trackList, context);
     },
-    [ensureActiveDeviceIfNone, deviceId, syncPublish, playTrackLocal],
+    [ensureActiveDeviceIfNone, deviceId, syncPublish, playTrackLocal, takeOverTab],
   );
 
   const togglePlayPause = useCallback(() => {
@@ -1264,8 +1293,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       });
       return;
     }
+    takeOverTab();
     togglePlayPauseLocal();
-  }, [ensureActiveDeviceIfNone, deviceId, syncPublish, togglePlayPauseLocal]);
+  }, [ensureActiveDeviceIfNone, deviceId, syncPublish, togglePlayPauseLocal, takeOverTab]);
 
   const seekTo = useCallback(
     (seconds: number) => {

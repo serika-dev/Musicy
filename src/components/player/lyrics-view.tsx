@@ -33,10 +33,13 @@ export function useHasLyrics(trackId: string | undefined): boolean {
 
 interface LyricsViewProps {
   variant: "mobile" | "desktop";
+  /** "left" = Spotify-style block of left-aligned bold lines, no glow. */
+  align?: "center" | "left";
   className?: string;
 }
 
-export function LyricsView({ variant, className }: LyricsViewProps) {
+export function LyricsView({ variant, align = "center", className }: LyricsViewProps) {
+  const left = align === "left";
   const { currentTrack, currentTime, seekTo } = useMusicPlayer();
   const { settings } = useSettings();
   const isMobile = variant === "mobile";
@@ -110,12 +113,17 @@ export function LyricsView({ variant, className }: LyricsViewProps) {
       ref={containerRef}
       className={cn(
         "no-scrollbar relative w-full overflow-y-auto",
-        isMobile ? "px-2" : "mx-auto max-w-5xl px-12",
+        left ? "px-1" : isMobile ? "px-2" : "mx-auto max-w-5xl px-12",
         className,
       )}
       style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
     >
-      <div className={cn("space-y-6 text-center", isMobile ? "pt-8" : "pt-32")}>
+      <div
+        className={cn(
+          left ? "space-y-1 text-left" : "space-y-6 text-center",
+          left ? "pt-4" : isMobile ? "pt-8" : "pt-32",
+        )}
+      >
         {lyricsWithIds.length > 0 ? (
           (() => {
             const maxLen = lyricsWithIds.reduce((m, l) => {
@@ -123,8 +131,13 @@ export function LyricsView({ variant, className }: LyricsViewProps) {
               const t = romanizeEnabled && r && r !== l.text ? r : l.text;
               return Math.max(m, (t || "").length);
             }, 0);
-            const sizeClass =
-              maxLen > 80
+            const sizeClass = left
+              ? isMobile
+                ? "text-2xl"
+                : maxLen > 60
+                  ? "text-2xl xl:text-3xl"
+                  : "text-3xl xl:text-4xl"
+              : maxLen > 80
                 ? isMobile
                   ? "text-2xl"
                   : "text-3xl lg:text-4xl"
@@ -153,16 +166,23 @@ export function LyricsView({ variant, className }: LyricsViewProps) {
                   data-lyric-id={line.id}
                   onClick={() => seekTo(line.time)}
                   className={cn(
-                    "block w-full break-words rounded-2xl px-4 py-6 text-center font-semibold leading-relaxed [overflow-wrap:anywhere] transition-all duration-500 lg:px-8",
+                    left
+                      ? "block w-full break-words rounded-lg px-2 py-2 text-left font-bold leading-snug [overflow-wrap:anywhere] transition-colors duration-300"
+                      : "block w-full break-words rounded-2xl px-4 py-6 text-center font-semibold leading-relaxed [overflow-wrap:anywhere] transition-all duration-500 lg:px-8",
                     sizeClass,
-                    isCurrent
-                      ? "scale-[1.03] text-white drop-shadow-2xl"
-                      : "text-white/35 hover:scale-[1.01] hover:text-white/60",
+                    left
+                      ? isCurrent
+                        ? "text-white"
+                        : "text-white/40 hover:text-white/70"
+                      : isCurrent
+                        ? "scale-[1.03] text-white drop-shadow-2xl"
+                        : "text-white/35 hover:scale-[1.01] hover:text-white/60",
                   )}
                   style={{
-                    textShadow: isCurrent
-                      ? "0 0 40px rgba(255,255,255,0.85)"
-                      : "none",
+                    textShadow:
+                      isCurrent && !left
+                        ? "0 0 40px rgba(255,255,255,0.85)"
+                        : "none",
                   }}
                 >
                   {showBoth ? (
@@ -182,7 +202,12 @@ export function LyricsView({ variant, className }: LyricsViewProps) {
             });
           })()
         ) : lyricsTyped?.plainLyrics ? (
-          <div className="mx-auto max-w-3xl whitespace-pre-wrap py-10 text-2xl leading-loose text-white/90">
+          <div
+            className={cn(
+              "whitespace-pre-wrap text-white/90",
+              left ? "px-2 py-4 text-xl font-semibold leading-relaxed" : "mx-auto max-w-3xl py-10 text-2xl leading-loose",
+            )}
+          >
             {romanizeEnabled &&
             romanizedPlain &&
             romanizedPlain !== lyricsTyped.plainLyrics ? (
@@ -201,7 +226,7 @@ export function LyricsView({ variant, className }: LyricsViewProps) {
         ) : (
           <div className="py-10 text-xl text-white/60">No lyrics available</div>
         )}
-        <div className={isMobile ? "h-32" : "h-96"} />
+        <div className={left ? "h-40" : isMobile ? "h-32" : "h-96"} />
       </div>
     </div>
   );

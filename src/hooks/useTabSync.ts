@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 const TAB_ID_KEY = "musicy:tab-id"
 const CHANNEL_NAME = "musicy:tab-sync"
@@ -50,6 +50,7 @@ export function useTabSync(deviceId: string) {
   const channelRef = useRef<BroadcastChannel | null>(null)
   const isLeaderRef = useRef(false)
   const presenceRef = useRef<Map<string, number>>(new Map())
+  const claimRef = useRef<() => void>(() => {})
 
   const [isLeader, setIsLeader] = useState(false)
   const [otherTabs, setOtherTabs] = useState<string[]>([])
@@ -117,6 +118,14 @@ export function useTabSync(deviceId: string) {
       channel?.postMessage({ type: "elect", tabId: myTabId } satisfies TabMessage)
       const after = readLeader()
       setLeader(after?.tabId === myTabId)
+    }
+
+    // Explicit takeover for the tab the listener is actually using. Other
+    // tabs see the new record (storage event / "elect") and step down.
+    claimRef.current = () => {
+      writeLeader()
+      setLeader(true)
+      channel?.postMessage({ type: "elect", tabId: myTabId } satisfies TabMessage)
     }
 
     const prunePresence = () => {
@@ -192,12 +201,16 @@ export function useTabSync(deviceId: string) {
       handleUnload()
       channel?.close()
       channelRef.current = null
+      claimRef.current = () => {}
     }
   }, [deviceId])
+
+  const claimLeadership = useCallback(() => claimRef.current(), [])
 
   return {
     tabId: tabIdRef.current,
     isLeader,
     otherTabs,
+    claimLeadership,
   }
 }

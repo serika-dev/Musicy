@@ -1,27 +1,18 @@
 "use client";
 
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
-import {
-  BadgeCheck,
-  ChevronDown,
-  Mic2,
-  Minimize2,
-  Music2,
-} from "lucide-react";
+import { BadgeCheck, ChevronDown, ListMusic, Mic2, Music2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DownloadButton } from "@/components/download-button";
 import { LikeButton } from "@/components/shared/like-button";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useMusicPlayer } from "@/contexts/music-player-context";
-import {
-  extractColorsFromImage,
-  generateGradientFromPalette,
-  genreGradients,
-} from "@/lib/color-extractor";
+import { useArtworkColor } from "@/hooks/useArtworkColor";
 import { cn } from "@/lib/utils";
+import { DeviceSwitcher } from "./device-switcher";
 import { LyricsView, useHasLyrics } from "./lyrics-view";
 import { PlayerControls } from "./player-controls";
 import { QualityBadge } from "./quality-badge";
@@ -34,8 +25,20 @@ interface NowPlayingProps {
   onClose: () => void;
 }
 
+type Panel = "lyrics" | "queue";
+
 export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
-  const { currentTrack, playbackContext } = useMusicPlayer();
+  const { currentTrack, playbackContext, queue, currentIndex, playTrack } = useMusicPlayer();
+  // Phones: artwork view or lyrics view. Desktop: which side panel is shown.
+  const [mobileLyrics, setMobileLyrics] = useState(false);
+  const [panel, setPanel] = useState<Panel>("lyrics");
+
+  const hasLyrics = useHasLyrics(currentTrack?.id);
+  const artwork = getTrackArtwork(currentTrack);
+  const tint = useArtworkColor(isOpen ? artwork : null);
+
+  if (!currentTrack || !isOpen) return null;
+
   const contextLabel =
     playbackContext?.type === "album"
       ? "album"
@@ -44,61 +47,113 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
         : playbackContext?.type === "daily-mix"
           ? "mix"
           : null;
-  const [showLyrics, setShowLyrics] = useState(true);
-  const [gradient, setGradient] = useState<string | null>(null);
+  const upNext = queue.slice(currentIndex + 1, currentIndex + 41);
+  const sidePanel: Panel = panel === "lyrics" && !hasLyrics ? "queue" : panel;
+  const showMobileLyrics = mobileLyrics && hasLyrics;
 
-  const hasLyrics = useHasLyrics(currentTrack?.id);
-  const artwork = getTrackArtwork(currentTrack);
+  // Spotify-style backdrop: the cover's own colour, deepening to near-black.
+  const background = tint
+    ? `linear-gradient(180deg, color-mix(in srgb, ${tint} 72%, #000) 0%, color-mix(in srgb, ${tint} 38%, #000) 45%, #0b0b0d 100%)`
+    : "linear-gradient(180deg, #3b2a63 0%, #1a1426 45%, #0b0b0d 100%)";
 
-  useEffect(() => {
-    if (!currentTrack || !isOpen) return;
-    let cancelled = false;
-    const run = async () => {
-      if (artwork) {
-        try {
-          const palette = await extractColorsFromImage(artwork);
-          if (!cancelled) setGradient(generateGradientFromPalette(palette));
-          return;
-        } catch {
-          // fall through to genre gradient
-        }
-      }
-      if (!cancelled)
-        setGradient(
-          genreGradients[currentTrack.genre || "default"] ||
-            genreGradients.default,
-        );
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentTrack, isOpen, artwork]);
-
-  if (!currentTrack || !isOpen) return null;
-
-  const showLyricsPane = showLyrics && hasLyrics;
-
-  const cover = (sizes: string, className: string) =>
+  const cover = (sizes: string) =>
     artwork ? (
-      <Image
-        src={artwork}
-        alt={currentTrack.title}
-        fill
-        sizes={sizes}
-        className={className}
-        priority
-      />
+      <Image src={artwork} alt={currentTrack.title} fill sizes={sizes} className="object-cover" priority />
     ) : (
       <div className="flex h-full w-full items-center justify-center bg-white/10">
         <Music2 className="h-1/3 w-1/3 text-white/50" />
       </div>
     );
 
+  const header = (
+    <div className="flex shrink-0 items-center justify-between gap-3">
+      <Button
+        onClick={onClose}
+        variant="ghost"
+        size="icon"
+        className="-ml-2 rounded-full text-white hover:bg-white/10"
+        aria-label="Close player"
+      >
+        <ChevronDown className="!size-7" />
+      </Button>
+      <div className="min-w-0 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-white/70">
+          {contextLabel ? `Playing from ${contextLabel}` : "Now playing"}
+        </p>
+        {contextLabel && playbackContext?.name && (
+          <p className="truncate text-[13px] font-bold text-white">{playbackContext.name}</p>
+        )}
+      </div>
+      <span className="w-9" aria-hidden />
+    </div>
+  );
+
+  const titleBlock = (size: "md" | "lg") => (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <Link
+          href={`/tracks/${currentTrack.id}`}
+          onClick={onClose}
+          className={cn(
+            "block truncate font-bold text-white hover:underline",
+            size === "lg" ? "text-3xl" : "text-2xl",
+          )}
+        >
+          {currentTrack.title}
+        </Link>
+        <div className="mt-0.5 flex min-w-0 items-center gap-2">
+          <Link
+            href={`/artists/${currentTrack.artist.id}`}
+            onClick={onClose}
+            className="inline-flex min-w-0 items-center gap-1 truncate text-base text-white/70 hover:text-white hover:underline"
+          >
+            <span className="truncate">{currentTrack.artist.name}</span>
+            {currentTrack.artist.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-300" />}
+          </Link>
+          <QualityBadge variant="immersive" className="shrink-0" />
+        </div>
+      </div>
+      <LikeButton trackId={currentTrack.id} size="md" tone="onDark" className="shrink-0" />
+    </div>
+  );
+
+  const queueList = (
+    <div className="space-y-1">
+      {upNext.length === 0 && (
+        <p className="px-2 py-8 text-sm text-white/60">Nothing queued after this song.</p>
+      )}
+      {upNext.map((t) => {
+        const art = getTrackArtwork(t);
+        return (
+          <button
+            key={`${t.id}-${queue.indexOf(t)}`}
+            type="button"
+            onClick={() =>
+              playTrack(
+                t,
+                queue,
+                playbackContext?.type ? (playbackContext as Parameters<typeof playTrack>[2]) : undefined,
+              )
+            }
+            className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-white/10"
+          >
+            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded bg-white/10">
+              {art && <Image src={art} alt="" fill sizes="44px" className="object-cover" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] text-white">{t.title}</span>
+              <span className="block truncate text-[13px] text-white/60">{t.artist.name}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="h-full max-h-full w-full max-w-full border-0 bg-transparent p-0 [&>button.absolute]:hidden"
+        className="h-full max-h-full w-full max-w-full rounded-none border-0 bg-transparent p-0 sm:rounded-none [&>button.absolute]:hidden"
         forceMount
       >
         <DialogTitle asChild>
@@ -106,152 +161,77 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
             {currentTrack.title} - {currentTrack.artist.name}
           </VisuallyHidden.Root>
         </DialogTitle>
+        <DialogDescription asChild>
+          <VisuallyHidden.Root>Full screen player with playback controls and lyrics.</VisuallyHidden.Root>
+        </DialogDescription>
 
-        <div className="relative flex h-full w-full flex-col overflow-hidden bg-black">
-          {artwork && (
-            <div className="absolute inset-0 -z-10">
-              <Image
-                src={artwork}
-                alt=""
-                fill
-                priority
-                sizes="100vw"
-                className="scale-150 object-cover opacity-50 blur-[64px]"
-              />
-            </div>
-          )}
-          <div
-            className="absolute inset-0 transition-all duration-1000"
-            style={{
-              background:
-                gradient || "linear-gradient(135deg,#667eea 0%,#764ba2 100%)",
-              mixBlendMode: "multiply",
-            }}
-          />
-          <div className="absolute inset-0 bg-black/45" />
+        <div
+          className="relative flex h-full w-full flex-col overflow-hidden text-white transition-[background] duration-700"
+          style={{ background }}
+        >
+          {/* ---------------- Phones / tablets ---------------- */}
+          <div className="flex h-full w-full flex-col px-6 pb-[max(env(safe-area-inset-bottom),20px)] pt-[max(env(safe-area-inset-top),14px)] lg:hidden">
+            {header}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-6 top-6 z-50 hidden text-white hover:bg-white/15 lg:flex"
-          >
-            <Minimize2 className="h-6 w-6" />
-          </Button>
-
-          {/* ---------------- Mobile ---------------- */}
-          <div className="relative z-10 flex h-full w-full flex-col px-6 pb-[max(env(safe-area-inset-bottom),16px)] pt-[max(env(safe-area-inset-top),20px)] lg:hidden">
-            <div className="mb-4 flex shrink-0 items-center justify-between">
-              <Button
-                onClick={onClose}
-                variant="ghost"
-                size="icon"
-                className="-ml-2 text-white hover:bg-white/15"
-                aria-label="Minimize"
-              >
-                <ChevronDown className="h-7 w-7" />
-              </Button>
-              <div className="min-w-0 px-4 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-white/70">
-                  {contextLabel ? `Playing from ${contextLabel}` : "Now playing"}
-                </p>
-                {playbackContext?.name && contextLabel && (
-                  <p className="truncate text-[13px] font-bold text-white">
-                    {playbackContext.name}
-                  </p>
-                )}
-              </div>
-              <span className="h-9 w-9" />
-            </div>
-
-            {showLyricsPane ? (
-              <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4 flex shrink-0 items-center gap-3">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/30 shadow-xl">
-                    {cover("56px", "object-cover")}
+            {showMobileLyrics ? (
+              <div className="flex min-h-0 flex-1 flex-col pt-4">
+                <div className="flex shrink-0 items-center gap-3">
+                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md shadow-lg">
+                    {cover("48px")}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-base font-bold text-white">
-                      {currentTrack.title}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm text-white/70">
-                        {currentTrack.artist.name}
-                      </p>
-                      <QualityBadge variant="immersive" />
-                    </div>
+                    <p className="truncate font-bold">{currentTrack.title}</p>
+                    <p className="truncate text-sm text-white/70">{currentTrack.artist.name}</p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowLyrics(false)}
-                    aria-label="Hide lyrics"
-                    className="text-white hover:bg-white/15"
-                  >
-                    <Mic2 className="h-5 w-5" />
-                  </Button>
+                  <LikeButton trackId={currentTrack.id} tone="onDark" />
                 </div>
-                <LyricsView variant="mobile" className="min-h-0 flex-1" />
-                <div className="shrink-0 rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur-md">
-                  <SeekBar variant="immersive" showTimes />
-                  <div className="mt-3">
-                    <PlayerControls variant="immersive" size="md" />
+                <LyricsView variant="mobile" align="left" className="min-h-0 flex-1" />
+                <div className="shrink-0 pt-3">
+                  <SeekBar variant="immersive" showTimes remaining />
+                  <PlayerControls variant="immersive" size="md" showToggles className="mt-3 justify-between" />
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setMobileLyrics(false)}
+                      aria-label="Hide lyrics"
+                      aria-pressed
+                      className="rounded-full bg-white/15 text-white hover:bg-white/25"
+                    >
+                      <Mic2 className="h-5 w-5" />
+                    </Button>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="flex min-h-0 flex-1 items-center justify-center py-4">
+                <div className="flex min-h-0 flex-1 items-center justify-center py-6">
                   <div
-                    className="relative aspect-square overflow-hidden rounded-2xl bg-black/30 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-                    style={{ height: "min(100%,400px,46vh)" }}
+                    className="relative aspect-square w-full overflow-hidden rounded-lg shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+                    style={{ maxWidth: "min(100%, 48vh)" }}
                   >
-                    {cover("400px", "object-cover")}
+                    {cover("(max-width: 1024px) 90vw, 480px")}
                   </div>
                 </div>
-                <div className="min-h-0 flex-1">
-                  <div className="mb-5 flex items-center justify-between">
-                    <div className="min-w-0 pr-4">
-                      <h1 className="truncate text-2xl font-bold text-white">
-                        {currentTrack.title}
-                      </h1>
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-lg text-white/70">
-                          {currentTrack.artist.name}
-                        </p>
-                        <QualityBadge variant="immersive" />
-                      </div>
+                <div className="shrink-0">
+                  {titleBlock("md")}
+                  <SeekBar variant="immersive" showTimes remaining className="mt-5" />
+                  <PlayerControls variant="immersive" size="lg" showToggles className="mt-3 justify-between" />
+                  <div className="mt-4 flex items-center justify-between">
+                    <DeviceSwitcher variant="immersive" />
+                    <div className="flex items-center gap-1">
+                      <DownloadButton track={currentTrack} />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setMobileLyrics(true)}
+                        disabled={!hasLyrics}
+                        aria-label="Show lyrics"
+                        className="rounded-full text-white hover:bg-white/10 disabled:opacity-30"
+                      >
+                        <Mic2 className="h-5 w-5" />
+                      </Button>
                     </div>
-                    <LikeButton
-                      trackId={currentTrack.id}
-                      size="md"
-                      tone="onDark"
-                    />
-                  </div>
-                  <SeekBar
-                    variant="immersive"
-                    showTimes
-                    remaining
-                    className="mb-5"
-                  />
-                  <PlayerControls
-                    variant="immersive"
-                    size="lg"
-                    className="mb-5 justify-between"
-                  />
-                  <div className="flex items-center justify-between">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowLyrics(true)}
-                      disabled={!hasLyrics}
-                      aria-label="Show lyrics"
-                      className="text-white hover:bg-white/15 disabled:opacity-30"
-                    >
-                      <Mic2 className="h-5 w-5" />
-                    </Button>
-                    <DownloadButton track={currentTrack} />
                   </div>
                 </div>
               </div>
@@ -259,89 +239,63 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
           </div>
 
           {/* ---------------- Desktop ---------------- */}
-          <div className="relative z-10 hidden h-full w-full flex-col lg:flex">
-            <div className="flex h-[calc(100%-120px)] w-full flex-1 overflow-hidden">
-              {showLyricsPane ? (
-                <LyricsView variant="desktop" className="h-full" />
-              ) : (
-                <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center gap-16 px-12 text-white">
-                  <div className="relative h-80 w-80 shrink-0 overflow-hidden rounded-2xl bg-black/30 shadow-2xl xl:h-96 xl:w-96">
-                    {cover("400px", "object-cover")}
-                  </div>
-                  <div className="flex h-full flex-col justify-center gap-5">
-                    <h1 className="text-5xl font-bold leading-tight xl:text-7xl">
-                      {currentTrack.title}
-                    </h1>
-                    <h2 className="flex items-center gap-2 text-3xl text-white/80">
-                      <Link
-                        href={`/artists/${currentTrack.artist.id}`}
-                        className="hover:underline"
-                      >
-                        {currentTrack.artist.name}
-                      </Link>
-                      {currentTrack.artist.verified && (
-                        <BadgeCheck className="h-6 w-6 text-sky-400" />
-                      )}
-                    </h2>
-                    {currentTrack.album && (
-                      <p className="text-xl text-white/70">
-                        {currentTrack.album.title}
-                      </p>
-                    )}
-                  </div>
+          <div className="hidden h-full w-full flex-col px-10 pb-8 pt-6 lg:flex">
+            {header}
+            <div className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 grid-cols-[minmax(0,26rem)_minmax(0,1fr)] gap-16 pt-6 xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
+              {/* Player column */}
+              <div className="flex min-h-0 flex-col justify-center">
+                <div className="relative aspect-square w-full overflow-hidden rounded-lg shadow-[0_24px_60px_rgba(0,0,0,0.55)]">
+                  {cover("480px")}
                 </div>
-              )}
-            </div>
-
-            <div className="absolute bottom-0 left-0 right-0 h-[120px] border-t border-white/10 bg-black/25 backdrop-blur-md">
-              <div className="mx-auto flex h-full max-w-7xl flex-col justify-center gap-3 px-8">
-                <SeekBar variant="immersive" showTimes />
-                <div className="flex items-center justify-between">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/30">
-                      {cover("56px", "object-cover")}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-white">
-                        {currentTrack.title}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm text-white/70">
-                          {currentTrack.artist.name}
-                        </p>
-                        <QualityBadge variant="immersive" />
-                      </div>
-                    </div>
-                    <LikeButton
-                      trackId={currentTrack.id}
-                      tone="onDark"
-                      className="ml-2"
-                    />
+                <div className="mt-7">{titleBlock("lg")}</div>
+                <SeekBar variant="immersive" showTimes className="mt-5" />
+                <PlayerControls variant="immersive" size="lg" showToggles className="mt-2 justify-between" />
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <DeviceSwitcher variant="immersive" />
+                    <DownloadButton track={currentTrack} />
                   </div>
+                  <VolumeControl variant="immersive" />
+                </div>
+              </div>
 
-                  <PlayerControls
-                    variant="immersive"
-                    size="md"
-                    className="flex-1"
-                  />
-
-                  <div className="flex flex-1 items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setShowLyrics(!showLyrics)}
-                      disabled={!hasLyrics}
-                      aria-label="Toggle lyrics"
+              {/* Side panel: lyrics or up next */}
+              <div className="flex min-h-0 flex-col">
+                <div className="flex shrink-0 gap-2" role="tablist" aria-label="Side panel">
+                  {(
+                    [
+                      { id: "lyrics", label: "Lyrics", icon: Mic2, disabled: !hasLyrics },
+                      { id: "queue", label: "Up next", icon: ListMusic, disabled: false },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={sidePanel === tab.id}
+                      disabled={tab.disabled}
+                      onClick={() => setPanel(tab.id)}
                       className={cn(
-                        "text-white hover:bg-white/15 disabled:opacity-30",
-                        showLyricsPane && "text-primary",
+                        "inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors disabled:opacity-40",
+                        sidePanel === tab.id ? "bg-white text-black" : "bg-white/10 text-white hover:bg-white/20",
                       )}
                     >
-                      <Mic2 className="h-5 w-5" />
-                    </Button>
-                    <DownloadButton track={currentTrack} />
-                    <VolumeControl variant="immersive" className="ml-2" />
-                  </div>
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="mt-4 min-h-0 flex-1 overflow-y-auto no-scrollbar"
+                  style={{
+                    maskImage: "linear-gradient(180deg, transparent 0, #000 24px, #000 calc(100% - 64px), transparent 100%)",
+                  }}
+                >
+                  {sidePanel === "lyrics" ? (
+                    <LyricsView variant="desktop" align="left" className="h-full" />
+                  ) : (
+                    <div className="pt-3">{queueList}</div>
+                  )}
                 </div>
               </div>
             </div>
