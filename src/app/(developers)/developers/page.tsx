@@ -1,93 +1,175 @@
-"use client"
+import { ArrowRight, Code2, KeyRound, PlayCircle, Share2 } from "lucide-react";
+import Link from "next/link";
+import { CodeBlock } from "@/components/developers/code-block";
+import { MethodBadge } from "@/components/developers/docs-ui";
+import { ALL_ENDPOINTS, API_GROUPS, snippets } from "@/lib/developer-docs";
+import { getAppUrl } from "@/lib/seo";
 
-import { Button } from "@/components/ui/button"
-import { 
-  Zap, ArrowRight, Shield, Code, Globe, 
-  Terminal, Sparkles, MoveRight
-} from "lucide-react"
-import Link from "next/link"
+const CARDS = [
+  {
+    href: "/developers/docs/api/tracks",
+    icon: Code2,
+    title: "Web API",
+    body: "REST endpoints for tracks, albums, artists, playlists, search and the listener's library.",
+  },
+  {
+    href: "/developers/docs/iframe-sdk",
+    icon: PlayCircle,
+    title: "Embed player",
+    body: "Drop a Musicy player into any page with an iframe, and control it from JavaScript.",
+  },
+  {
+    href: "/developers/docs/oembed",
+    icon: Share2,
+    title: "oEmbed",
+    body: "Turn a Musicy link into a rich preview in chat apps, CMSs and forums.",
+  },
+];
 
 export default function DevelopersHome() {
-  return (
-    <div className="min-h-screen bg-black select-none">
-      {/* Cinematic Hero */}
-      <section className="relative pt-32 pb-40 overflow-hidden border-b border-white/5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(var(--primary-rgb),0.08),transparent)] pointer-events-none" />
-        <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-4xl space-y-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.2em] mb-4">
-              <Sparkles className="w-3 h-3" />
-              New: Lossless Audio SDK v2.0
-            </div>
-            
-            <h1 className="text-7xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase">
-              The Architecture <br />
-              <span className="text-primary italic">of Sound.</span>
-            </h1>
-            
-            <p className="text-2xl text-white/40 font-medium max-w-2xl leading-relaxed">
-              Musicy APIs empower you to integrate world-class audio, cinematic metadata, 
-              and real-time playback control into any application. Built for engineers who demand more.
-            </p>
+  const base = getAppUrl();
+  const search = ALL_ENDPOINTS.find((e) => e.id === "search");
+  const example = search ? snippets(base, search) : null;
+  const count = ALL_ENDPOINTS.length;
 
-            <div className="flex flex-wrap gap-6 pt-4">
-              <Button asChild size="lg" className="rounded-full px-10 h-16 font-black italic text-xl shadow-[0_0_40px_rgba(var(--primary-rgb),0.3)] hover:scale-105 transition-transform">
-                <Link href="/developers/docs">Get Started <ArrowRight className="ml-2 w-6 h-6" /></Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full px-10 h-16 font-black text-xl border-white/10 hover:bg-white/5">
-                <Link href="/developers/dashboard">Control Center</Link>
-              </Button>
+  return (
+    <div>
+      {/* Hero */}
+      <section className="relative isolate overflow-hidden border-b border-border">
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-[radial-gradient(60%_80%_at_20%_0%,hsl(var(--primary)/0.22),transparent_70%)]"
+        />
+        <div className="mx-auto grid max-w-[90rem] gap-12 px-4 py-16 sm:px-6 md:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:items-center lg:px-8">
+          <div className="max-w-2xl">
+            <p className="text-sm font-medium text-primary">
+              Musicy for Developers
+            </p>
+            <h1 className="mt-3 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+              Build with lossless music.
+            </h1>
+            <p className="mt-5 text-lg leading-relaxed text-muted-foreground">
+              A straightforward REST API over the whole catalogue, the
+              listener&apos;s library and quality-aware streaming, plus embeds
+              that work anywhere a link does.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/developers/docs"
+                className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-6 font-semibold text-background transition-transform hover:scale-105"
+              >
+                Read the docs <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/developers/dashboard"
+                className="inline-flex h-11 items-center gap-2 rounded-full px-6 font-semibold ring-1 ring-foreground/30 transition-colors hover:ring-foreground"
+              >
+                <KeyRound className="h-4 w-4" /> Get an API key
+              </Link>
             </div>
+            <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Endpoints</dt>
+                <dd className="text-xl font-semibold">{count}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Auth</dt>
+                <dd className="text-xl font-semibold">Bearer key</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Audio</dt>
+                <dd className="text-xl font-semibold">Up to 24-bit FLAC</dd>
+              </div>
+            </dl>
           </div>
+          {example && (
+            <CodeBlock
+              tabs={[
+                { label: "cURL", code: example.curl },
+                { label: "JavaScript", code: example.js },
+                { label: "Python", code: example.py },
+              ]}
+              className="shadow-2xl shadow-black/50"
+            />
+          )}
         </div>
-        
-        {/* Abstract 3D-ish element */}
-        <div className="absolute right-[-10%] top-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
       </section>
 
-      {/* Quick Start Grid */}
-      <section className="container mx-auto px-6 py-32">
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Link href="/developers/docs/authentication" className="group p-10 rounded-[3rem] bg-neutral-900/40 border border-white/5 hover:border-primary/20 transition-all space-y-6">
-               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                  <Shield className="w-8 h-8" />
-               </div>
-               <h3 className="text-2xl font-black uppercase italic tracking-tighter">Secure Access</h3>
-               <p className="text-white/40 font-medium leading-relaxed">
-                  Implement industry-standard OAuth 2.0 or Simple API Keys to access user data and library features.
-               </p>
-               <div className="pt-4 flex items-center gap-2 text-primary font-black uppercase text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                  Learn More <MoveRight className="w-4 h-4" />
-               </div>
+      {/* Products */}
+      <section className="mx-auto max-w-[90rem] px-4 py-16 sm:px-6 lg:px-8">
+        <div className="grid gap-4 md:grid-cols-3">
+          {CARDS.map((c) => (
+            <Link
+              key={c.href}
+              href={c.href}
+              className="group rounded-xl bg-raised p-6 transition-colors hover:bg-foreground/[0.07]"
+            >
+              <c.icon className="h-6 w-6 text-primary" />
+              <h2 className="mt-4 text-lg font-semibold">{c.title}</h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                {c.body}
+              </p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+                Learn more{" "}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
             </Link>
+          ))}
+        </div>
+      </section>
 
-            <Link href="/developers/docs/oembed" className="group p-10 rounded-[3rem] bg-neutral-900/40 border border-white/5 hover:border-primary/20 transition-all space-y-6">
-               <div className="w-16 h-16 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:scale-110 transition-transform">
-                  <Globe className="w-8 h-8" />
-               </div>
-               <h3 className="text-2xl font-black uppercase italic tracking-tighter">Universal Embeds</h3>
-               <p className="text-white/40 font-medium leading-relaxed">
-                  Utilize our 1:1 Spotify-compatible oEmbed API to unfurl Musicy links into interactive player previews.
-               </p>
-               <div className="pt-4 flex items-center gap-2 text-orange-500 font-black uppercase text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                  Explore oEmbed <MoveRight className="w-4 h-4" />
-               </div>
+      {/* Reference index */}
+      <section className="mx-auto max-w-[90rem] px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">API reference</h2>
+            <p className="mt-1 text-muted-foreground">
+              Every endpoint, grouped by what it works with.
+            </p>
+          </div>
+          <Link
+            href="/developers/playground"
+            className="hidden text-sm font-semibold text-muted-foreground hover:text-foreground sm:block"
+          >
+            Try them in the playground
+          </Link>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {API_GROUPS.map((g) => (
+            <Link
+              key={g.slug}
+              href={`/developers/docs/api/${g.slug}`}
+              className="rounded-xl p-5 ring-1 ring-border transition-colors hover:bg-foreground/[0.04] hover:ring-foreground/25"
+            >
+              <h3 className="font-semibold">{g.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {g.description}
+              </p>
+              <ul className="mt-4 space-y-1.5">
+                {g.endpoints.slice(0, 4).map((e) => (
+                  <li
+                    key={e.id}
+                    className="flex items-center gap-2 text-[13px]"
+                  >
+                    <MethodBadge
+                      method={e.method}
+                      className="min-w-[3.25rem]"
+                    />
+                    <code className="truncate font-mono text-muted-foreground">
+                      {e.path}
+                    </code>
+                  </li>
+                ))}
+                {g.endpoints.length > 4 && (
+                  <li className="pl-[3.75rem] text-[13px] text-muted-foreground">
+                    +{g.endpoints.length - 4} more
+                  </li>
+                )}
+              </ul>
             </Link>
-
-            <Link href="/developers/docs/web-api" className="group p-10 rounded-[3rem] bg-indigo-500/10 border border-white/5 hover:border-primary/20 transition-all space-y-6">
-               <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
-                  <Terminal className="w-8 h-8" />
-               </div>
-               <h3 className="text-2xl font-black uppercase italic tracking-tighter">Real-time Web API</h3>
-               <p className="text-white/40 font-medium leading-relaxed">
-                  Programmatically fetch hi-res artwork, track details, and artist biographies via our RESTful endpoints.
-               </p>
-               <div className="pt-4 flex items-center gap-2 text-indigo-400 font-black uppercase text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                  API Reference <MoveRight className="w-4 h-4" />
-               </div>
-            </Link>
-         </div>
+          ))}
+        </div>
       </section>
     </div>
-  )
+  );
 }

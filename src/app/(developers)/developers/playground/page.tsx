@@ -1,270 +1,354 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { DocsSidebar } from "@/components/docs-sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { 
-  Play, Terminal, Send, Trash2, 
-  ChevronRight, Database, Globe,
-  Shield, Code, List, Copy
-} from "lucide-react"
-import { toast } from "sonner"
+import { AlertTriangle, Loader2, Play, Search } from "lucide-react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useEffect, useMemo, useState } from "react";
+import { CodeBlock } from "@/components/developers/code-block";
+import { AuthBadge, MethodBadge } from "@/components/developers/docs-ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  ALL_ENDPOINTS,
+  API_GROUPS,
+  type Endpoint,
+  exampleBody,
+  snippets,
+} from "@/lib/developer-docs";
+import { cn } from "@/lib/utils";
 
-const ENDPOINTS = [
-  { id: "get-track", name: "Get Track", method: "GET", path: "/api/tracks/{id}", category: "Tracks", params: ["id"] },
-  { id: "get-tracks", name: "List Tracks", method: "GET", path: "/api/tracks", category: "Tracks", params: ["limit", "offset"] },
-  { id: "get-album", name: "Get Album", method: "GET", path: "/api/albums/{id}", category: "Albums", params: ["id"] },
-  { id: "get-artist", name: "Get Artist", method: "GET", path: "/api/artists/{id}", category: "Artists", params: ["id"] },
-  { id: "get-playlist", name: "Get Playlist", method: "GET", path: "/api/playlists/{id}", category: "Playlists", params: ["id"] },
-  { id: "search", name: "Search", method: "GET", path: "/api/search", category: "Search", params: ["q", "type", "limit"] },
-  { id: "get-daily", name: "Daily Mixes", method: "GET", path: "/api/daily-mixes", category: "Discovery", params: [] },
-  { id: "get-me", name: "Get Current User", method: "GET", path: "/api/user/profile", category: "Users", params: [] },
-  { id: "get-stats", name: "Platform Stats", method: "GET", path: "/api/stats", category: "Analytics", params: [] },
-  { id: "get-apikeys", name: "List API Keys", method: "GET", path: "/api/api-keys", category: "Self", params: [] },
-  { id: "get-oembed", name: "oEmbed Lookup", method: "GET", path: "/api/oembed", category: "Embeds", params: ["url"] },
-]
+type Result = {
+  status: number;
+  ms: number;
+  body: string;
+  location?: string | null;
+};
 
-export default function ApiPlayground() {
-  const [isMounted, setIsMounted] = useState(false)
-  const [selectedEndpoint, setSelectedEndpoint] = useState(ENDPOINTS[0])
-  const [params, setParams] = useState<any>({ 
-    id: "clow...", 
-    q: "Imagine", 
-    type: "track", 
-    limit: "20", 
-    offset: "0",
-    url: "https://musicy.app/tracks/..."
-  })
-  const [response, setResponse] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [apiKey, setApiKey] = useState("")
-  const [status, setStatus] = useState<number | null>(null)
-  const [responseTime, setResponseTime] = useState<number | null>(null)
+function initialValues(ep: Endpoint): Record<string, string> {
+  const v: Record<string, string> = {};
+  for (const p of [...(ep.pathParams ?? []), ...(ep.query ?? [])])
+    v[p.name] = p.required ? (p.example ?? "") : "";
+  return v;
+}
 
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
+export default function Playground() {
+  const { status: sessionStatus } = useSession();
+  const [selectedId, setSelectedId] = useState(
+    ALL_ENDPOINTS.find((e) => e.id === "search")?.id ?? ALL_ENDPOINTS[0].id,
+  );
+  const ep = ALL_ENDPOINTS.find((e) => e.id === selectedId) ?? ALL_ENDPOINTS[0];
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    initialValues(ep),
+  );
+  const [body, setBody] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [filter, setFilter] = useState("");
+  const [result, setResult] = useState<Result | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [origin, setOrigin] = useState("");
 
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : ""
+  useEffect(() => setOrigin(window.location.origin), []);
 
-  const buildUrl = (ep: typeof ENDPOINTS[0], p: any) => {
-    let url = ep.path
-    // Handle path params
-    if (url.includes("{id}")) {
-      url = url.replace("{id}", p.id || "")
-    }
+  const select = (id: string) => {
+    const next = ALL_ENDPOINTS.find((e) => e.id === id);
+    if (!next) return;
+    setSelectedId(id);
+    setValues(initialValues(next));
+    const b = exampleBody(next);
+    setBody(b ? JSON.stringify(b, null, 2) : "");
+    setResult(null);
+  };
 
-    // Handle query params
-    const queryParts: string[] = []
-    ep.params.forEach(key => {
-      if (key !== "id" && p[key]) {
-        queryParts.push(`${key}=${encodeURIComponent(p[key])}`)
-      }
-    })
+  const url = useMemo(() => {
+    let path = ep.path;
+    for (const p of ep.pathParams ?? [])
+      path = path.replace(
+        `{${p.name}}`,
+        encodeURIComponent(values[p.name] || `{${p.name}}`),
+      );
+    const qs = (ep.query ?? [])
+      .filter((p) => values[p.name])
+      .map((p) => `${p.name}=${encodeURIComponent(values[p.name])}`)
+      .join("&");
+    return `${path}${qs ? `?${qs}` : ""}`;
+  }, [ep, values]);
 
-    if (queryParts.length > 0) {
-      url += `?${queryParts.join("&")}`
-    }
+  const missing = [...(ep.pathParams ?? []), ...(ep.query ?? [])].filter(
+    (p) => p.required && !values[p.name],
+  );
 
-    return url
-  }
-
-  const handleSend = async () => {
-    setIsLoading(true)
-    setResponse(null)
-    setStatus(null)
-    setResponseTime(null)
-    
-    const start = Date.now()
-    const path = buildUrl(selectedEndpoint, params)
-
+  const send = async () => {
+    setLoading(true);
+    setResult(null);
+    const start = performance.now();
     try {
-      const res = await fetch(path, {
-        headers: apiKey ? { "Authorization": `Bearer ${apiKey}` } : {}
-      })
-      
-      setStatus(res.status)
-      setResponseTime(Date.now() - start)
-
-      let data
+      const headers: Record<string, string> = {};
+      if (apiKey.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
+      if (ep.body?.length) headers["Content-Type"] = "application/json";
+      const res = await fetch(url, {
+        method: ep.method,
+        headers,
+        body: ep.body?.length && body.trim() ? body : undefined,
+        redirect: ep.path.endsWith("/stream") ? "manual" : "follow",
+        // With a key pasted, test exactly what an external client would see.
+        credentials: apiKey.trim() ? "omit" : "same-origin",
+      });
+      const text = await res.text();
+      let pretty = text;
       try {
-        data = await res.json()
-      } catch (e) {
-        data = { error: "Invalid JSON response from server" }
+        pretty = JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        // not JSON (e.g. audio or a redirect)
       }
-      
-      setResponse(data)
-      
-      if (!res.ok) {
-        toast.error(`Error ${res.status}: ${data.error || data.message || 'Request failed'}`)
-      }
-    } catch (err: any) {
-      toast.error("Execution failed. Check your network or credentials.")
-      console.error(err)
+      setResult({
+        status: res.type === "opaqueredirect" ? 302 : res.status,
+        ms: Math.round(performance.now() - start),
+        body:
+          res.type === "opaqueredirect"
+            ? "Redirected to the audio file (open the URL to follow it)."
+            : pretty.slice(0, 20000) || "(empty body)",
+      });
+    } catch (err) {
+      setResult({
+        status: 0,
+        ms: Math.round(performance.now() - start),
+        body: `Request failed: ${String(err)}`,
+      });
     } finally {
-      setIsLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const getCurlCmd = () => {
-    let path = selectedEndpoint.path
-    Object.keys(params).forEach(key => {
-      path = path.replace(`{${key}}`, params[key])
-    })
-    return `curl -X ${selectedEndpoint.method} "${appUrl}${path}" \\\n  -H "Authorization: Bearer ${apiKey || 'YOUR_API_KEY'}"`
-  }
+  const s = snippets(origin, ep);
+  const q = filter.trim().toLowerCase();
 
   return (
-    <div className="container mx-auto px-6 py-20 pb-40">
-       <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
-          {/* Sidebar */}
-          <aside className="space-y-12">
-             <div className="space-y-6">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-primary ml-4">Playground</h4>
-                <div className="flex flex-col gap-1">
-                   {ENDPOINTS.map((ep) => (
-                     <button 
-                       key={ep.id}
-                       onClick={() => setSelectedEndpoint(ep)}
-                       className={`flex items-center justify-between px-6 py-4 rounded-2xl transition-all font-black italic uppercase text-xs ${
-                         selectedEndpoint.id === ep.id ? 'bg-primary/10 text-primary' : 'text-white/40 hover:text-white/60 hover:bg-white/5'
-                       }`}
-                     >
-                        <div className="flex items-center gap-3">
-                           <span className={`text-[8px] px-1.5 py-0.5 rounded ${ep.method === 'GET' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                             {ep.method}
-                           </span>
-                           {ep.name}
-                        </div>
-                        <ChevronRight className="w-4 h-4 opacity-20" />
-                     </button>
-                   ))}
-                </div>
-             </div>
-          </aside>
+    <div className="mx-auto max-w-[90rem] px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mb-8">
+        <p className="text-sm font-medium text-primary">Tools</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">
+          API playground
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Send real requests from your browser.{" "}
+          {sessionStatus === "authenticated"
+            ? "You're signed in, so requests use your session unless you paste a key."
+            : "Paste an API key to call endpoints that need one."}
+        </p>
+      </div>
 
-          {/* Main Area */}
-          <main className="lg:col-span-3 space-y-12">
-             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-                <div className="space-y-4">
-                   <h1 className="text-5xl font-black italic tracking-tighter uppercase leading-none">API Explorer</h1>
-                   <div className="flex items-center gap-3 text-sm font-bold text-white/30 truncate max-w-xl">
-                      <Globe className="w-4 h-4" />
-                      <span className="text-emerald-400/60">{selectedEndpoint.method}</span>
-                      {isMounted ? `${appUrl}${buildUrl(selectedEndpoint, params)}` : '...'}
-                   </div>
-                </div>
-                <Button 
-                   onClick={handleSend}
-                   disabled={isLoading}
-                   className="h-16 px-12 rounded-full font-black italic text-xl shadow-[0_0_40px_rgba(var(--primary-rgb),0.2)] bg-primary hover:bg-primary/90 text-white border-none group"
-                >
-                   {isLoading ? 'Sending...' : 'Run Request'}
-                   <Send className="ml-2 w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                </Button>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                {/* Configuration */}
-                <div className="space-y-8 h-fit">
-                   <div className="bg-neutral-900/50 p-10 rounded-[3rem] border border-white/5 space-y-8 backdrop-blur-xl">
-                      <div className="flex items-center gap-3">
-                         <div className="w-1.5 h-6 bg-primary rounded-full" />
-                         <h3 className="text-xl font-black uppercase tracking-tighter italic">Request Configuration</h3>
-                      </div>
-                      
-                      <div className="space-y-6">
-                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-primary ml-1">Authentication</label>
-                            <Input 
-                               value={apiKey}
-                               onChange={(e) => setApiKey(e.target.value)}
-                               placeholder="Bearer YOUR_API_KEY" 
-                               type="password"
-                               className="bg-black/60 border-white/10 h-14 rounded-xl font-bold px-6 focus:border-primary/50 transition-colors"
-                            />
-                         </div>
-
-                         {selectedEndpoint.params.map(key => (
-                            <div key={key} className="space-y-2">
-                               <label className="text-[10px] font-black uppercase tracking-widest text-primary ml-1">{key}</label>
-                               <Input 
-                                 value={params[key] || ""}
-                                 onChange={(e) => setParams({...params, [key]: e.target.value})}
-                                 placeholder={`Enter ${key}...`}
-                                 className="bg-black/60 border-white/10 h-14 rounded-xl font-bold px-6 focus:border-primary/50 transition-colors"
-                               />
-                            </div>
-                         ))}
-                      </div>
-                   </div>
-
-                   <div className="bg-black p-8 rounded-[2rem] border border-white/5 space-y-4">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40">
-                         <Code className="w-4 h-4" /> cURL Template
-                      </div>
-                      <pre className="text-[10px] text-emerald-400 font-mono bg-neutral-900/50 p-4 rounded-xl break-all whitespace-pre-wrap">
-                         {getCurlCmd()}
-                      </pre>
-                   </div>
-                </div>
-
-                {/* Console Output */}
-                <div className="space-y-4">
-                   <div className="flex justify-between items-center px-4">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/20">
-                         <Terminal className="w-4 h-4" /> Runtime Console
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {responseTime !== null && (
-                          <span className="text-[10px] font-black text-white/20 italic">{responseTime}ms</span>
-                        )}
-                        {response && (
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(JSON.stringify(response, null, 2))
-                              toast.success("Response copied")
-                            }} 
-                            className="text-white/20 hover:text-white transition-colors"
-                            title="Copy Response"
-                          >
-                             <Copy className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button onClick={() => { setResponse(null); setStatus(null); setResponseTime(null); }} className="text-white/20 hover:text-white transition-colors" title="Clear Console">
-                           <Trash2 className="w-4 h-4" />
+      <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        {/* Endpoint picker */}
+        <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto no-scrollbar">
+          <div className="relative mb-3">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter endpoints"
+              aria-label="Filter endpoints"
+              className="h-9 pl-9"
+            />
+          </div>
+          <div className="space-y-4">
+            {API_GROUPS.map((g) => {
+              const items = g.endpoints.filter(
+                (e) =>
+                  !q ||
+                  e.title.toLowerCase().includes(q) ||
+                  e.path.toLowerCase().includes(q),
+              );
+              if (items.length === 0) return null;
+              return (
+                <div key={g.slug}>
+                  <p className="mb-1 px-2 text-xs font-semibold text-muted-foreground">
+                    {g.title}
+                  </p>
+                  <ul>
+                    {items.map((e) => (
+                      <li key={e.id}>
+                        <button
+                          type="button"
+                          onClick={() => select(e.id)}
+                          aria-current={e.id === ep.id}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                            e.id === ep.id
+                              ? "bg-accent text-foreground"
+                              : "text-muted-foreground hover:bg-panel-hover hover:text-foreground",
+                          )}
+                        >
+                          <MethodBadge
+                            method={e.method}
+                            className="min-w-[3rem] text-[10px]"
+                          />
+                          <span className="truncate">{e.title}</span>
                         </button>
-                      </div>
-                   </div>
-                   <div className="bg-black rounded-[3rem] border border-white/10 p-8 h-[600px] overflow-auto font-mono text-sm group relative">
-                      {response ? (
-                        <pre className="text-emerald-400/90 leading-relaxed whitespace-pre-wrap">
-                           {JSON.stringify(response, null, 2)}
-                        </pre>
-                      ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-white/10">
-                           <Database className={`w-16 h-16 ${isLoading ? 'animate-bounce text-primary' : 'animate-pulse'}`} />
-                           <div className="font-black uppercase tracking-[0.2em] text-xs max-w-[200px]">
-                              {isLoading ? 'Executing Request...' : 'Waiting for API execution'}
-                           </div>
-                        </div>
-                      )}
-                      
-                      {status && (
-                        <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                             status >= 200 && status < 300 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-                           }`}>
-                             {status} {status === 200 ? 'OK' : status === 401 ? 'Unauthorized' : 'Error'}
-                           </div>
-                        </div>
-                      )}
-                   </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-             </div>
-          </main>
-       </div>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Request / response */}
+        <div className="min-w-0 space-y-5">
+          <div className="rounded-xl bg-raised p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <MethodBadge method={ep.method} />
+              <code className="min-w-0 break-all font-mono text-sm">{url}</code>
+              <AuthBadge auth={ep.auth} />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {ep.description}{" "}
+              <Link
+                href={`/developers/docs/api/${ep.group}#${ep.id}`}
+                className="text-primary hover:underline"
+              >
+                Docs
+              </Link>
+            </p>
+
+            {[...(ep.pathParams ?? []), ...(ep.query ?? [])].length > 0 && (
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {[...(ep.pathParams ?? []), ...(ep.query ?? [])].map((p) => (
+                  <div key={p.name} className="block">
+                    <label
+                      htmlFor={`param-${p.name}`}
+                      className="flex items-baseline gap-2 text-[13px]"
+                    >
+                      <code className="font-mono font-semibold">{p.name}</code>
+                      {p.required && (
+                        <span className="text-[11px] text-amber-300">
+                          required
+                        </span>
+                      )}
+                    </label>
+                    <Input
+                      id={`param-${p.name}`}
+                      value={values[p.name] ?? ""}
+                      placeholder={p.example ?? p.type}
+                      onChange={(e) =>
+                        setValues((v) => ({ ...v, [p.name]: e.target.value }))
+                      }
+                      className="mt-1 h-9 font-mono text-[13px]"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {ep.body?.length ? (
+              <label className="mt-5 block">
+                <span className="text-[13px] font-semibold">JSON body</span>
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  spellCheck={false}
+                  rows={Math.min(10, Math.max(4, body.split("\n").length + 1))}
+                  className="mt-1 w-full rounded-md border border-input bg-background/60 p-3 font-mono text-[13px] focus:border-primary focus:outline-none"
+                />
+              </label>
+            ) : null}
+
+            <div className="mt-5">
+              <label
+                htmlFor="playground-key"
+                className="text-[13px] font-semibold"
+              >
+                API key
+              </label>
+              <Input
+                id="playground-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={
+                  sessionStatus === "authenticated"
+                    ? "Optional: using your session"
+                    : "Paste a key"
+                }
+                autoComplete="off"
+                className="mt-1 h-9 font-mono text-[13px]"
+              />
+            </div>
+
+            {ep.method !== "GET" && (
+              <p className="mt-4 flex items-start gap-2 text-[13px] text-amber-300">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                This request changes real data in the account it runs as.
+              </p>
+            )}
+
+            <div className="mt-5 flex items-center gap-3">
+              <Button
+                onClick={send}
+                disabled={loading || missing.length > 0}
+                className="h-10 rounded-full px-6 font-semibold"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 fill-current" />
+                )}
+                Send request
+              </Button>
+              {missing.length > 0 && (
+                <span className="text-[13px] text-muted-foreground">
+                  Fill in {missing.map((m) => m.name).join(", ")}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center gap-3 text-sm">
+                <span className="font-semibold">Response</span>
+                {result && (
+                  <>
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 font-mono text-xs font-semibold",
+                        result.status >= 200 && result.status < 400
+                          ? "bg-emerald-500/15 text-emerald-300"
+                          : "bg-rose-500/15 text-rose-300",
+                      )}
+                    >
+                      {result.status || "ERR"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {result.ms} ms
+                    </span>
+                  </>
+                )}
+              </div>
+              {result ? (
+                <CodeBlock
+                  title="Body"
+                  tabs={[{ label: "Body", code: result.body }]}
+                />
+              ) : (
+                <div className="flex h-40 items-center justify-center rounded-xl text-sm text-muted-foreground ring-1 ring-border">
+                  Send a request to see the response.
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="mb-2 text-sm font-semibold">Code</p>
+              <CodeBlock
+                tabs={[
+                  { label: "cURL", code: s.curl },
+                  { label: "JavaScript", code: s.js },
+                  { label: "Python", code: s.py },
+                ]}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

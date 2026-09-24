@@ -1,85 +1,182 @@
-(function() {
-  const API_VERSION = 'v1';
-  const BASE_URL = window.location.origin;
+/*
+ * Musicy iFrame API v1
+ *
+ *   <div id="player"></div>
+ *   <script>
+ *     window.onMusicyIframeApiReady = (IFrameAPI) => {
+ *       IFrameAPI.createController(document.getElementById("player"),
+ *         { uri: "musicy:track:TRACK_ID" },
+ *         (controller) => {
+ *           controller.on("playback_update", (e) => console.log(e.data));
+ *           controller.play();
+ *         });
+ *     };
+ *   </script>
+ *   <script src="https://YOUR-MUSICY-HOST/embed/iframe-api/v1.js" async></script>
+ */
+(() => {
+  // The Musicy host is wherever this script was loaded from, not the page
+  // embedding it.
+  const script = document.currentScript;
+  const ORIGIN = script?.src
+    ? new URL(script.src, window.location.href).origin
+    : window.location.origin;
 
-  class EmbedController {
-    constructor(iframe, options, callback) {
+  const TYPES = {
+    track: "tracks",
+    album: "albums",
+    artist: "artists",
+    playlist: "playlists",
+  };
+  const PLURALS = Object.values(TYPES);
+
+  /** musicy:track:ID or a Musicy link (/tracks/ID) → embed URL. */
+  const embedUrl = (uri) => {
+    let type;
+    let id;
+    if (typeof uri === "string" && uri.startsWith("musicy:")) {
+      const [, kind, value] = uri.split(":");
+      type = TYPES[kind] || kind;
+      id = value;
+    } else if (typeof uri === "string") {
+      const path = new URL(uri, ORIGIN).pathname.split("/").filter(Boolean);
+      if (path[0] === "embed") path.shift();
+      type = TYPES[path[0]] || path[0];
+      id = path[1];
+    }
+    if (!type || !id || !PLURALS.includes(type)) {
+      throw new Error(`Musicy iFrame API: unsupported uri ${String(uri)}`);
+    }
+    return `${ORIGIN}/embed/${type}/${encodeURIComponent(id)}`;
+  };
+
+  class Controller {
+    constructor(iframe) {
       this.iframe = iframe;
-      this.options = options;
-      this.callback = callback;
-      this._id = Math.random().toString(36).substr(2, 9);
-      
-      this._init();
-    }
-
-    _init() {
-      // Add event listener for messages from iframe
-      window.addEventListener('message', (event) => {
-        if (event.origin !== BASE_URL) return;
-        if (event.data && event.data.type === 'MUSICY_EMBED_READY' && event.data.id === this._id) {
-           if (this.callback) this.callback(this);
+      this._listeners = {};
+      this._ready = false;
+      this._queue = [];
+      this._onMessage = (event) => {
+        if (event.origin !== ORIGIN || event.source !== iframe.contentWindow)
+          return;
+        const msg = event.data;
+        if (!msg || msg.source !== "musicy-embed") return;
+        if (msg.type === "ready") {
+          this._ready = true;
+          for (const [command, value] of this._queue.splice(0))
+            this._send(command, value);
         }
-      });
+        this._emit(msg.type, msg);
+      };
+      window.addEventListener("message", this._onMessage);
     }
 
-    loadUri(uri) {
-      // Musicy URIs: musicy:track:id, musicy:album:id, etc.
-      const parts = uri.split(':');
-      if (parts.length < 3) return;
-      const type = parts[1] + 's'; // simple pluralization
-      const id = parts[2];
-      this.iframe.src = `${BASE_URL}/embed/${type}/${id}`;
+    _emit(type, event) {
+      for (const fn of this._listeners[type] || []) {
+        try {
+          fn(event);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
+
+    _send(command, value) {
+      // Commands sent before the embed is ready are replayed once it is.
+      if (!this._ready) {
+        this._queue.push([command, value]);
+        return;
+      }
+      this.iframe.contentWindow.postMessage(
+        { source: "musicy-iframe-api", command, value },
+        ORIGIN,
+      );
+    }
+
+    /** Subscribe to "ready" or "playback_update". Returns an unsubscribe function. */
+    on(type, fn) {
+      if (!this._listeners[type]) this._listeners[type] = [];
+      this._listeners[type].push(fn);
+      return () => this.off(type, fn);
+    }
+
+    addListener(type, fn) {
+      return this.on(type, fn);
+    }
+
+    off(type, fn) {
+      this._listeners[type] = (this._listeners[type] || []).filter(
+        (f) => f !== fn,
+      );
+    }
+
+    removeListener(type, fn) {
+      this.off(type, fn);
     }
 
     play() {
-      this._postMessage('PLAY');
+      this._send("play");
+    }
+
+    resume() {
+      this._send("play");
     }
 
     pause() {
-      this._postMessage('PAUSE');
+      this._send("pause");
     }
 
     togglePlay() {
-      this._postMessage('TOGGLE_PLAY');
+      this._send("toggle");
     }
 
-    _postMessage(action, value) {
-      this.iframe.contentWindow.postMessage({ action, value }, BASE_URL);
+    /** Jump to a position, in seconds. */
+    seek(seconds) {
+      this._send("seek", Number(seconds) || 0);
+    }
+
+    /** Swap what the player shows without recreating it. */
+    loadUri(uri) {
+      this._ready = false;
+      this.iframe.src = embedUrl(uri);
+    }
+
+    destroy() {
+      window.removeEventListener("message", this._onMessage);
+      this._listeners = {};
+      this.iframe.remove();
     }
   }
 
-  window.onMusicyIframeApiReady = window.onSpotifyIframeApiReady || null;
+  const IFrameAPI = {
+    /**
+     * Replace `element` with a Musicy player.
+     * options: { uri, width = "100%", height = 152 }
+     */
+    createController(element, options, callback) {
+      if (!element) throw new Error("Musicy iFrame API: element is required");
+      const iframe = document.createElement("iframe");
+      iframe.src = embedUrl(options?.uri);
+      iframe.width = String(options?.width || "100%");
+      iframe.height = String(options?.height || 152);
+      iframe.title = "Musicy player";
+      iframe.loading = "lazy";
+      iframe.style.border = "0";
+      iframe.style.borderRadius = "12px";
+      iframe.allow =
+        "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+      element.replaceChildren(iframe);
 
-  window.IFrameAPI = {
-    createController: function(element, options, callback) {
-      const parts = options.uri.split(':');
-      const type = parts[1] + 's';
-      const id = parts[2];
-      
-      const iframe = document.createElement('iframe');
-      iframe.src = `${BASE_URL}/embed/${type}/${id}`;
-      iframe.width = options.width || '100%';
-      iframe.height = options.height || '152';
-      iframe.frameBorder = '0';
-      iframe.style.borderRadius = '12px';
-      iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
-      
-      element.innerHTML = '';
-      element.appendChild(iframe);
-
-      const controller = new EmbedController(iframe, options, callback);
-      
-      // Simulate ready for now since we don't have complex handshake yet
-      if (callback) {
-        setTimeout(() => callback(controller), 500);
-      }
-    }
+      const controller = new Controller(iframe);
+      if (typeof callback === "function") callback(controller);
+      return controller;
+    },
   };
 
-  // Trigger ready
-  if (typeof window.onSpotifyIframeApiReady === 'function') {
-    window.onSpotifyIframeApiReady(window.IFrameAPI);
-  } else if (typeof window.onMusicyIframeApiReady === 'function') {
-    window.onMusicyIframeApiReady(window.IFrameAPI);
-  }
+  window.MusicyIFrameAPI = IFrameAPI;
+  // Kept for pages written against the earlier name.
+  window.IFrameAPI = IFrameAPI;
+
+  const ready = window.onMusicyIframeApiReady || window.onSpotifyIframeApiReady;
+  if (typeof ready === "function") ready(IFrameAPI);
 })();

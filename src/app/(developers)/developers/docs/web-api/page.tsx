@@ -1,88 +1,190 @@
-"use client"
+import Link from "next/link";
+import { CodeBlock } from "@/components/developers/code-block";
+import { DocsShell } from "@/components/developers/docs-shell";
+import {
+  C,
+  Callout,
+  DocHeader,
+  DocSection,
+  MethodBadge,
+} from "@/components/developers/docs-ui";
+import { API_GROUPS } from "@/lib/developer-docs";
+import { getAppUrl } from "@/lib/seo";
 
-import { DocsSidebar } from "@/components/docs-sidebar"
-import { Button } from "@/components/ui/button"
-import { 
-  Terminal, Layers, 
-  ExternalLink, Github, Code,
-  Server, Cpu, Database, Play
-} from "lucide-react"
-import Link from "next/link"
+export const metadata = { title: "Conventions · Musicy Developers" };
 
-export default function WebApiDocs() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
+const TOC = [
+  { id: "base-url", title: "Base URL" },
+  { id: "pagination", title: "Pagination" },
+  { id: "errors", title: "Errors" },
+  { id: "audio-quality", title: "Audio quality" },
+  { id: "rate-limits", title: "Rate limits" },
+  { id: "endpoints", title: "All endpoints" },
+];
 
+export default function ConventionsDocs() {
+  const base = getAppUrl();
   return (
-    <div className="container mx-auto px-6 py-20 pb-40">
-       <div className="grid grid-cols-1 lg:grid-cols-4 gap-16">
-          <DocsSidebar />
+    <DocsShell toc={TOC}>
+      <DocHeader
+        eyebrow="Getting started"
+        title="Conventions"
+        lead="The rules every endpoint follows, so you only have to learn them once."
+      />
 
-          <main className="lg:col-span-3 space-y-16 max-w-4xl">
-            <div className="space-y-4">
-               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Data & Control</div>
-               <h1 className="text-6xl font-black italic tracking-tighter uppercase">Web API Reference</h1>
-               <p className="text-2xl text-white/40 font-medium leading-relaxed">
-                  The Musicy Web API endpoints return JSON-formated data about tracks, artists, albums, and playlists.
-               </p>
-            </div>
+      <div className="space-y-12">
+        <DocSection id="base-url" title="Base URL">
+          <CodeBlock
+            title="Base URL"
+            tabs={[{ label: "Base URL", code: `${base}/api` }]}
+          />
+          <p>
+            Requests and responses are JSON (UTF-8). IDs are opaque strings;
+            don&apos;t parse them. Timestamps are ISO 8601 in UTC. Durations are
+            whole seconds.
+          </p>
+        </DocSection>
 
-            <section className="space-y-12">
-               <h2 className="text-3xl font-black italic uppercase">Core Endpoints</h2>
-               
-               <div className="grid grid-cols-1 gap-6">
-                  {[
-                    { 
-                      name: "Get Track", 
-                      method: "GET", 
-                      path: "/api/tracks/{id}", 
-                      desc: "Get detailed information about a single track.",
-                      icon: Cpu 
-                    },
-                    { 
-                      name: "Search", 
-                      method: "GET", 
-                      path: "/api/search", 
-                      desc: "Search for tracks, albums, artists or playlists.",
-                      icon: Database 
-                    },
-                  ].map((ep) => (
-                    <div key={ep.name} className="p-10 rounded-[3rem] bg-neutral-900/40 border border-white/5 hover:border-indigo-500/20 transition-all group">
-                       <div className="flex items-center justify-between mb-6">
-                          <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                                <ep.icon className="w-6 h-6" />
-                             </div>
-                             <h3 className="text-2xl font-black uppercase italic tracking-tighter">{ep.name}</h3>
-                          </div>
-                          <Badge variant="GET">{ep.method}</Badge>
-                       </div>
-                       <p className="text-white/40 font-medium leading-relaxed mb-8">
-                          {ep.desc}
-                       </p>
-                       <div className="flex items-center gap-4">
-                          <code className="bg-black px-6 py-3 rounded-xl border border-white/5 text-emerald-400 font-mono text-sm flex-1">
-                             {ep.path}
-                          </code>
-                          <Button asChild size="sm" className="rounded-xl h-12 px-6 font-black italic uppercase tracking-widest bg-primary/20 text-primary hover:bg-primary/30 border-none">
-                             <Link href="/developers/playground">Try it <Play className="ml-2 w-4 h-4 fill-current" /></Link>
-                          </Button>
-                       </div>
-                    </div>
+        <DocSection id="pagination" title="Pagination">
+          <p>
+            List endpoints take <C>limit</C> and <C>offset</C>, and return the
+            page alongside <C>total</C> and, on most lists, <C>hasMore</C>.
+          </p>
+          <CodeBlock
+            title="Response"
+            tabs={[
+              {
+                label: "Response",
+                code: `{\n  "tracks": [ … ],\n  "total": 132,\n  "limit": 20,\n  "offset": 40,\n  "hasMore": true\n}`,
+              },
+            ]}
+          />
+          <CodeBlock
+            title="JavaScript"
+            tabs={[
+              {
+                label: "JavaScript",
+                code: `// Walk every page of liked songs\nlet offset = 0;\nconst all = [];\nwhile (true) {\n  const res = await fetch(\`${base}/api/user/liked-songs?limit=50&offset=\${offset}\`, {\n    headers: { Authorization: \`Bearer \${process.env.MUSICY_API_KEY}\` },\n  });\n  const page = await res.json();\n  all.push(...page.tracks);\n  if (!page.hasMore) break;\n  offset += page.limit;\n}`,
+              },
+            ]}
+          />
+          <p className="text-sm text-muted-foreground">
+            Search is paginated per type: each of <C>tracks</C>, <C>artists</C>,{" "}
+            <C>albums</C> and <C>playlists</C> carries its own <C>items</C>,{" "}
+            <C>total</C>, <C>limit</C> and <C>offset</C>.
+          </p>
+        </DocSection>
+
+        <DocSection id="errors" title="Errors">
+          <p>
+            Failures use standard HTTP status codes with a JSON body holding a
+            human-readable <C>message</C> (a few older endpoints use{" "}
+            <C>error</C>, so read both).
+          </p>
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border text-sm">
+            {[
+              [
+                "400",
+                "Bad request",
+                "A parameter is missing or invalid, or the action was already done (e.g. liking a liked song).",
+              ],
+              ["401", "Unauthorized", "No valid key or session."],
+              [
+                "403",
+                "Forbidden",
+                "You can't touch this resource, such as another listener's playlist.",
+              ],
+              [
+                "404",
+                "Not found",
+                "The ID doesn't exist or isn't visible to you.",
+              ],
+              [
+                "500",
+                "Server error",
+                "Something went wrong on our side. Retrying later is safe for GET requests.",
+              ],
+            ].map(([code, name, text]) => (
+              <div
+                key={code}
+                className="grid gap-1 px-4 py-3 sm:grid-cols-[4rem_8rem_minmax(0,1fr)] sm:gap-4"
+              >
+                <code className="font-mono font-semibold">{code}</code>
+                <span className="font-medium">{name}</span>
+                <span className="text-muted-foreground">{text}</span>
+              </div>
+            ))}
+          </div>
+        </DocSection>
+
+        <DocSection id="audio-quality" title="Audio quality">
+          <p>
+            Streaming and downloads take a <C>quality</C> parameter. Masters are
+            kept as uploaded; smaller tiers are transcoded in the background.
+          </p>
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border text-sm">
+            {[
+              ["lossless", "The original master, usually FLAC up to 24-bit."],
+              ["high", "MP3, 320 kbps."],
+              ["medium", "MP3, 192 kbps."],
+              ["low", "MP3, 128 kbps. Easy on mobile data."],
+              [
+                "auto",
+                "Same as high today. The default, and what unknown values fall back to.",
+              ],
+            ].map(([q, text]) => (
+              <div
+                key={q}
+                className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4"
+              >
+                <code className="font-mono font-semibold">{q}</code>
+                <span className="text-muted-foreground">{text}</span>
+              </div>
+            ))}
+          </div>
+        </DocSection>
+
+        <DocSection id="rate-limits" title="Rate limits">
+          <Callout title="No hard limit today">
+            There&apos;s currently no enforced rate limit, but keys are tied to
+            accounts and abuse gets keys revoked. Cache catalogue data you read
+            often, and back off when you see 5xx errors.
+          </Callout>
+        </DocSection>
+
+        <DocSection id="endpoints" title="All endpoints">
+          <div className="space-y-6">
+            {API_GROUPS.map((g) => (
+              <div key={g.slug}>
+                <Link
+                  href={`/developers/docs/api/${g.slug}`}
+                  className="font-semibold hover:underline underline-offset-4"
+                >
+                  {g.title}
+                </Link>
+                <ul className="mt-2 divide-y divide-border rounded-lg ring-1 ring-border">
+                  {g.endpoints.map((e) => (
+                    <li key={e.id}>
+                      <Link
+                        href={`/developers/docs/api/${g.slug}#${e.id}`}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-foreground/[0.04]"
+                      >
+                        <MethodBadge method={e.method} />
+                        <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
+                          {e.path}
+                        </code>
+                        <span className="hidden text-muted-foreground sm:block">
+                          {e.title}
+                        </span>
+                      </Link>
+                    </li>
                   ))}
-               </div>
-            </section>
-          </main>
-       </div>
-    </div>
-  )
-}
-
-function Badge({ children, variant }: any) {
-  return (
-    <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-      variant === 'GET' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-    }`}>
-      {children}
-    </div>
-  )
+                </ul>
+              </div>
+            ))}
+          </div>
+        </DocSection>
+      </div>
+    </DocsShell>
+  );
 }

@@ -1,63 +1,170 @@
-"use client"
+import Link from "next/link";
+import { CodeBlock } from "@/components/developers/code-block";
+import { DocsShell } from "@/components/developers/docs-shell";
+import {
+  AuthBadge,
+  C,
+  Callout,
+  DocHeader,
+  DocSection,
+} from "@/components/developers/docs-ui";
+import { getAppUrl } from "@/lib/seo";
 
-import { DocsSidebar } from "@/components/docs-sidebar"
-import { 
-  Shield, Key, Lock, CheckCircle2, 
-  Terminal, Copy, ExternalLink 
-} from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+export const metadata = { title: "Authentication · Musicy Developers" };
 
-export default function AuthDocs() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
+const TOC = [
+  { id: "api-keys", title: "API keys" },
+  { id: "sending-the-key", title: "Sending the key" },
+  { id: "access-levels", title: "Access levels" },
+  { id: "sign-in-for-apps", title: "Signing in from an app" },
+  { id: "errors", title: "Auth errors" },
+];
 
+export default function AuthenticationDocs() {
+  const base = getAppUrl();
   return (
-    <div className="container mx-auto px-6 py-20 pb-40">
-       <div className="grid grid-cols-1 lg:grid-cols-4 gap-16">
-          <DocsSidebar />
-          
-          <main className="lg:col-span-3 space-y-16 max-w-4xl">
-            <div className="space-y-4">
-               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Security & Access</div>
-               <h1 className="text-6xl font-black italic tracking-tighter uppercase">Authentication</h1>
-               <p className="text-2xl text-white/40 font-medium leading-relaxed">
-                  Secure your integrations using Musicy API Keys or industry-standard OAuth 2.0 flows.
-               </p>
-            </div>
+    <DocsShell toc={TOC}>
+      <DocHeader
+        eyebrow="Getting started"
+        title="Authentication"
+        lead="Musicy uses personal API keys. A key acts as your account, so treat it like a password."
+      />
 
-            <section className="space-y-8">
-               <h2 className="text-3xl font-black italic uppercase">1. API Keys</h2>
-               <p className="text-lg text-white/60 font-medium leading-relaxed">
-                  For server-side integrations or private scripts, API Keys are the quickest way to gain access. 
-                  You can generate multiple keys for different applications in your dashboard.
-               </p>
-               <div className="bg-neutral-900 border border-white/5 p-8 rounded-[2rem] space-y-6">
-                  <div className="flex items-center gap-3 text-sm font-black uppercase tracking-widest text-primary">
-                     <Key className="w-5 h-5" /> Usage
-                  </div>
-                  <div className="bg-black p-6 rounded-2xl border border-white/10 font-mono text-emerald-400 text-sm overflow-x-auto">
-                     Authorization: Bearer YOUR_API_KEY
-                  </div>
-               </div>
-            </section>
+      <div className="space-y-12">
+        <DocSection id="api-keys" title="API keys">
+          <p>
+            Create and revoke keys on the{" "}
+            <Link
+              href="/developers/dashboard"
+              className="text-primary hover:underline"
+            >
+              API keys
+            </Link>{" "}
+            page. Each key has a name so you can tell integrations apart, and
+            records when it was last used.
+          </p>
+          <Callout kind="warning" title="Keep keys on the server">
+            A key can read and change everything in your library. Don&apos;t
+            ship it in browser JavaScript or a public repository. If one leaks,
+            revoke it and create a new one.
+          </Callout>
+        </DocSection>
 
-            <section className="space-y-8">
-               <h2 className="text-3xl font-black italic uppercase">2. OAuth 2.0 (Coming Soon)</h2>
-               <p className="text-lg text-white/60 font-medium leading-relaxed">
-                  Empower your users to grant your application access to their Musicy library without sharing credentials. 
-                  We will support the standard Authorization Code flow.
-               </p>
-               <div className="p-8 rounded-[2rem] bg-indigo-500/5 border border-indigo-500/20 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                        <Lock className="w-6 h-6" />
-                     </div>
-                     <div className="font-bold italic uppercase tracking-tight">Enterprise Identity Support</div>
-                  </div>
-                  <Badge variant="outline" className="border-indigo-500/40 text-indigo-400 uppercase font-black text-[10px]">Development Phase</Badge>
-               </div>
-            </section>
-          </main>
-       </div>
-    </div>
-  )
+        <DocSection id="sending-the-key" title="Sending the key">
+          <p>
+            Send the key as a Bearer token in the <C>Authorization</C> header on
+            every request that needs one.
+          </p>
+          <CodeBlock
+            title="HTTP"
+            tabs={[
+              {
+                label: "HTTP",
+                code: `GET /api/user/liked-songs HTTP/1.1\nHost: ${base.replace(/^https?:\/\//, "")}\nAuthorization: Bearer 3f6c2e1a-…`,
+              },
+            ]}
+          />
+        </DocSection>
+
+        <DocSection id="access-levels" title="Access levels">
+          <p>
+            Each endpoint in the reference is tagged with one of three levels:
+          </p>
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border">
+            {(
+              [
+                [
+                  "none",
+                  "No credentials needed. Search, genres, album lists, lyrics and oEmbed.",
+                ],
+                [
+                  "optional",
+                  "Works without a key; with one you also get private or personal data (e.g. private playlists, follow status).",
+                ],
+                [
+                  "required",
+                  "Returns 401 without a key. Everything in the listener's library, and most catalogue reads.",
+                ],
+              ] as const
+            ).map(([auth, text]) => (
+              <div
+                key={auth}
+                className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
+              >
+                <div className="w-32 shrink-0">
+                  <AuthBadge auth={auth} />
+                </div>
+                <p className="text-sm text-muted-foreground">{text}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Requests from the Musicy web app itself use the browser session
+            cookie instead of a key; the endpoints are the same.
+          </p>
+        </DocSection>
+
+        <DocSection id="sign-in-for-apps" title="Signing in from an app">
+          <p>
+            Native apps that let a listener sign in with their Musicy email and
+            password can exchange them for a key. The key is named{" "}
+            <C>Mobile App</C> and reused on later sign-ins.
+          </p>
+          <CodeBlock
+            tabs={[
+              {
+                label: "cURL",
+                code: `curl -X POST "${base}/api/mobile/login" \\\n  -H "Content-Type: application/json" \\\n  -d '{"email":"alex@example.com","password":"…"}'`,
+              },
+            ]}
+          />
+          <CodeBlock
+            title="Response"
+            tabs={[
+              {
+                label: "Response",
+                code: `{\n  "message": "Login successful",\n  "apiKey": "3f6c2e1a-…",\n  "user": { "id": "cm4usr01", "email": "alex@example.com", "username": "alex" }\n}`,
+              },
+            ]}
+          />
+          <Callout title="Only for apps you ship to your own listeners">
+            Never ask people to type their Musicy password into a third-party
+            service. For your own integrations, use a key from the dashboard.
+          </Callout>
+        </DocSection>
+
+        <DocSection id="errors" title="Auth errors">
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border text-sm">
+            {[
+              [
+                "401",
+                "Missing, wrong or revoked key.",
+                `{ "message": "Unauthorized" }`,
+              ],
+              [
+                "403",
+                "The key is valid but you don't own the resource (e.g. someone else's playlist).",
+                `{ "message": "Access denied" }`,
+              ],
+            ].map(([code, text, body]) => (
+              <div
+                key={code}
+                className="grid gap-2 px-4 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_minmax(0,16rem)] sm:items-center"
+              >
+                <code className="font-mono font-semibold">{code}</code>
+                <p className="text-muted-foreground">{text}</p>
+                <code className="font-mono text-[12px] text-muted-foreground">
+                  {body}
+                </code>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            If an administrator turns off the developer API for the instance,
+            every key stops working (401) until it&apos;s turned back on.
+          </p>
+        </DocSection>
+      </div>
+    </DocsShell>
+  );
 }

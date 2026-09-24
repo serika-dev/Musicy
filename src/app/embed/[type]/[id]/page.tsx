@@ -10,6 +10,15 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { formatDuration } from "@/lib/utils"
 
+/**
+ * iFrame API (public/embed/iframe-api/v1.js): report to the embedding page.
+ * Only playback state is shared, so any parent origin may receive it.
+ */
+function postToParent(type: string, data?: Record<string, unknown>) {
+  if (typeof window === 'undefined' || window.parent === window) return
+  window.parent.postMessage({ source: 'musicy-embed', type, data }, '*')
+}
+
 export default function EmbedPage() {
   const params = useParams()
   const rawType = params.type as string
@@ -102,6 +111,46 @@ export default function EmbedPage() {
     }
   }, [data])
 
+  // Accept play / pause / toggle / seek from the embedding page. Only playback
+  // is exposed, so any parent origin may drive it.
+  useEffect(() => {
+    if (window.parent === window) return
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return
+      const msg = event.data as { source?: string; command?: string; value?: unknown; action?: string } | null
+      if (!msg) return
+      // v1 protocol, plus the legacy { action: 'PLAY' | 'PAUSE' | 'TOGGLE_PLAY' } shape
+      const command =
+        msg.source === 'musicy-iframe-api'
+          ? msg.command
+          : msg.action === 'PLAY' ? 'play' : msg.action === 'PAUSE' ? 'pause' : msg.action === 'TOGGLE_PLAY' ? 'toggle' : undefined
+      if (command === 'play') setIsPlaying(true)
+      else if (command === 'pause') setIsPlaying(false)
+      else if (command === 'toggle') setIsPlaying((p) => !p)
+      else if (command === 'seek' && audioRef.current) {
+        const t = Number(msg.value)
+        if (Number.isFinite(t)) audioRef.current.currentTime = Math.max(0, t)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  const hasData = !!data
+  useEffect(() => {
+    if (hasData) postToParent('ready', { type, id })
+  }, [hasData, type, id])
+
+  // Playback reports: on play/pause, and about four times a second while playing.
+  const lastReport = useRef(0)
+  const trackId = trackToPlay?.id ?? null
+  useEffect(() => {
+    const now = Date.now()
+    if (isPlaying && now - lastReport.current < 250) return
+    lastReport.current = now
+    postToParent('playback_update', { isPaused: !isPlaying, position: currentTime, duration, trackId })
+  }, [isPlaying, currentTime, duration, trackId])
+
   useEffect(() => {
     if (!audioRef.current) return
     if (isPlaying) {
@@ -120,9 +169,13 @@ export default function EmbedPage() {
 
   return (
     <div className="flex items-center h-screen bg-neutral-900 text-white p-4 overflow-hidden select-none">
-      <audio 
-        ref={audioRef} 
-        src={trackToPlay?.filePath || undefined} 
+      {/* Stream endpoint, not filePath: the raw path is hidden from signed-out
+          visitors (most people viewing an embed on another site), while the
+          stream route serves public tracks to guests. */}
+      <audio
+        ref={audioRef}
+        preload="none"
+        src={trackToPlay?.id ? `/api/tracks/${trackToPlay.id}/stream?quality=high` : undefined}
       />
       
       <div className="relative w-[120px] h-[120px] shrink-0 rounded-lg overflow-hidden shadow-2xl mr-4 group">

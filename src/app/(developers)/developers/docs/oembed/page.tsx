@@ -1,70 +1,145 @@
-"use client"
+import { CodeBlock } from "@/components/developers/code-block";
+import { DocsShell } from "@/components/developers/docs-shell";
+import {
+  C,
+  DocHeader,
+  DocSection,
+  ParamTable,
+} from "@/components/developers/docs-ui";
+import { getAppUrl } from "@/lib/seo";
 
-import { DocsSidebar } from "@/components/docs-sidebar"
-import { 
-  Globe, Info, CheckCircle2, 
-  Terminal, Copy, ExternalLink 
-} from "lucide-react"
-import { toast } from "sonner"
+export const metadata = { title: "oEmbed · Musicy Developers" };
+
+const TOC = [
+  { id: "endpoint", title: "Endpoint" },
+  { id: "response", title: "Response" },
+  { id: "discovery", title: "Discovery" },
+  { id: "errors", title: "Errors" },
+];
 
 export default function OEmbedDocs() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success("Snippet copied")
-  }
-
+  const base = getAppUrl();
   return (
-    <div className="container mx-auto px-6 py-20 pb-40">
-       <div className="grid grid-cols-1 lg:grid-cols-4 gap-16">
-          <DocsSidebar />
+    <DocsShell toc={TOC}>
+      <DocHeader
+        eyebrow="Embeds"
+        title="oEmbed"
+        lead={
+          <>
+            Turn any Musicy link into a playable preview. Musicy implements the{" "}
+            <a
+              href="https://oembed.com"
+              className="text-primary hover:underline"
+              rel="noreferrer"
+              target="_blank"
+            >
+              oEmbed
+            </a>{" "}
+            standard, so most chat apps, CMSs and forums pick it up
+            automatically.
+          </>
+        }
+      />
 
-          <main className="lg:col-span-3 space-y-16 max-w-4xl">
-            <div className="space-y-4">
-               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500">Discovery & Social</div>
-               <h1 className="text-6xl font-black italic tracking-tighter uppercase">oEmbed API</h1>
-               <p className="text-2xl text-white/40 font-medium leading-relaxed">
-                  Transform Musicy URLs into rich, interactive player embeds on any platform.
-               </p>
-            </div>
+      <div className="space-y-12">
+        <DocSection id="endpoint" title="Endpoint">
+          <CodeBlock
+            tabs={[
+              {
+                label: "cURL",
+                code: `curl "${base}/api/oembed?url=${encodeURIComponent(`${base}/tracks/cm4trk01`)}"`,
+              },
+            ]}
+          />
+          <ParamTable
+            title="Query parameters"
+            params={[
+              {
+                name: "url",
+                type: "string",
+                required: true,
+                description:
+                  "A Musicy link to a track, album, artist or playlist.",
+              },
+              {
+                name: "format",
+                type: "enum",
+                description: "json (default) or xml.",
+              },
+              {
+                name: "maxwidth",
+                type: "integer",
+                description: "Width in px, 200–1200. Default 456.",
+              },
+              {
+                name: "maxheight",
+                type: "integer",
+                description: "Height in px, 80–600. Default 152.",
+              },
+            ]}
+          />
+        </DocSection>
 
-            <section className="space-y-10">
-               <div className="bg-orange-500/5 border-l-4 border-orange-500 p-10 rounded-r-[2rem] space-y-4">
-                  <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-orange-500">
-                     <Info className="w-5 h-5" /> Standard Format
-                  </div>
-                  <h3 className="text-3xl font-black italic uppercase">Spotify-Compatible</h3>
-                  <p className="text-white/60 font-medium leading-relaxed text-lg">
-                     Our oEmbed endpoint follows the standard precisely, making it compatible with WordPress, Discord, 
-                     Slack, and any platform that supports link unfurling.
-                  </p>
-               </div>
+        <DocSection id="response" title="Response">
+          <CodeBlock
+            title="Response"
+            tabs={[
+              {
+                label: "JSON",
+                code: `{\n  "version": "1.0",\n  "type": "rich",\n  "provider_name": "Serika Music",\n  "provider_url": "${base}",\n  "cache_age": 3600,\n  "title": "Midnight Drive",\n  "author_name": "Luna Vale",\n  "thumbnail_url": "https://…/cover.jpg",\n  "thumbnail_width": 300,\n  "thumbnail_height": 300,\n  "width": 456,\n  "height": 152,\n  "html": "<iframe src=\\"${base}/embed/tracks/cm4trk01\\" …></iframe>"\n}`,
+              },
+            ]}
+          />
+          <p>
+            Put <C>html</C> into your page as-is. It&apos;s the same player
+            described in{" "}
+            <a
+              href="/developers/docs/iframe-sdk"
+              className="text-primary hover:underline"
+            >
+              Embed player & iFrame API
+            </a>
+            .
+          </p>
+        </DocSection>
 
-               <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                     <h4 className="text-sm font-black uppercase tracking-[0.3em] text-white/30">API Endpoint</h4>
-                     <button onClick={() => copyToClipboard(`${appUrl}/api/oembed?url=...`)} className="text-orange-500 font-black uppercase text-[10px] tracking-widest hover:underline flex items-center gap-2">
-                        <Copy className="w-3 h-3" /> Copy URL
-                     </button>
-                  </div>
-                  <div className="group bg-black p-8 rounded-[2rem] border border-white/10 font-mono text-lg text-emerald-400 overflow-x-auto relative">
-                     {appUrl}/api/oembed?url=RESOURCE_URL
-                  </div>
-               </div>
+        <DocSection id="discovery" title="Discovery">
+          <p>
+            Track, album, artist and playlist pages advertise their own oEmbed
+            URL in the document head, so consumers that support discovery find
+            it on their own:
+          </p>
+          <CodeBlock
+            title="HTML"
+            tabs={[
+              {
+                label: "HTML",
+                code: `<!-- on ${base}/tracks/cm4trk01 -->\n<link rel="alternate" type="application/json+oembed"\n      href="${base}/api/oembed?url=${encodeURIComponent(`${base}/tracks/cm4trk01`)}" />\n<link rel="alternate" type="text/xml+oembed"\n      href="${base}/api/oembed?url=${encodeURIComponent(`${base}/tracks/cm4trk01`)}&format=xml" />`,
+              },
+            ]}
+          />
+        </DocSection>
 
-               <div className="space-y-6">
-                  <h4 className="text-sm font-black uppercase tracking-[0.3em] text-white/30">HTML Discovery</h4>
-                  <p className="text-white/40 font-medium">Add this to your page &lt;head&gt; for automatic discovery:</p>
-                  <div className="relative group bg-neutral-900 p-8 rounded-[2rem] border border-white/5 font-mono text-sm leading-relaxed overflow-x-auto text-white/60">
-<pre>{`<link rel="alternate" type="application/json+oembed"
-      href="${appUrl}/api/oembed?url=${appUrl}/tracks/ABC"
-      title="Musicy oEmbed Preview" />`}</pre>
-                  </div>
-               </div>
-            </section>
-          </main>
-       </div>
-    </div>
-  )
+        <DocSection id="errors" title="Errors">
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border text-sm">
+            {[
+              [
+                "400",
+                "url is missing, isn't a Musicy link, or points at an unsupported page.",
+              ],
+              ["404", "The track, album, artist or playlist doesn't exist."],
+            ].map(([code, text]) => (
+              <div
+                key={code}
+                className="grid gap-1 px-4 py-3 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4"
+              >
+                <code className="font-mono font-semibold">{code}</code>
+                <span className="text-muted-foreground">{text}</span>
+              </div>
+            ))}
+          </div>
+        </DocSection>
+      </div>
+    </DocsShell>
+  );
 }

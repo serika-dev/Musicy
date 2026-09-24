@@ -1,71 +1,168 @@
-"use client"
+import { CodeBlock } from "@/components/developers/code-block";
+import { DocsShell } from "@/components/developers/docs-shell";
+import {
+  C,
+  Callout,
+  DocHeader,
+  DocSection,
+} from "@/components/developers/docs-ui";
+import { getAppUrl } from "@/lib/seo";
 
-import { DocsSidebar } from "@/components/docs-sidebar"
-import { 
-  Layers, Code, Smartphone, 
-  Monitor, Play, Pause, SkipForward,
-  Terminal, Copy, ExternalLink 
-} from "lucide-react"
+export const metadata = {
+  title: "Embed player & iFrame API · Musicy Developers",
+};
 
-export default function IFrameSdkDocs() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://musicy.app"
+const TOC = [
+  { id: "embed", title: "Embed a player" },
+  { id: "iframe-api", title: "iFrame API" },
+  { id: "controller", title: "Controller methods" },
+  { id: "events", title: "Events" },
+  { id: "uris", title: "URIs" },
+];
 
+const METHODS: [string, string][] = [
+  ["play()", "Start or resume playback."],
+  ["pause()", "Pause playback."],
+  ["togglePlay()", "Play if paused, pause if playing."],
+  ["seek(seconds)", "Jump to a position in the current track."],
+  ["loadUri(uri)", "Show something else in the same player."],
+  [
+    "on(event, fn)",
+    "Listen for an event. Returns a function that unsubscribes.",
+  ],
+  ["off(event, fn)", "Stop listening."],
+  ["destroy()", "Remove the iframe and all listeners."],
+];
+
+export default function IframeDocs() {
+  const base = getAppUrl();
   return (
-    <div className="container mx-auto px-6 py-20 pb-40">
-       <div className="grid grid-cols-1 lg:grid-cols-4 gap-16">
-          <DocsSidebar />
+    <DocsShell toc={TOC}>
+      <DocHeader
+        eyebrow="Embeds"
+        title="Embed player & iFrame API"
+        lead="Put a Musicy player on any web page with one iframe, then control it from your own JavaScript. No API key needed."
+      />
 
-          <main className="lg:col-span-3 space-y-16 max-w-4xl">
-            <div className="space-y-4">
-               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Frontend Integration</div>
-               <h1 className="text-6xl font-black italic tracking-tighter uppercase">iFrame SDK</h1>
-               <p className="text-2xl text-white/40 font-medium leading-relaxed">
-                  The Musicy iFrame API allows you to programmatically control playback and monitor state within your custom embeds.
-               </p>
+      <div className="space-y-12">
+        <DocSection id="embed" title="Embed a player">
+          <p>
+            Every track, album, artist and playlist has an embed at{" "}
+            <C>
+              /embed/{"{type}"}/{"{id}"}
+            </C>
+            . Public tracks play for anyone, signed in or not.
+          </p>
+          <CodeBlock
+            title="HTML"
+            tabs={[
+              {
+                label: "HTML",
+                code: `<iframe\n  src="${base}/embed/tracks/cm4trk01"\n  width="100%" height="152"\n  style="border:0;border-radius:12px"\n  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"\n  loading="lazy"\n></iframe>`,
+              },
+            ]}
+          />
+          <p className="text-sm text-muted-foreground">
+            Albums, artists and playlists play their first track. 152 px is the
+            compact height; the player fills the width you give it.
+          </p>
+        </DocSection>
+
+        <DocSection id="iframe-api" title="iFrame API">
+          <p>
+            Load the script, then create a controller. It replaces the element
+            you pass with a player and hands you an object to drive it.
+          </p>
+          <CodeBlock
+            title="HTML"
+            tabs={[
+              {
+                label: "HTML",
+                code: `<div id="player"></div>
+
+<script>
+  window.onMusicyIframeApiReady = (IFrameAPI) => {
+    const element = document.getElementById("player");
+    const options = { uri: "musicy:track:cm4trk01", height: 152 };
+
+    IFrameAPI.createController(element, options, (controller) => {
+      controller.on("ready", () => console.log("Player ready"));
+      controller.on("playback_update", (e) => {
+        console.log(e.data.isPaused, e.data.position, e.data.duration);
+      });
+      document.querySelector("#play").onclick = () => controller.togglePlay();
+    });
+  };
+</script>
+<script src="${base}/embed/iframe-api/v1.js" async></script>`,
+              },
+            ]}
+          />
+          <Callout kind="tip">
+            Define <C>onMusicyIframeApiReady</C> before the script loads.
+            Commands you send before the player is ready are queued and run as
+            soon as it is. The script also calls <C>onSpotifyIframeApiReady</C>{" "}
+            if that&apos;s what your page defines, so code written for
+            Spotify&apos;s embed API ports with a changed URI.
+          </Callout>
+        </DocSection>
+
+        <DocSection id="controller" title="Controller methods">
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border text-sm">
+            {METHODS.map(([m, d]) => (
+              <div
+                key={m}
+                className="grid gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4"
+              >
+                <code className="font-mono font-semibold">{m}</code>
+                <span className="text-muted-foreground">{d}</span>
+              </div>
+            ))}
+          </div>
+        </DocSection>
+
+        <DocSection id="events" title="Events">
+          <div className="divide-y divide-border rounded-lg ring-1 ring-border text-sm">
+            <div className="grid gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4">
+              <code className="font-mono font-semibold">ready</code>
+              <span className="text-muted-foreground">
+                The player has loaded its content and accepts commands.
+              </span>
             </div>
+            <div className="grid gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4">
+              <code className="font-mono font-semibold">playback_update</code>
+              <span className="text-muted-foreground">
+                On play, pause and about four times a second while playing.
+              </span>
+            </div>
+          </div>
+          <CodeBlock
+            title="playback_update"
+            tabs={[
+              {
+                label: "Event",
+                code: `{\n  "type": "playback_update",\n  "data": {\n    "isPaused": false,\n    "position": 42.7,   // seconds\n    "duration": 214,    // seconds\n    "trackId": "cm4trk01"\n  }\n}`,
+              },
+            ]}
+          />
+        </DocSection>
 
-            <section className="space-y-8">
-               <h2 className="text-3xl font-black italic uppercase">1. Initialization</h2>
-               <p className="text-lg text-white/60 font-medium leading-relaxed">
-                  Include our lightweight JavaScript controller to start communicating with the Musicy embed iframe.
-               </p>
-               <div className="bg-neutral-900 border border-white/5 p-8 rounded-[2rem] space-y-6">
-                  <div className="bg-black p-6 rounded-2xl border border-white/10 font-mono text-white/80 text-sm overflow-x-auto">
-                     <pre>{`<script src="${appUrl}/embed/iframe-api/v1.js"></script>`}</pre>
-                  </div>
-               </div>
-            </section>
-
-            <section className="space-y-8">
-               <h2 className="text-3xl font-black italic uppercase">2. Controller Instance</h2>
-               <div className="relative group bg-neutral-900 p-8 rounded-[2rem] border border-white/5 font-mono text-sm leading-relaxed overflow-x-auto text-emerald-400">
-<pre>{`const player = new Musicy.Player({
-  element: '#musicy-player',
-  width: '100%',
-  height: '380'
-});
-
-player.on('ready', () => {
-  console.log('Player initialized');
-  player.play();
-});`}</pre>
-               </div>
-            </section>
-
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               {[
-                 { name: "play()", icon: Play },
-                 { name: "pause()", icon: Pause },
-                 { name: "next()", icon: SkipForward },
-               ].map((method) => (
-                  <div key={method.name} className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col items-center gap-4 group hover:bg-primary/5 hover:border-primary/20 transition-all">
-                     <method.icon className="w-6 h-6 text-white/20 group-hover:text-primary transition-colors" />
-                     <span className="font-black italic uppercase text-xs tracking-tighter">{method.name}</span>
-                  </div>
-               ))}
-            </section>
-          </main>
-       </div>
-    </div>
-  )
+        <DocSection id="uris" title="URIs">
+          <p>
+            <C>uri</C> and <C>loadUri</C> take a Musicy URI or a normal Musicy
+            link:
+          </p>
+          <CodeBlock
+            title="Examples"
+            tabs={[
+              {
+                label: "Examples",
+                code: `musicy:track:cm4trk01\nmusicy:album:cm4alb01\nmusicy:artist:cm4art01\nmusicy:playlist:cm4pl01\n${base}/tracks/cm4trk01`,
+              },
+            ]}
+          />
+        </DocSection>
+      </div>
+    </DocsShell>
+  );
 }
