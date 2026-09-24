@@ -4,7 +4,7 @@ import { Loader2, Shield } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getProviders, signIn, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/ui/logo";
@@ -30,8 +30,9 @@ export function AuthCard({ initialMode }: { initialMode: Mode }) {
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
   const { status } = useSession();
 
+  const justRegistered = useRef(false);
   useEffect(() => {
-    if (status === "authenticated") router.replace(callbackUrl);
+    if (status === "authenticated" && !justRegistered.current) router.replace(callbackUrl);
   }, [status, router, callbackUrl]);
 
   useEffect(() => {
@@ -102,8 +103,22 @@ export function AuthCard({ initialMode }: { initialMode: Mode }) {
         body: JSON.stringify({ email, password, username, displayName }),
       });
       if (response.ok) {
-        switchMode("login");
-        setError("");
+        // Sign straight in and hand new listeners to onboarding, rather
+        // than making them type the same credentials again.
+        justRegistered.current = true;
+        const result = await signIn("credentials", {
+          email,
+          password,
+          redirect: false,
+        });
+        if (result?.error) {
+          justRegistered.current = false;
+          switchMode("login");
+          setError("");
+        } else {
+          router.push("/welcome");
+          router.refresh();
+        }
       } else {
         const data = await response.json();
         setError(data.message || "Registration failed");

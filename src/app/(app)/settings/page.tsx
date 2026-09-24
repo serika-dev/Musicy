@@ -18,6 +18,7 @@ import {
   Unlink,
   Crown,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -36,14 +37,27 @@ import { Label } from "@/components/ui/label";
 import { SaveButton } from "@/components/ui/save-button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { resetPreferences } from "@/lib/settings-defaults";
+import { cn } from "@/lib/utils";
 import { useMusicPlayer } from "@/contexts/music-player-context";
 import { useSaveState } from "@/hooks/useSaveState";
-import {
-  DEFAULT_SETTINGS,
-  type UserSettings,
-  useSettings,
-} from "@/hooks/useSettings";
+import { type UserSettings, useSettings } from "@/hooks/useSettings";
+
+const SECTIONS = [
+  { value: "audio", label: "Audio", icon: Music, description: "Streaming quality, volume and crossfade." },
+  { value: "playback", label: "Playback", icon: Play, description: "What happens between and after songs." },
+  { value: "taste", label: "Your taste", icon: Sparkles, description: "What your home and mixes are built around." },
+  { value: "lyrics", label: "Lyrics", icon: Languages, description: "Romanization for Japanese, Korean and Hindi lyrics." },
+  { value: "appearance", label: "Appearance", icon: Palette, description: "Theme, motion and density." },
+  { value: "notifications", label: "Notifications", icon: Bell, description: "What we tell you about, and when." },
+  { value: "devices", label: "Devices", icon: Radio, description: "Where you're signed in and playing." },
+  { value: "privacy", label: "Privacy", icon: Shield, description: "Listening history, scrobbling and your account." },
+  { value: "account", label: "Serika Account", icon: Link2, description: "Link your Serika Account for premium sync." },
+] as const;
+type SectionValue = (typeof SECTIONS)[number]["value"];
 
 function SegmentedControl<T extends string>({
   value,
@@ -222,6 +236,14 @@ function DevicesPanel() {
   );
 }
 
+// Settings values are primitives or string arrays.
+function sameValue(a: unknown, b: unknown) {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return a === b;
+}
+
 function SettingRow({
   icon,
   title,
@@ -261,6 +283,29 @@ export default function SettingsPage() {
   } = useSettings();
   const save = useSaveState();
 
+  const [section, setSectionState] = useState<SectionValue>("audio");
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("section");
+    if (q && SECTIONS.some((x) => x.value === q)) setSectionState(q as SectionValue);
+  }, []);
+  const setSection = useCallback((value: string) => {
+    setSectionState(value as SectionValue);
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", value);
+    window.history.replaceState(null, "", url);
+  }, []);
+
+  const genresQuery = useQuery<{ genres: { name: string; count: number }[] }>({
+    queryKey: ["onboarding", "genres"],
+    queryFn: async () => {
+      const r = await fetch("/api/genres");
+      if (!r.ok) throw new Error("Failed to load genres");
+      return r.json();
+    },
+    staleTime: 5 * 60_000,
+    enabled: section === "taste",
+  });
+
   // Settings are edited as a draft and committed explicitly, so the save
   // control has something meaningful to enable and disable against.
   const [draft, setDraft] = useState<UserSettings>(savedSettings);
@@ -282,9 +327,13 @@ export default function SettingsPage() {
   const changedKeys = useMemo(
     () =>
       (Object.keys(draft) as Array<keyof UserSettings>).filter(
-        (k) => draft[k] !== savedSettings[k],
+        (k) => !sameValue(draft[k], savedSettings[k]),
       ),
     [draft, savedSettings],
+  );
+  const defaults = useMemo(() => resetPreferences(draft), [draft]);
+  const atDefaults = (Object.keys(defaults) as Array<keyof UserSettings>).every((k) =>
+    sameValue(draft[k], defaults[k]),
   );
   const dirty = changedKeys.length > 0;
 
@@ -462,64 +511,144 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Settings</h1>
-            <p className="text-muted-foreground mt-1">
-              Changes apply once you save them.
+            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {SECTIONS.find((x) => x.value === section)?.description}
             </p>
           </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            onClick={() => setDraft(DEFAULT_SETTINGS)}
-            disabled={(
-              Object.keys(DEFAULT_SETTINGS) as Array<keyof UserSettings>
-            ).every((k) => draft[k] === DEFAULT_SETTINGS[k])}
+            onClick={() => setDraft(defaults)}
+            disabled={atDefaults}
+            className="rounded-full text-muted-foreground"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
             Restore defaults
           </Button>
         </div>
 
-        <Tabs defaultValue="lyrics" className="w-full">
-          <TabsList className="grid grid-cols-4 md:grid-cols-8 w-full">
-            <TabsTrigger value="lyrics">
-              <Languages className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Lyrics</span>
-            </TabsTrigger>
-            <TabsTrigger value="audio">
-              <Music className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Audio</span>
-            </TabsTrigger>
-            <TabsTrigger value="playback">
-              <Play className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Playback</span>
-            </TabsTrigger>
-            <TabsTrigger value="devices">
-              <Radio className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Devices</span>
-            </TabsTrigger>
-            <TabsTrigger value="appearance">
-              <Palette className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Appearance</span>
-            </TabsTrigger>
-            <TabsTrigger value="privacy">
-              <Shield className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Privacy</span>
-            </TabsTrigger>
-            <TabsTrigger value="account">
-              <Link2 className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Account</span>
-            </TabsTrigger>
-            <TabsTrigger value="notifications">
-              <Bell className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Notifications</span>
-            </TabsTrigger>
-          </TabsList>
+        <Tabs
+          value={section}
+          onValueChange={setSection}
+          className="w-full lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-start lg:gap-8"
+        >
+          <nav aria-label="Settings sections" className="-mx-4 lg:sticky lg:top-0 lg:mx-0">
+            <div className="flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar lg:hidden">
+              {SECTIONS.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className="chip"
+                  data-active={section === item.value}
+                  aria-current={section === item.value ? "page" : undefined}
+                  onClick={() => setSection(item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <ul className="hidden space-y-0.5 lg:block">
+              {SECTIONS.map((item) => {
+                const on = section === item.value;
+                return (
+                  <li key={item.value}>
+                    <button
+                      type="button"
+                      onClick={() => setSection(item.value)}
+                      aria-current={on ? "page" : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                        on ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:bg-panel-hover hover:text-foreground",
+                      )}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="min-w-0">
+          {/* YOUR TASTE */}
+          <TabsContent value="taste" className="mt-4 space-y-4 lg:mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>Favourite genres</CardTitle>
+                <CardDescription>
+                  Seeds recommendations and discovery until your likes and history
+                  take over. Pick as many as you like.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {genresQuery.isLoading &&
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <span key={i} className="h-9 w-24 animate-pulse rounded-full bg-secondary" />
+                    ))}
+                  {[
+                    ...new Set([
+                      ...(genresQuery.data?.genres.map((g) => g.name) ?? []),
+                      ...settings.favoriteGenres,
+                    ]),
+                  ].map((name) => {
+                    const on = settings.favoriteGenres.includes(name);
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          set({
+                            favoriteGenres: on
+                              ? settings.favoriteGenres.filter((g) => g !== name)
+                              : [...settings.favoriteGenres, name],
+                          })
+                        }
+                        className={cn(
+                          "inline-flex h-9 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition-colors",
+                          on
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border hover:border-foreground/40",
+                        )}
+                      >
+                        {on && <Check className="h-3.5 w-3.5" />}
+                        {name}
+                      </button>
+                    );
+                  })}
+                  {genresQuery.data?.genres.length === 0 && settings.favoriteGenres.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No genres in the catalogue yet.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-medium">Retune from scratch</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Run the welcome flow again to pick genres, artists to follow and
+                    your listening quality.
+                  </p>
+                </div>
+                <Button asChild variant="secondary" className="shrink-0 rounded-full">
+                  <Link href="/welcome">
+                    <Sparkles className="h-4 w-4" />
+                    Open welcome flow
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* LYRICS */}
-          <TabsContent value="lyrics" className="space-y-4 mt-6">
+          <TabsContent value="lyrics" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -618,7 +747,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* AUDIO */}
-          <TabsContent value="audio" className="space-y-4 mt-6">
+          <TabsContent value="audio" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle>Audio Quality</CardTitle>
@@ -702,7 +831,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* PLAYBACK */}
-          <TabsContent value="playback" className="space-y-4 mt-6">
+          <TabsContent value="playback" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle>Playback</CardTitle>
@@ -733,12 +862,12 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* DEVICES */}
-          <TabsContent value="devices" className="space-y-4 mt-6">
+          <TabsContent value="devices" className="mt-4 space-y-4 lg:mt-0">
             <DevicesPanel />
           </TabsContent>
 
           {/* APPEARANCE */}
-          <TabsContent value="appearance" className="space-y-4 mt-6">
+          <TabsContent value="appearance" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle>Appearance</CardTitle>
@@ -784,7 +913,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* PRIVACY */}
-          <TabsContent value="privacy" className="space-y-4 mt-6">
+          <TabsContent value="privacy" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle>Privacy & Security</CardTitle>
@@ -853,7 +982,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* SERIKA ACCOUNT */}
-          <TabsContent value="account" className="space-y-4 mt-6">
+          <TabsContent value="account" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -958,7 +1087,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* NOTIFICATIONS */}
-          <TabsContent value="notifications" className="space-y-4 mt-6">
+          <TabsContent value="notifications" className="mt-4 space-y-4 lg:mt-0">
             <Card>
               <CardHeader>
                 <CardTitle>Notifications</CardTitle>
@@ -1002,12 +1131,13 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          </div>
         </Tabs>
 
         {/* Save bar — only appears when there's something to act on, so it
             isn't sitting in the way the rest of the time. */}
         {(dirty || save.status !== "idle" || isSaving) && (
-          <div className="sticky bottom-0 z-30 -mx-4 px-4 pb-2 pt-3 bg-gradient-to-t from-background via-background to-transparent animate-in slide-in-from-bottom-3 fade-in duration-300">
+          <div className="sticky bottom-0 z-30 -mx-4 px-4 pb-2 pt-3 bg-gradient-to-t from-background via-background to-transparent lg:from-card lg:via-card animate-in slide-in-from-bottom-3 fade-in duration-300">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/90 backdrop-blur-xl px-4 py-3 shadow-lg">
               <p
                 className="text-xs text-muted-foreground min-w-0"

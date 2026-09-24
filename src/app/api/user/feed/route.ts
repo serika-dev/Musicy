@@ -38,12 +38,24 @@ export async function GET(request: NextRequest) {
       take: 100,
     })
 
+    // Genres picked during onboarding seed recommendations until real
+    // listening signals (likes, history) exist; they trail those signals.
+    const settingsRow = await prisma.userSettings.findUnique({
+      where: { userId },
+      select: { data: true },
+    })
+    const rawFavorites = (settingsRow?.data as { favoriteGenres?: unknown } | null)?.favoriteGenres
+    const favoriteGenres = Array.isArray(rawFavorites)
+      ? rawFavorites.filter((g): g is string => typeof g === "string")
+      : []
+
     const likedGenres = [
-      ...new Set(
-        likedTracks
+      ...new Set([
+        ...(likedTracks
           .map((l) => l.track.genre)
-          .filter(Boolean) as string[]
-      ),
+          .filter(Boolean) as string[]),
+        ...favoriteGenres,
+      ]),
     ]
     const likedArtistIds = [
       ...new Set(

@@ -130,6 +130,8 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
   --color-panel-hover: hsl(var(--panel-hover));
+  /* A block sitting on a page or panel; translucent so it reads on both. */
+  --color-raised: hsl(var(--foreground) / 0.045);
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --radius-sm: calc(var(--radius) - 4px);

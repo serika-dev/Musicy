@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
 import { SiteFooter } from "@/components/site-footer"
+import { OnboardingGate } from "@/components/onboarding-gate"
+import { AnnouncementBar } from "@/components/announcement-bar"
 import { useMusicPlayer } from "@/contexts/music-player-context"
 import { useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
@@ -67,6 +69,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
+      {session && <OnboardingGate enabled={publicSettings.ONBOARDING_ENABLED !== "false"} />}
       {!isAuthPage && <Header />}
 
       {/* Desktop: library panel + main panel side by side on a near-black
@@ -79,7 +82,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       >
         {/* overflow-hidden is a hard stop: nothing in the sidebar may bleed
             into the content column, whatever a child's CSS tries to do. */}
-        {showSidebar && (
+        {/* The admin console brings its own section nav, so it gets the width. */}
+        {showSidebar && !isAdminPage && (
           <aside className="hidden w-[18.5rem] min-w-0 shrink-0 overflow-hidden lg:flex xl:w-80">
             <Sidebar className="h-full min-w-0 w-full" />
           </aside>
@@ -103,7 +107,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           }}
         >
           <div className="flex min-h-full w-full flex-col">
-            <div className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8">{children}</div>
+            <div className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8">
+              {session && !isAdminPage && <AnnouncementBar text={publicSettings.ANNOUNCEMENT} />}
+              {children}
+            </div>
             {/* Footer handles its own route visibility checks */}
             {!isAuthPage && <SiteFooter />}
           </div>

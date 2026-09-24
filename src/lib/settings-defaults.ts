@@ -27,6 +27,11 @@ export interface UserSettings {
   // Privacy
   privateSession: boolean
   allowScrobbling: boolean
+
+  // Onboarding
+  onboardingCompleted: boolean
+  /** Genres picked during onboarding; seeds recommendations before any likes. */
+  favoriteGenres: string[]
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -51,8 +56,23 @@ export const DEFAULT_SETTINGS: UserSettings = {
 
   privateSession: false,
   allowScrobbling: true,
+
+  onboardingCompleted: false,
+  favoriteGenres: [],
 }
 
 export function mergeSettings(partial: Partial<UserSettings> | undefined | null): UserSettings {
   return { ...DEFAULT_SETTINGS, ...(partial ?? {}) }
+}
+
+/** Keys that record account state rather than preferences; "reset" keeps them. */
+export const ACCOUNT_STATE_KEYS = ["onboardingCompleted", "favoriteGenres"] as const
+
+/** Defaults for every preference, leaving account-state keys as they are. */
+export function resetPreferences(current: UserSettings): UserSettings {
+  const next = { ...DEFAULT_SETTINGS }
+  for (const k of ACCOUNT_STATE_KEYS) {
+    ;(next as Record<string, unknown>)[k] = current[k]
+  }
+  return next
 }

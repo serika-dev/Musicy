@@ -15,19 +15,14 @@ import {
   FileMusic,
   FileText,
   Globe,
-  HardDrive,
   Layers,
-  Lock,
   Music,
   Plus,
-  Radio,
   RefreshCw,
   Search,
   Settings,
   Shield,
-  Sparkles,
   Trash2,
-  Unlock,
   Upload,
   User as UserIcon,
   Users,
@@ -35,7 +30,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ImageCropModal } from "@/components/image-crop-modal";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -68,7 +63,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { AdminOverview } from "@/components/admin/admin-overview";
+import { AdminSettings } from "@/components/admin/admin-settings";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAdminAlbums,
@@ -84,19 +81,19 @@ import {
   useUpdateUserRole,
 } from "@/hooks/useAdminData";
 import { useProfile } from "@/hooks/useProfile";
-import { cn, formatDuration, formatFileSize } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
 
 const ITEMS_PER_PAGE = 25;
 
 // Avatar helper for generating colorful fallback backgrounds based on user ID or string
 function getAvatarGradient(str: string = "") {
   const gradients = [
-    "from-purple-600 to-indigo-700",
+    "from-primary to-indigo-700",
     "from-pink-600 to-rose-700",
     "from-cyan-600 to-blue-700",
     "from-amber-600 to-orange-700",
     "from-emerald-600 to-teal-700",
-    "from-fuchsia-600 to-purple-700",
+    "from-fuchsia-600 to-violet-700",
   ];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -118,13 +115,13 @@ function AdminSearchInput({
 }) {
   return (
     <div className="relative flex-1 max-w-md">
-      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none z-10" />
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
       <Input
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         style={{ paddingLeft: "2.75rem" }}
-        className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-400 focus:border-purple-500 font-medium h-10 shadow-sm"
+        className="bg-card border-border text-white placeholder:text-muted-foreground focus:border-primary font-medium h-10 shadow-sm"
       />
     </div>
   );
@@ -203,8 +200,8 @@ function ImageUrlOrUploadField({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-bold text-zinc-200">{label}</Label>
-        <label className="text-[11px] text-purple-400 hover:text-purple-300 font-bold cursor-pointer flex items-center gap-1 transition-colors">
+        <Label className="text-xs font-bold text-foreground/90">{label}</Label>
+        <label className="text-[11px] text-primary hover:text-primary/80 font-bold cursor-pointer flex items-center gap-1 transition-colors">
           <Upload className="w-3 h-3" />
           {isUploading ? "Uploading..." : "Upload & Crop File"}
           <input
@@ -220,7 +217,7 @@ function ImageUrlOrUploadField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="bg-zinc-950 border-zinc-700 text-xs text-white placeholder:text-zinc-500 font-medium"
+        className="bg-background/60 border-border text-xs text-white placeholder:text-muted-foreground/80 font-medium"
       />
       <ImageCropModal
         open={showCropModal}
@@ -254,8 +251,8 @@ function PaginationControls({
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-zinc-800 text-xs text-zinc-300 bg-zinc-950">
-      <div className="font-semibold text-zinc-300">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border text-xs text-foreground/80 bg-background/60">
+      <div className="font-semibold text-foreground/80">
         Showing <span className="font-bold text-white">{startItem}</span> - <span className="font-bold text-white">{endItem}</span> of{" "}
         <span className="font-bold text-white">{totalItems}</span> items (25 per page)
       </div>
@@ -265,15 +262,15 @@ function PaginationControls({
           size="sm"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="h-8 border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs gap-1 text-white font-medium"
+          className="h-8 border-border bg-card hover:bg-accent text-xs gap-1 text-white font-medium"
         >
           <ChevronLeft className="w-3.5 h-3.5" /> Previous
         </Button>
 
         <div className="flex items-center gap-1 font-bold text-white px-2">
-          <span className="text-zinc-400">Page</span>
-          <span className="px-2.5 py-0.5 rounded bg-purple-600/40 text-purple-200 border border-purple-500/40 font-mono text-xs">{currentPage}</span>
-          <span className="text-zinc-400">of {totalPages}</span>
+          <span className="text-muted-foreground">Page</span>
+          <span className="px-2.5 py-0.5 rounded bg-primary/30 text-primary border border-primary/40 font-mono text-xs">{currentPage}</span>
+          <span className="text-muted-foreground">of {totalPages}</span>
         </div>
 
         <Button
@@ -281,7 +278,7 @@ function PaginationControls({
           size="sm"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="h-8 border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-xs gap-1 text-white font-medium"
+          className="h-8 border-border bg-card hover:bg-accent text-xs gap-1 text-white font-medium"
         >
           Next <ChevronRight className="w-3.5 h-3.5" />
         </Button>
@@ -294,7 +291,20 @@ export default function AdminPage() {
   const { data: session, status } = useSession();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTabState] = useState("overview");
+  // Keep the section in the URL so refresh / back / shared links land on it.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t) setActiveTabState(t);
+  }, []);
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === "overview") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url);
+    document.querySelector("main")?.scrollTo({ top: 0 });
+  }, []);
 
   // Search states
   const [searchUsers, setSearchUsers] = useState("");
@@ -691,7 +701,7 @@ export default function AdminPage() {
       });
 
       if (response.ok) {
-        toast.success(`System setting updated!`);
+        toast.success("Setting saved");
         setSystemSettings((prev) => ({ ...prev, [key]: value }));
       } else {
         toast.error("Failed to update system setting");
@@ -1452,8 +1462,8 @@ export default function AdminPage() {
   if (status === "loading" || profileLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[500px] gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-        <p className="text-sm font-medium text-zinc-400 animate-pulse">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-sm font-medium text-muted-foreground animate-pulse">
           Verifying administrator permissions...
         </p>
       </div>
@@ -1463,11 +1473,11 @@ export default function AdminPage() {
   if (!session || !profile || profile.role !== "ADMIN") {
     return (
       <EmptyState
-        icon={<Crown className="h-10 w-10 text-purple-400" />}
+        icon={<Crown className="h-10 w-10 text-primary" />}
         title="Access Restricted"
         description="The admin panel is reserved exclusively for system administrators."
         action={
-          <Button onClick={() => router.push("/")} className="bg-purple-600 hover:bg-purple-500 text-white font-semibold">
+          <Button onClick={() => router.push("/")} className="bg-primary hover:bg-primary/90 text-white font-semibold">
             Return to Music Player
           </Button>
         }
@@ -1475,252 +1485,165 @@ export default function AdminPage() {
     );
   }
 
+  const navGroups: {
+    label: string;
+    items: { value: string; label: string; icon: typeof Layers; count?: number; description: string }[];
+  }[] = [
+    {
+      label: "",
+      items: [
+        { value: "overview", label: "Overview", icon: Layers, description: "Listening, growth and system health at a glance." },
+      ],
+    },
+    {
+      label: "Catalogue",
+      items: [
+        { value: "tracks", label: "Tracks", icon: Music, count: tracksData?.total, description: "Edit metadata, lyrics and visibility, and merge duplicates." },
+        { value: "albums", label: "Albums", icon: AlbumIcon, count: albumsData?.total, description: "Releases, artwork and track order." },
+        { value: "artists", label: "Artists", icon: UserIcon, count: artistsData?.total, description: "Profiles, verification and duplicate merging." },
+        { value: "collabs", label: "Collabs", icon: Users, count: collabsData?.total, description: "Group acts and the members they credit." },
+      ],
+    },
+    {
+      label: "Ingest",
+      items: [
+        { value: "upload", label: "Upload", icon: Upload, description: "Add new music. Tags are read from the file automatically." },
+        { value: "renditions", label: "Renditions", icon: FileMusic, description: "Streaming quality tiers transcoded from each master." },
+      ],
+    },
+    {
+      label: "Platform",
+      items: [
+        { value: "users", label: "Users", icon: Users, count: usersData?.total, description: "Accounts, roles and premium status." },
+        { value: "settings", label: "Settings", icon: Settings, description: "Registration, maintenance, branding and defaults." },
+      ],
+    },
+  ];
+  const allNavItems = navGroups.flatMap((g) => g.items);
+  const currentSection = allNavItems.find((i) => i.value === activeTab) ?? allNavItems[0];
+
   return (
-    <div className="w-full space-y-6 pb-20 text-white">
-      {/* Sleek Solid Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
-              Admin Portal
-            </h1>
-            <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-              <Shield className="w-3 h-3 mr-1 text-purple-400" />
-              Live Console
-            </Badge>
-          </div>
-          <p className="text-sm text-zinc-400 font-medium">
-            Manage users, catalog, high-fidelity music storage, and system settings
+    <div className="w-full pb-20">
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+            <Shield className="h-3.5 w-3.5" /> Admin
           </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">{currentSection.label}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{currentSection.description}</p>
         </div>
-
-        {/* Quick System Indicators & Action Shortcuts */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden md:flex items-center gap-2 rounded-xl bg-zinc-900 border border-zinc-700 px-3.5 py-2 text-xs font-semibold text-zinc-300">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            R2 Cloud Storage: <span className="text-emerald-400 font-bold">Connected</span>
-          </div>
-
-          <Button
-            size="sm"
-            onClick={() => setActiveTab("upload")}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/30 transition-all gap-1.5 h-9 px-4"
-          >
-            <Plus className="w-4 h-4" />
-            Upload Music
-          </Button>
-        </div>
+        <Button
+          onClick={() => setActiveTab("upload")}
+          className="h-10 shrink-0 rounded-full px-5 font-semibold hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" />
+          Upload music
+        </Button>
       </div>
 
-      {/* Tabs Bar */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="overflow-x-auto pb-1 scrollbar-none">
-          <TabsList className="inline-flex h-12 items-center justify-start rounded-xl bg-zinc-900 border border-zinc-800 p-1.5 shadow-md">
-            {[
-              { value: "overview", label: "Overview", icon: Layers },
-              { value: "users", label: "Users", icon: Users, badge: usersData?.total },
-              { value: "tracks", label: "Tracks", icon: Music, badge: tracksData?.total },
-              { value: "artists", label: "Artists", icon: UserIcon, badge: artistsData?.total },
-              { value: "collabs", label: "Collabs", icon: Users, badge: collabsData?.total },
-              { value: "albums", label: "Albums", icon: AlbumIcon, badge: albumsData?.total },
-              { value: "upload", label: "Upload", icon: Upload },
-              { value: "renditions", label: "Renditions", icon: FileMusic },
-              { value: "settings", label: "Settings", icon: Settings },
-            ].map(({ value, label, icon: Icon, badge }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs lg:text-sm font-bold transition-all text-zinc-400 data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-8"
+      >
+        {/* Section nav: grouped list on desktop, scrolling chips on phones */}
+        <nav aria-label="Admin sections" className="-mx-4 mb-6 lg:sticky lg:top-0 lg:mx-0 lg:mb-0">
+          <div className="flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar lg:hidden">
+            {allNavItems.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                className="chip"
+                data-active={activeTab === item.value}
+                aria-current={activeTab === item.value ? "page" : undefined}
+                onClick={() => setActiveTab(item.value)}
               >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-                {badge !== undefined && (
-                  <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-extrabold text-white">
-                    {badge}
-                  </span>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
-
-        {/* 📊 OVERVIEW TAB */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              {
-                title: "Total Registered Users",
-                value: usersData?.total || 0,
-                desc: `${usersData?.users?.filter((u: any) => u.isPremium).length || 0} Premium Subscribers`,
-                icon: Users,
-                color: "bg-gradient-to-br from-blue-950/80 via-zinc-900 to-zinc-900 border-blue-600/40 text-blue-400",
-              },
-              {
-                title: "Catalog Music Tracks",
-                value: tracksData?.total || 0,
-                desc: `${tracksData?.tracks?.filter((t: any) => t.isPublic).length || 0} Publicly Streamable`,
-                icon: Music,
-                color: "bg-gradient-to-br from-purple-950/80 via-zinc-900 to-zinc-900 border-purple-600/40 text-purple-400",
-              },
-              {
-                title: "Verified Artists",
-                value: artistsData?.total || 0,
-                desc: `${artistsData?.artists?.filter((a: any) => a.verified).length || 0} Verified Profiles`,
-                icon: Shield,
-                color: "bg-gradient-to-br from-amber-950/80 via-zinc-900 to-zinc-900 border-amber-600/40 text-amber-400",
-              },
-              {
-                title: "Discography Albums",
-                value: albumsData?.total || 0,
-                desc: `${albumsData?.albums?.length || 0} Published Albums`,
-                icon: AlbumIcon,
-                color: "bg-gradient-to-br from-emerald-950/80 via-zinc-900 to-zinc-900 border-emerald-600/40 text-emerald-400",
-              },
-            ].map((stat, i) => (
-              <Card key={i} className={`${stat.color} border shadow-lg relative overflow-hidden`}>
-                <CardContent className="p-5 flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">{stat.title}</p>
-                    <p className="text-3xl font-black tracking-tight text-white">{stat.value}</p>
-                    <p className="text-xs text-zinc-300 font-semibold">{stat.desc}</p>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-zinc-950 border border-zinc-700 shrink-0 shadow-md">
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                </CardContent>
-              </Card>
+                {item.label}
+              </button>
             ))}
           </div>
-
-          {/* Activity / Quick Overview Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Users List */}
-            <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
-              <CardHeader className="flex flex-row items-center justify-between border-b border-zinc-800 pb-4">
-                <div>
-                  <CardTitle className="text-lg font-extrabold text-white">Recent Registrations</CardTitle>
-                  <CardDescription className="text-zinc-400 text-xs">Latest platform users</CardDescription>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => setActiveTab("users")} className="text-xs text-purple-400 hover:text-purple-300 font-bold">
-                  View All →
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-4">
-                {usersData?.users?.slice(0, 5).map((user: any) => (
-                  <div key={user.id} className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-all">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border border-zinc-700 shrink-0">
-                        <AvatarImage src={user.avatarUrl} alt={user.displayName || user.email} />
-                        <AvatarFallback className={`bg-gradient-to-br ${getAvatarGradient(user.id)} text-white font-bold text-xs`}>
-                          {(user.displayName?.charAt(0) || user.email.charAt(0)).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-white">{user.displayName || user.username || "User"}</span>
-                          {user.role === "ADMIN" && (
-                            <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-[10px] px-1.5 py-0 font-bold">ADMIN</Badge>
-                          )}
-                          {user.isPremium && (
-                            <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] px-1.5 py-0 flex items-center gap-1 font-bold">
-                              <Crown className="w-2.5 h-2.5" /> PRO
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-zinc-400 font-medium">{user.email}</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => handleEditUserClick(user)} className="h-8 text-xs border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold">
-                      Manage
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Storage & Environment Health */}
-            <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
-              <CardHeader className="border-b border-zinc-800 pb-4">
-                <CardTitle className="text-lg font-extrabold text-white flex items-center gap-2">
-                  <HardDrive className="w-5 h-5 text-purple-400" />
-                  System & Storage Status
-                </CardTitle>
-                <CardDescription className="text-zinc-400 text-xs">Infrastructure and cloud health metrics</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <div className="p-4 rounded-xl bg-zinc-950 border border-purple-500/30 space-y-2">
-                  <div className="flex items-center justify-between text-sm font-bold text-purple-300">
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-purple-400" />
-                      Cloudflare R2 Bucket Engine
-                    </span>
-                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold">ACTIVE</Badge>
-                  </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed font-medium">
-                    High-performance audio streaming bucket configured for zero egress costs. Supports FLAC 24-bit/96kHz lossless audio playback.
+          <div className="hidden space-y-5 lg:block">
+            {navGroups.map((group) => (
+              <div key={group.label || "top"}>
+                {group.label && (
+                  <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {group.label}
                   </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-400 block mb-1 font-semibold">Database Provider</span>
-                    <span className="font-bold text-white">Prisma / PostgreSQL</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-400 block mb-1 font-semibold">Authentication Mode</span>
-                    <span className="font-bold text-white">NextAuth.js (JWT)</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-400 block mb-1 font-semibold">Lyrics API Engine</span>
-                    <span className="font-bold text-white">LRCLib Integration</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <span className="text-zinc-400 block mb-1 font-semibold">Audio Transcoder</span>
-                    <span className="font-bold text-white">music-metadata ID3</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+                <ul className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const on = activeTab === item.value;
+                    return (
+                      <li key={item.value}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab(item.value)}
+                          aria-current={on ? "page" : undefined}
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                            on ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:bg-panel-hover hover:text-foreground",
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 text-left">{item.label}</span>
+                          {item.count !== undefined && (
+                            <span className="text-xs tabular-nums text-muted-foreground">{item.count.toLocaleString("en")}</span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </div>
+        </nav>
+
+        <div className="min-w-0">
+        {/* OVERVIEW */}
+        <TabsContent value="overview" className="mt-0">
+          <AdminOverview
+            recentUsers={usersData?.users ?? []}
+            onNavigate={setActiveTab}
+            onEditUser={handleEditUserClick}
+          />
         </TabsContent>
 
         {/* 🎵 RENDITIONS TAB */}
-        <TabsContent value="renditions" className="space-y-6">
+        <TabsContent value="renditions" className="mt-0 space-y-6">
           {/* Stats + Actions */}
-          <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
-            <CardHeader className="border-b border-zinc-800 pb-4">
-              <CardTitle className="text-lg font-extrabold text-white flex items-center gap-2">
-                <FileMusic className="w-5 h-5 text-purple-400" />
+          <Card className="bg-raised border-0 shadow-none">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                <FileMusic className="w-5 h-5 text-primary" />
                 Multi-Quality Audio Renditions
               </CardTitle>
-              <CardDescription className="text-zinc-400 text-xs">Transcoded streaming tiers (lossless FLAC + 320/192/128 kbps MP3)</CardDescription>
+              <CardDescription className="text-muted-foreground text-xs">Transcoded streaming tiers (lossless FLAC + 320/192/128 kbps MP3)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
               {renditionStats ? (
                 <>
                   {/* Coverage stats grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30">
-                      <span className="text-zinc-400 block mb-1 font-semibold">Ready</span>
+                    <div className="p-3 rounded-xl bg-background/60 border border-emerald-500/30">
+                      <span className="text-muted-foreground block mb-1 font-semibold">Ready</span>
                       <span className="font-bold text-emerald-400 text-lg">{renditionStats.coverage?.ready ?? 0}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-amber-500/30">
-                      <span className="text-zinc-400 block mb-1 font-semibold">Processing</span>
+                    <div className="p-3 rounded-xl bg-background/60 border border-amber-500/30">
+                      <span className="text-muted-foreground block mb-1 font-semibold">Processing</span>
                       <span className="font-bold text-amber-400 text-lg">{renditionStats.coverage?.processing ?? 0}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-blue-500/30">
-                      <span className="text-zinc-400 block mb-1 font-semibold">Pending</span>
+                    <div className="p-3 rounded-xl bg-background/60 border border-blue-500/30">
+                      <span className="text-muted-foreground block mb-1 font-semibold">Pending</span>
                       <span className="font-bold text-blue-400 text-lg">{renditionStats.coverage?.pending ?? 0}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-rose-500/30">
-                      <span className="text-zinc-400 block mb-1 font-semibold">Failed</span>
+                    <div className="p-3 rounded-xl bg-background/60 border border-rose-500/30">
+                      <span className="text-muted-foreground block mb-1 font-semibold">Failed</span>
                       <span className="font-bold text-rose-400 text-lg">{renditionStats.coverage?.failed ?? 0}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-700">
-                      <span className="text-zinc-400 block mb-1 font-semibold">No Renditions</span>
+                    <div className="p-3 rounded-xl bg-background/60 border border-border">
+                      <span className="text-muted-foreground block mb-1 font-semibold">No Renditions</span>
                       <span className="font-bold text-white text-lg">{renditionStats.coverage?.none ?? 0}</span>
                     </div>
                   </div>
@@ -1738,19 +1661,19 @@ export default function AdminPage() {
                     return (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-zinc-300">
+                          <span className="font-semibold text-foreground/80">
                             {active > 0 ? `Processing… ${done}/${total} done` : `Complete: ${ready}/${total} ready`}
                           </span>
                           <span className="font-bold text-white">{pct}%</span>
                         </div>
-                        <div className="h-3 rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
+                        <div className="h-3 rounded-full bg-background/60 border border-border overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-500"
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-violet-400 transition-all duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
                         {active > 0 && (
-                          <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                          <p className="text-xs text-muted-foreground/80 flex items-center gap-1.5">
                             <RefreshCw className="w-3 h-3 animate-spin" />
                             Auto-refreshing every 3s while tracks are being processed…
                           </p>
@@ -1760,8 +1683,8 @@ export default function AdminPage() {
                   })()}
 
                   {/* Summary row */}
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                    <div className="text-xs text-zinc-400">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-background/60 border border-border">
+                    <div className="text-xs text-muted-foreground">
                       <span className="font-semibold">Total tracks:</span> <span className="font-bold text-white">{renditionStats.total}</span>
                       <span className="mx-2">·</span>
                       <span className="font-semibold">Renditions:</span> <span className="font-bold text-white">{renditionStats.totalRenditions}</span>
@@ -1769,7 +1692,7 @@ export default function AdminPage() {
                     {renditionStats.byQuality && Object.keys(renditionStats.byQuality).length > 0 && (
                       <div className="flex gap-2">
                         {Object.entries(renditionStats.byQuality).map(([q, n]) => (
-                          <Badge key={q} className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold">{q}: {n as number}</Badge>
+                          <Badge key={q} className="bg-primary/15 text-primary border-primary/40 text-[10px] font-bold">{q}: {n as number}</Badge>
                         ))}
                       </div>
                     )}
@@ -1799,7 +1722,7 @@ export default function AdminPage() {
                           setBackfillRunning(false);
                         }
                       }}
-                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-1.5"
+                      className="bg-primary hover:bg-primary/90 text-white font-bold gap-1.5"
                     >
                       {backfillRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                       Backfill Missing
@@ -1826,7 +1749,7 @@ export default function AdminPage() {
                           setBackfillRunning(false);
                         }
                       }}
-                      className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-1.5"
+                      className="border-border bg-card hover:bg-accent text-white font-semibold gap-1.5"
                     >
                       <RefreshCw className="w-4 h-4" />
                       Regenerate All
@@ -1843,7 +1766,7 @@ export default function AdminPage() {
                           setRenditionLoading(false);
                         }
                       }}
-                      className="text-zinc-400 hover:text-white font-semibold gap-1.5"
+                      className="text-muted-foreground hover:text-white font-semibold gap-1.5"
                     >
                       <RefreshCw className={`w-4 h-4 ${renditionLoading ? "animate-spin" : ""}`} />
                       Refresh
@@ -1851,33 +1774,33 @@ export default function AdminPage() {
                   </div>
                 </>
               ) : (
-                <div className="text-xs text-zinc-500 py-2">Loading rendition stats…</div>
+                <div className="text-xs text-muted-foreground/80 py-2">Loading rendition stats…</div>
               )}
             </CardContent>
           </Card>
 
           {/* What are renditions? Info card */}
-          <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
-            <CardHeader className="border-b border-zinc-800 pb-4">
-              <CardTitle className="text-base font-extrabold text-white">How it works</CardTitle>
+          <Card className="bg-raised border-0 shadow-none">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-base font-semibold text-white">How it works</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 pt-4 text-xs text-zinc-400 leading-relaxed">
+            <CardContent className="space-y-3 pt-4 text-xs text-muted-foreground leading-relaxed">
               <p>Each track is transcoded into multiple quality tiers on upload using <span className="font-bold text-white">ffmpeg</span>:</p>
               <ul className="space-y-1.5 ml-4">
-                <li className="flex items-center gap-2"><Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold">lossless</Badge> FLAC — bit-for-bit identical to source</li>
+                <li className="flex items-center gap-2"><Badge className="bg-primary/15 text-primary border-primary/40 text-[10px] font-bold">lossless</Badge> FLAC — bit-for-bit identical to source</li>
                 <li className="flex items-center gap-2"><Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[10px] font-bold">high</Badge> MP3 320 kbps</li>
                 <li className="flex items-center gap-2"><Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] font-bold">medium</Badge> MP3 192 kbps</li>
-                <li className="flex items-center gap-2"><Badge className="bg-zinc-500/20 text-zinc-300 border-zinc-500/40 text-[10px] font-bold">low</Badge> MP3 128 kbps</li>
+                <li className="flex items-center gap-2"><Badge className="bg-secondary text-foreground/80 border-border text-[10px] font-bold">low</Badge> MP3 128 kbps</li>
               </ul>
-              <p className="pt-1">Mobile clients pick a tier via the <code className="text-purple-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[11px]">audioQuality</code> setting and stream through <code className="text-purple-300 bg-zinc-950 px-1.5 py-0.5 rounded text-[11px]">/api/tracks/&#123;id&#125;/stream?quality=</code>, which 302-redirects to the matching rendition (falling back to the original when none exists).</p>
+              <p className="pt-1">Mobile clients pick a tier via the <code className="text-primary bg-background/60 px-1.5 py-0.5 rounded text-[11px]">audioQuality</code> setting and stream through <code className="text-primary bg-background/60 px-1.5 py-0.5 rounded text-[11px]">/api/tracks/&#123;id&#125;/stream?quality=</code>, which 302-redirects to the matching rendition (falling back to the original when none exists).</p>
               <p className="pt-1"><span className="font-bold text-amber-400">Backfill Missing</span> generates renditions for tracks with no, failed, or pending status. <span className="font-bold text-white">Regenerate All</span> force-regenerates every track, even those already marked ready.</p>
-              <p className="pt-1 text-zinc-500">Processing runs sequentially in the background via Next.js <code className="text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded text-[11px]">after()</code>. The progress bar auto-refreshes every 3 seconds while tracks are being processed.</p>
+              <p className="pt-1 text-muted-foreground/80">Processing runs sequentially in the background via Next.js <code className="text-muted-foreground bg-background/60 px-1.5 py-0.5 rounded text-[11px]">after()</code>. The progress bar auto-refreshes every 3 seconds while tracks are being processed.</p>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* 👥 USERS MANAGEMENT TAB (25 per page) */}
-        <TabsContent value="users" className="space-y-6">
+        <TabsContent value="users" className="mt-0 space-y-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <AdminSearchInput
               value={searchUsers}
@@ -1887,31 +1810,31 @@ export default function AdminPage() {
               }}
               placeholder="Search users by name or email..."
             />
-            <Button variant="outline" size="sm" onClick={() => refetchUsers()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
+            <Button variant="outline" size="sm" onClick={() => refetchUsers()} className="border-border bg-card hover:bg-accent text-white font-semibold gap-2 shrink-0 h-10 px-4">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh List
             </Button>
           </div>
 
-          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
+          <Card className="bg-card border-border overflow-hidden shadow-xl">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-zinc-950">
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="font-bold text-zinc-200">User Profile</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Role</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Subscription</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Playlists</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Joined</TableHead>
-                    <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
+                <TableHeader className="bg-background/60">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-bold text-foreground/90">User Profile</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Role</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Subscription</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Playlists</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Joined</TableHead>
+                    <TableHead className="font-bold text-foreground/90 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {usersData?.users?.map((user: any) => (
-                    <TableRow key={user.id} className="border-zinc-800/80 hover:bg-zinc-800/50 transition-colors">
+                    <TableRow key={user.id} className="border-border hover:bg-panel-hover transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10 border border-zinc-700 shrink-0">
+                          <Avatar className="h-10 w-10 border border-border shrink-0">
                             <AvatarImage src={user.avatarUrl} alt={user.displayName || user.email} />
                             <AvatarFallback className={`bg-gradient-to-br ${getAvatarGradient(user.id)} text-white font-bold text-xs`}>
                               {(user.displayName?.charAt(0) || user.email.charAt(0)).toUpperCase()}
@@ -1919,7 +1842,7 @@ export default function AdminPage() {
                           </Avatar>
                           <div>
                             <div className="font-bold text-sm text-white">{user.displayName || user.username || "User"}</div>
-                            <div className="text-xs text-zinc-400 font-medium">{user.email}</div>
+                            <div className="text-xs text-muted-foreground font-medium">{user.email}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -1935,18 +1858,18 @@ export default function AdminPage() {
                             <Crown className="w-3 h-3 text-amber-400" /> PRO
                           </Badge>
                         ) : (
-                          <span className="text-xs text-zinc-400 font-semibold">Free Tier</span>
+                          <span className="text-xs text-muted-foreground font-semibold">Free Tier</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-zinc-300 font-bold">
+                      <TableCell className="text-xs text-foreground/80 font-bold">
                         {user._count?.playlists || 0} playlists
                       </TableCell>
-                      <TableCell className="text-xs text-zinc-400 font-medium">
+                      <TableCell className="text-xs text-muted-foreground font-medium">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEditUserClick(user)} className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                          <Button variant="outline" size="sm" onClick={() => handleEditUserClick(user)} className="h-8 border-border bg-background/60 hover:bg-accent gap-1 text-xs text-white font-semibold">
                             <Edit className="w-3.5 h-3.5" /> Edit
                           </Button>
                           <Button
@@ -1980,7 +1903,7 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* 🎵 TRACKS MANAGEMENT TAB (25 per page) */}
-        <TabsContent value="tracks" className="space-y-6">
+        <TabsContent value="tracks" className="mt-0 space-y-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <AdminSearchInput
               value={searchTracks}
@@ -1991,10 +1914,10 @@ export default function AdminPage() {
               placeholder="Search tracks by title, artist, genre..."
             />
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              <Button variant="outline" size="sm" onClick={handleScanDuplicateTracks} disabled={isMergingTracks} className="border-purple-600/40 bg-purple-950/30 hover:bg-purple-900/30 text-purple-300 font-semibold gap-2 h-10 px-4">
+              <Button variant="outline" size="sm" onClick={handleScanDuplicateTracks} disabled={isMergingTracks} className="border-primary/40 bg-primary/10 hover:bg-primary/10 text-primary font-semibold gap-2 h-10 px-4">
                 <Music className={cn("h-3.5 w-3.5", isMergingTracks && "animate-spin")} /> Merge Duplicates
               </Button>
-              <Button onClick={() => setActiveTab("upload")} className="bg-purple-600 hover:bg-purple-500 text-white font-bold gap-2 shrink-0 h-10 px-4">
+              <Button onClick={() => setActiveTab("upload")} className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 shrink-0 h-10 px-4">
                 <Plus className="w-4 h-4" /> Add Track
               </Button>
             </div>
@@ -2002,7 +1925,7 @@ export default function AdminPage() {
 
           {/* Rendition filter buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-zinc-400 mr-1">Renditions:</span>
+            <span className="text-xs font-bold text-muted-foreground mr-1">Renditions:</span>
             {([
               { value: 'all', label: 'All' },
               { value: 'ready', label: 'Has Renditions' },
@@ -2015,8 +1938,8 @@ export default function AdminPage() {
                 onClick={() => { setTrackRenditionFilter(value); setTracksPage(1); }}
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
                   trackRenditionFilter === value
-                    ? 'bg-purple-600 border-purple-500 text-white shadow-md'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                    ? 'bg-primary border-primary text-white shadow-md'
+                    : 'bg-card border-border text-muted-foreground hover:text-white hover:border-foreground/20'
                 }`}
               >
                 {label}
@@ -2024,53 +1947,53 @@ export default function AdminPage() {
             ))}
           </div>
 
-          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
+          <Card className="bg-card border-border overflow-hidden shadow-xl">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-zinc-950">
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="font-bold text-zinc-200">Track Title</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Artist & Album</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Format & Quality</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Duration</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Renditions</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Lyrics Status</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Visibility</TableHead>
-                    <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
+                <TableHeader className="bg-background/60">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-bold text-foreground/90">Track Title</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Artist & Album</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Format & Quality</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Duration</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Renditions</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Lyrics Status</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Visibility</TableHead>
+                    <TableHead className="font-bold text-foreground/90 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tracksData?.tracks?.map((track: any) => (
-                    <TableRow key={track.id} className="border-zinc-800/80 hover:bg-zinc-800/50 transition-colors">
+                    <TableRow key={track.id} className="border-border hover:bg-panel-hover transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-700 flex items-center justify-center shrink-0">
+                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-background/60 border border-border flex items-center justify-center shrink-0">
                             {track.album?.coverImageUrl ? (
                               <img src={track.album.coverImageUrl} alt={track.title} className="h-full w-full object-cover" />
                             ) : (
-                              <Music className="h-5 w-5 text-purple-400" />
+                              <Music className="h-5 w-5 text-primary" />
                             )}
                           </div>
                           <div>
                             <div className="font-bold text-sm text-white">{track.title}</div>
-                            <div className="text-xs text-zinc-400 font-medium">{track.genre || "No Genre"} {track.year ? `• ${track.year}` : ""}</div>
+                            <div className="text-xs text-muted-foreground font-medium">{track.genre || "No Genre"} {track.year ? `• ${track.year}` : ""}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm font-bold text-purple-300 flex items-center gap-1.5">
+                        <div className="text-sm font-bold text-primary flex items-center gap-1.5">
                           {track.artist.name}
                           {track.artist.verified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />}
                         </div>
-                        <div className="text-xs text-zinc-400 font-medium truncate max-w-[180px]">{track.album?.title || "Single"}</div>
+                        <div className="text-xs text-muted-foreground font-medium truncate max-w-[180px]">{track.album?.title || "Single"}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold">
+                        <Badge className="bg-primary/15 text-primary border-primary/40 text-[10px] font-bold">
                           {track.format || "FLAC"} {track.bitRate ? `${Math.round(track.bitRate / 1000)}k` : ""}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-zinc-300 font-mono font-bold">
+                      <TableCell className="text-xs text-foreground/80 font-mono font-bold">
                         {formatDuration(track.duration)}
                       </TableCell>
                       <TableCell>
@@ -2083,7 +2006,7 @@ export default function AdminPage() {
                         ) : track.renditionStatus === 'failed' ? (
                           <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-[10px] font-bold">Failed</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-zinc-400 border-zinc-700 text-[10px] font-semibold">None</Badge>
+                          <Badge variant="outline" className="text-muted-foreground border-border text-[10px] font-semibold">None</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -2092,7 +2015,7 @@ export default function AdminPage() {
                         ) : track.plainLyrics ? (
                           <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[10px] font-bold">Plain Lyrics</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-zinc-400 border-zinc-700 text-[10px] font-semibold">No Lyrics</Badge>
+                          <Badge variant="outline" className="text-muted-foreground border-border text-[10px] font-semibold">No Lyrics</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -2102,13 +2025,13 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Button size="sm" variant="outline" onClick={() => handleEditTrackClick(track)} className="h-8 w-8 p-0 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-white" title="Edit Metadata">
+                          <Button size="sm" variant="outline" onClick={() => handleEditTrackClick(track)} className="h-8 w-8 p-0 border-border bg-background/60 hover:bg-accent text-white" title="Edit Metadata">
                             <Edit className="w-3.5 h-3.5" />
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => toggleTrackVisibility.mutate({ trackId: track.id, isPublic: !track.isPublic })} className="h-8 w-8 p-0 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-white" title="Toggle Public Status">
+                          <Button size="sm" variant="outline" onClick={() => toggleTrackVisibility.mutate({ trackId: track.id, isPublic: !track.isPublic })} className="h-8 w-8 p-0 border-border bg-background/60 hover:bg-accent text-white" title="Toggle Public Status">
                             {track.isPublic ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleSearchLyrics(track)} className="h-8 w-8 p-0 border-zinc-700 bg-zinc-950 hover:bg-purple-600/30 hover:text-purple-300 text-white" title="Manage Lyrics">
+                          <Button size="sm" variant="outline" onClick={() => handleSearchLyrics(track)} className="h-8 w-8 p-0 border-border bg-background/60 hover:bg-primary/20 hover:text-primary/80 text-white" title="Manage Lyrics">
                             <FileText className="w-3.5 h-3.5" />
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => confirm(`Delete track "${track.title}"?`) && deleteTrack.mutate(track.id)} className="h-8 w-8 p-0 font-bold" title="Delete Track">
@@ -2132,7 +2055,7 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* 🎤 ARTISTS MANAGEMENT TAB */}
-        <TabsContent value="artists" className="space-y-6">
+        <TabsContent value="artists" className="mt-0 space-y-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <AdminSearchInput
               value={searchArtists}
@@ -2172,32 +2095,32 @@ export default function AdminPage() {
               <Button variant="outline" size="sm" onClick={handleScanDuplicateArtists} disabled={isMergingArtists} className="border-cyan-600/40 bg-cyan-950/30 hover:bg-cyan-900/30 text-cyan-300 font-semibold gap-2 h-10 px-4">
                 <Users className={cn("h-3.5 w-3.5", isMergingArtists && "animate-spin")} /> Merge Duplicates
               </Button>
-              <Button variant="outline" size="sm" onClick={() => refetchArtists()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
+              <Button variant="outline" size="sm" onClick={() => refetchArtists()} className="border-border bg-card hover:bg-accent text-white font-semibold gap-2 shrink-0 h-10 px-4">
                 <RefreshCw className="h-3.5 w-3.5" /> Refresh List
               </Button>
             </div>
           </div>
 
-          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
+          <Card className="bg-card border-border overflow-hidden shadow-xl">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-zinc-950">
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="font-bold text-zinc-200">Artist Profile</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Status</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Tracks</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Albums</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Bio / Website</TableHead>
-                    <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
+                <TableHeader className="bg-background/60">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-bold text-foreground/90">Artist Profile</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Status</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Tracks</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Albums</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Bio / Website</TableHead>
+                    <TableHead className="font-bold text-foreground/90 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {artistsData?.artists?.map((artist: any) => (
-                    <TableRow key={artist.id} className="border-zinc-800/80 hover:bg-zinc-800/50 transition-colors">
+                    <TableRow key={artist.id} className="border-border hover:bg-panel-hover transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10 border border-zinc-700 shrink-0 shadow-sm">
+                          <Avatar className="h-10 w-10 border border-border shrink-0 shadow-sm">
                             <AvatarImage src={artist.imageUrl} alt={artist.name} />
                             <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-700 text-white font-bold text-xs">
                               {artist.name.charAt(0).toUpperCase()}
@@ -2208,7 +2131,7 @@ export default function AdminPage() {
                               {artist.name}
                               {artist.verified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
                               {(artist.isCollab === true || (artist.isCollab === null && artist.name?.includes(' & '))) && (
-                                <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
+                                <Badge className="bg-primary/15 text-primary border-primary/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
                               )}
                             </div>
                           </div>
@@ -2223,14 +2146,14 @@ export default function AdminPage() {
                           <Badge variant="secondary" className="text-[10px] font-semibold">Standard</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs font-bold text-zinc-200">{artist._count?.tracks || 0} tracks</TableCell>
-                      <TableCell className="text-xs font-bold text-zinc-200">{artist._count?.albums || 0} albums</TableCell>
+                      <TableCell className="text-xs font-bold text-foreground/90">{artist._count?.tracks || 0} tracks</TableCell>
+                      <TableCell className="text-xs font-bold text-foreground/90">{artist._count?.albums || 0} albums</TableCell>
                       <TableCell>
-                        <div className="text-xs text-zinc-400 font-medium truncate max-w-[200px]">
+                        <div className="text-xs text-muted-foreground font-medium truncate max-w-[200px]">
                           {artist.bio || "No bio set"}
                         </div>
                         {artist.website && (
-                          <a href={artist.website} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400 hover:underline flex items-center gap-1 mt-0.5 font-semibold">
+                          <a href={artist.website} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-1 mt-0.5 font-semibold">
                             <Globe className="w-2.5 h-2.5" /> Website
                           </a>
                         )}
@@ -2238,13 +2161,13 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {(artist.isCollab === true || (artist.isCollab === null && artist.name?.includes(' & '))) && (
-                            <Button variant="outline" size="sm" asChild className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                            <Button variant="outline" size="sm" asChild className="h-8 border-border bg-background/60 hover:bg-accent gap-1 text-xs text-white font-semibold">
                               <a href={`/collabs/${artist.id}`} target="_blank" rel="noreferrer">
                                 <ExternalLink className="w-3.5 h-3.5" /> View
                               </a>
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => handleEditArtistClick(artist)} className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                          <Button variant="outline" size="sm" onClick={() => handleEditArtistClick(artist)} className="h-8 border-border bg-background/60 hover:bg-accent gap-1 text-xs text-white font-semibold">
                             <Edit className="w-3.5 h-3.5" /> Edit Profile
                           </Button>
                           <Button variant="destructive" size="sm" onClick={() => handleDeleteArtist(artist.id, artist.name)} className="h-8 text-xs font-bold">
@@ -2268,7 +2191,7 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* 🤝 COLLABORATIONS MANAGEMENT TAB */}
-        <TabsContent value="collabs" className="space-y-6">
+        <TabsContent value="collabs" className="mt-0 space-y-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <AdminSearchInput
               value={searchCollabs}
@@ -2278,33 +2201,33 @@ export default function AdminPage() {
               }}
               placeholder="Search collaborations..."
             />
-            <Button variant="outline" size="sm" onClick={() => refetchCollabs()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 shrink-0 h-10 px-4">
+            <Button variant="outline" size="sm" onClick={() => refetchCollabs()} className="border-border bg-card hover:bg-accent text-white font-semibold gap-2 shrink-0 h-10 px-4">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh List
             </Button>
           </div>
 
-          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
+          <Card className="bg-card border-border overflow-hidden shadow-xl">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-zinc-950">
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="font-bold text-zinc-200">Collaboration</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Status</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Tracks</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Albums</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Bio</TableHead>
-                    <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
+                <TableHeader className="bg-background/60">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-bold text-foreground/90">Collaboration</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Status</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Tracks</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Albums</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Bio</TableHead>
+                    <TableHead className="font-bold text-foreground/90 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {collabsData?.artists?.map((collab: any) => (
-                    <TableRow key={collab.id} className="border-zinc-800/80 hover:bg-zinc-800/50 transition-colors">
+                    <TableRow key={collab.id} className="border-border hover:bg-panel-hover transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10 border border-zinc-700 shrink-0 shadow-sm">
+                          <Avatar className="h-10 w-10 border border-border shrink-0 shadow-sm">
                             <AvatarImage src={collab.imageUrl} alt={collab.name} />
-                            <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-bold text-xs">
+                            <AvatarFallback className="bg-gradient-to-br from-primary to-violet-800 text-white font-bold text-xs">
                               {collab.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
@@ -2312,7 +2235,7 @@ export default function AdminPage() {
                             <div className="font-bold text-sm text-white flex items-center gap-1.5">
                               {collab.name}
                               {collab.verified && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-                              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
+                              <Badge className="bg-primary/15 text-primary border-primary/40 text-[8px] font-bold py-0 px-1.5 uppercase">Collab</Badge>
                             </div>
                           </div>
                         </div>
@@ -2326,21 +2249,21 @@ export default function AdminPage() {
                           <Badge variant="secondary" className="text-[10px] font-semibold">Standard</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs font-bold text-zinc-200">{collab._count?.tracks || 0} tracks</TableCell>
-                      <TableCell className="text-xs font-bold text-zinc-200">{collab._count?.albums || 0} albums</TableCell>
+                      <TableCell className="text-xs font-bold text-foreground/90">{collab._count?.tracks || 0} tracks</TableCell>
+                      <TableCell className="text-xs font-bold text-foreground/90">{collab._count?.albums || 0} albums</TableCell>
                       <TableCell>
-                        <div className="text-xs text-zinc-400 font-medium truncate max-w-[200px]">
+                        <div className="text-xs text-muted-foreground font-medium truncate max-w-[200px]">
                           {collab.bio || "No bio set"}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="outline" size="sm" asChild className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                          <Button variant="outline" size="sm" asChild className="h-8 border-border bg-background/60 hover:bg-accent gap-1 text-xs text-white font-semibold">
                             <a href={`/collabs/${collab.id}`} target="_blank" rel="noreferrer">
                               <ExternalLink className="w-3.5 h-3.5" /> View
                             </a>
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleEditCollabClick(collab)} className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                          <Button variant="outline" size="sm" onClick={() => handleEditCollabClick(collab)} className="h-8 border-border bg-background/60 hover:bg-accent gap-1 text-xs text-white font-semibold">
                             <Edit className="w-3.5 h-3.5" /> Edit
                           </Button>
                           <Button variant="destructive" size="sm" onClick={() => handleDeleteArtist(collab.id, collab.name)} className="h-8 text-xs font-bold">
@@ -2364,7 +2287,7 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* 💿 ALBUMS MANAGEMENT TAB (25 per page) */}
-        <TabsContent value="albums" className="space-y-6">
+        <TabsContent value="albums" className="mt-0 space-y-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <AdminSearchInput
               value={searchAlbums}
@@ -2378,58 +2301,58 @@ export default function AdminPage() {
               <Button variant="outline" size="sm" onClick={handleScanDuplicateAlbums} disabled={isMerging} className="border-amber-600/40 bg-amber-950/30 hover:bg-amber-900/30 text-amber-300 font-semibold gap-2 h-10 px-4">
                 <Disc className={cn("h-3.5 w-3.5", isMerging && "animate-spin")} /> Merge Duplicates
               </Button>
-              <Button variant="outline" size="sm" onClick={() => refetchAlbums()} className="border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold gap-2 h-10 px-4">
+              <Button variant="outline" size="sm" onClick={() => refetchAlbums()} className="border-border bg-card hover:bg-accent text-white font-semibold gap-2 h-10 px-4">
                 <RefreshCw className="h-3.5 w-3.5" /> Refresh List
               </Button>
             </div>
           </div>
 
-          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden shadow-xl">
+          <Card className="bg-card border-border overflow-hidden shadow-xl">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-zinc-950">
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="font-bold text-zinc-200">Album</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Artist</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Type</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Tracks</TableHead>
-                    <TableHead className="font-bold text-zinc-200">Created</TableHead>
-                    <TableHead className="font-bold text-zinc-200 text-right">Actions</TableHead>
+                <TableHeader className="bg-background/60">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-bold text-foreground/90">Album</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Artist</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Type</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Tracks</TableHead>
+                    <TableHead className="font-bold text-foreground/90">Created</TableHead>
+                    <TableHead className="font-bold text-foreground/90 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {albumsData?.albums?.map((album: any) => (
-                    <TableRow key={album.id} className="border-zinc-800/80 hover:bg-zinc-800/50 transition-colors">
+                    <TableRow key={album.id} className="border-border hover:bg-panel-hover transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-700 flex items-center justify-center shrink-0">
+                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-background/60 border border-border flex items-center justify-center shrink-0">
                             {album.coverImageUrl ? (
                               <img src={album.coverImageUrl} alt={album.title} className="h-full w-full object-cover" />
                             ) : (
-                              <AlbumIcon className="h-5 w-5 text-purple-400" />
+                              <AlbumIcon className="h-5 w-5 text-primary" />
                             )}
                           </div>
                           <div className="font-bold text-sm text-white">{album.title}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm font-bold text-purple-300">
+                      <TableCell className="text-sm font-bold text-primary">
                         {album.artist?.name || "Unknown Artist"}
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold">
+                        <Badge className="bg-primary/15 text-primary border-primary/40 text-[10px] font-bold">
                           {album.albumType || "ALBUM"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-zinc-300 font-bold">
+                      <TableCell className="text-xs text-foreground/80 font-bold">
                         {album._count?.tracks || 0} tracks
                       </TableCell>
-                      <TableCell className="text-xs text-zinc-400 font-medium">
+                      <TableCell className="text-xs text-muted-foreground font-medium">
                         {new Date(album.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEditAlbumClick(album)} className="h-8 border-zinc-700 bg-zinc-950 hover:bg-zinc-800 gap-1 text-xs text-white font-semibold">
+                          <Button variant="outline" size="sm" onClick={() => handleEditAlbumClick(album)} className="h-8 border-border bg-background/60 hover:bg-accent gap-1 text-xs text-white font-semibold">
                             <Edit className="w-3.5 h-3.5" /> Edit
                           </Button>
                           <Button
@@ -2462,27 +2385,27 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* 📤 UPLOAD TRACK TAB */}
-        <TabsContent value="upload" className="space-y-6">
-          <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
-            <CardHeader className="border-b border-zinc-800 pb-4">
-              <CardTitle className="text-xl font-extrabold text-white flex items-center gap-2">
-                <Upload className="w-5 h-5 text-purple-400" />
+        <TabsContent value="upload" className="mt-0 space-y-6">
+          <Card className="bg-raised border-0 shadow-none">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-xl font-semibold text-white flex items-center gap-2">
+                <Upload className="w-5 h-5 text-primary" />
                 Audio & Track Uploader
               </CardTitle>
-              <CardDescription className="text-zinc-400 text-xs">
+              <CardDescription className="text-muted-foreground text-xs">
                 Upload high-resolution music files with real-time automatic ID3 metadata extraction
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-4">
               {/* Mode Selector */}
-              <div className="flex flex-col gap-4 p-4 rounded-xl bg-zinc-950 border border-zinc-800 sm:flex-row sm:items-center sm:gap-6">
+              <div className="flex flex-col gap-4 p-4 rounded-xl bg-background/60 border border-border sm:flex-row sm:items-center sm:gap-6">
                 <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setAutoExtractMode(true)}>
-                  <input type="radio" checked={autoExtractMode} onChange={() => setAutoExtractMode(true)} className="accent-purple-500 h-4 w-4" />
+                  <input type="radio" checked={autoExtractMode} onChange={() => setAutoExtractMode(true)} className="accent-primary h-4 w-4" />
                   <Label className="cursor-pointer font-bold text-white text-sm">Automatic Metadata Extraction (Recommended)</Label>
                 </div>
                 <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setAutoExtractMode(false)}>
-                  <input type="radio" checked={!autoExtractMode} onChange={() => setAutoExtractMode(false)} className="accent-purple-500 h-4 w-4" />
-                  <Label className="cursor-pointer font-semibold text-zinc-300 text-sm">Manual Entry</Label>
+                  <input type="radio" checked={!autoExtractMode} onChange={() => setAutoExtractMode(false)} className="accent-primary h-4 w-4" />
+                  <Label className="cursor-pointer font-semibold text-foreground/80 text-sm">Manual Entry</Label>
                 </div>
               </div>
 
@@ -2502,10 +2425,10 @@ export default function AdminPage() {
                         }
                       }}
                       required
-                      className="bg-zinc-950 border-zinc-700 text-white h-11"
+                      className="bg-background/60 border-border text-white h-11"
                     />
                     {isExtracting && (
-                      <p className="text-xs text-purple-400 animate-pulse font-bold">🔄 Parsing ID3 & Audio Tags...</p>
+                      <p className="text-xs text-primary animate-pulse font-bold">🔄 Parsing ID3 & Audio Tags...</p>
                     )}
                   </div>
 
@@ -2516,7 +2439,7 @@ export default function AdminPage() {
                       type="file"
                       accept="image/*"
                       onChange={(e) => setUploadFormData({ ...uploadFormData, coverImage: e.target.files?.[0] || null })}
-                      className="bg-zinc-950 border-zinc-700 text-white h-11"
+                      className="bg-background/60 border-border text-white h-11"
                     />
                   </div>
                 </div>
@@ -2531,7 +2454,7 @@ export default function AdminPage() {
                       onChange={(e) => setUploadFormData({ ...uploadFormData, title: e.target.value })}
                       placeholder="e.g. Midnight City"
                       required
-                      className="bg-zinc-950 border-zinc-700 text-white font-medium placeholder:text-zinc-500 h-10"
+                      className="bg-background/60 border-border text-white font-medium placeholder:text-muted-foreground/80 h-10"
                     />
                   </div>
 
@@ -2542,7 +2465,7 @@ export default function AdminPage() {
                       value={uploadFormData.genre}
                       onChange={(e) => setUploadFormData({ ...uploadFormData, genre: e.target.value })}
                       placeholder="e.g. Synthwave"
-                      className="bg-zinc-950 border-zinc-700 text-white font-medium placeholder:text-zinc-500 h-10"
+                      className="bg-background/60 border-border text-white font-medium placeholder:text-muted-foreground/80 h-10"
                     />
                   </div>
                 </div>
@@ -2562,7 +2485,7 @@ export default function AdminPage() {
                           artistName: artist?.name || "",
                         });
                       }}
-                      className="w-full h-10 rounded-md bg-zinc-950 border border-zinc-700 px-3 text-sm text-white font-medium focus:border-purple-500"
+                      className="w-full h-10 rounded-md bg-background/60 border border-border px-3 text-sm text-white font-medium focus:border-primary"
                     >
                       <option value="">Select artist...</option>
                       {availableArtists.map((a) => (
@@ -2577,7 +2500,7 @@ export default function AdminPage() {
                       value={uploadFormData.artistName}
                       onChange={(e) => setUploadFormData({ ...uploadFormData, artistName: e.target.value, selectedArtistId: "" })}
                       placeholder="e.g. M83"
-                      className="bg-zinc-950 border-zinc-700 text-white font-medium placeholder:text-zinc-500 h-10"
+                      className="bg-background/60 border-border text-white font-medium placeholder:text-muted-foreground/80 h-10"
                     />
                   </div>
                 </div>
@@ -2585,7 +2508,7 @@ export default function AdminPage() {
                 <Button
                   type="submit"
                   disabled={isUploading}
-                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold h-11 text-base shadow-lg shadow-purple-600/30"
+                  className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-11 text-base shadow-lg shadow-primary/20"
                 >
                   {isUploading ? (uploadProgress || "Uploading...") : "Publish Track to Platform"}
                 </Button>
@@ -2595,277 +2518,46 @@ export default function AdminPage() {
         </TabsContent>
 
         {/* ⚙️ SYSTEM SETTINGS TAB */}
-        <TabsContent value="settings" className="space-y-6">
-          <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
-            <CardHeader className="border-b border-zinc-800 pb-4 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-extrabold text-white flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-purple-400" />
-                  Global Platform & System Control Panel
-                </CardTitle>
-                <CardDescription className="text-zinc-400 text-xs">
-                  Configure real-time registration, public API endpoints, guest preview mode, and system parameters
-                </CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  setIsSettingsLoading(true);
-                  try {
-                    const res = await fetch("/api/admin/settings");
-                    if (res.ok) {
-                      const data = await res.json();
-                      setSystemSettings(data.settings || {});
-                      toast.success("System settings refreshed!");
-                    }
-                  } catch (e) {
-                    toast.error("Failed to refresh settings");
-                  } finally {
-                    setIsSettingsLoading(false);
-                  }
-                }}
-                className="border-zinc-700 bg-zinc-950 hover:bg-zinc-800 text-white font-semibold text-xs gap-1.5"
-              >
-                <RefreshCw className={cn("w-3.5 h-3.5", isSettingsLoading && "animate-spin")} />
-                Refresh Status
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              {[
-                {
-                  key: "ALLOW_REGISTRATION",
-                  label: "Public User Registration",
-                  description: "Allow new users to create accounts and sign up freely",
-                  default: "true",
-                  type: "switch",
-                  icon: Users,
-                },
-                {
-                  key: "PUBLIC_API_ACCESS",
-                  label: "Public API Access & Developer Hub",
-                  description: "Enable developer API endpoints and OAuth application keys",
-                  default: "true",
-                  type: "switch",
-                  icon: Globe,
-                },
-                {
-                  key: "MAINTENANCE_MODE",
-                  label: "Platform Maintenance Mode",
-                  description: "Restrict platform access to system administrators only",
-                  default: "false",
-                  type: "switch",
-                  icon: Lock,
-                },
-                {
-                  key: "ALLOW_ANONYMOUS_PLAYBACK",
-                  label: "Guest Audio Preview",
-                  description: "Allow unauthenticated visitors to stream audio previews",
-                  default: "true",
-                  type: "switch",
-                  icon: Music,
-                },
-                {
-                  key: "REQUIRE_EMAIL_VERIFICATION",
-                  label: "Require Email Verification",
-                  description: "Require email confirmation before unlocking streaming",
-                  default: "false",
-                  type: "switch",
-                  icon: Shield,
-                },
-                {
-                  key: "SITE_NAME",
-                  label: "Platform Branding Name",
-                  description: "Global app name shown in headers, footers, and emails",
-                  default: "Serika Music",
-                  type: "input",
-                  icon: Sparkles,
-                },
-                {
-                  key: "DEFAULT_AUDIO_QUALITY",
-                  label: "Default Audio Bitrate Tier",
-                  description: "Quality streaming tier for standard free subscribers",
-                  default: "FLAC_LOSSLESS",
-                  type: "select",
-                  options: ["FLAC_LOSSLESS", "AAC_256K", "MP3_320K", "AUTO"],
-                  icon: HardDrive,
-                },
-              ].map((setting) => {
-                const getVal = () => {
-                  const val = systemSettings[setting.key];
-                  if (val === undefined || val === null) {
-                    return setting.default;
-                  }
-                  return val;
-                };
-
-                const currentVal = getVal();
-                const isEnabled = currentVal === "true";
-                const SettingIcon = setting.icon;
-
-                return (
-                  <div
-                    key={setting.key}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-all gap-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-purple-400 shrink-0 mt-0.5">
-                        <SettingIcon className="w-4 h-4" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-white font-bold text-sm">{setting.label}</Label>
-                          {setting.type === "switch" && (
-                            <Badge
-                              className={cn(
-                                "text-[10px] font-bold px-1.5 py-0 border",
-                                isEnabled
-                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                                  : "bg-zinc-800 text-zinc-400 border-zinc-700"
-                              )}
-                            >
-                              {isEnabled ? "ENABLED" : "DISABLED"}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-                          {setting.description}
-                        </p>
-                        <p className="text-[10px] text-zinc-500 font-mono">Key: {setting.key}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center w-full sm:w-auto">
-                      {setting.type === "switch" ? (
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={(val) => {
-                            const newStr = val ? "true" : "false";
-                            handleUpdateSystemSetting(setting.key, newStr);
-                          }}
-                        />
-                      ) : setting.type === "select" ? (
-                        <select
-                          value={currentVal}
-                          onChange={(e) => handleUpdateSystemSetting(setting.key, e.target.value)}
-                          className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white font-bold focus:border-purple-500 h-9"
-                        >
-                          {setting.options?.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          <Input
-                            value={currentVal}
-                            onChange={(e) =>
-                              setSystemSettings((prev) => ({ ...prev, [setting.key]: e.target.value }))
-                            }
-                            className="flex-1 sm:w-48 h-9 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => handleUpdateSystemSetting(setting.key, currentVal)}
-                            className="h-9 bg-purple-600 hover:bg-purple-500 font-bold text-xs text-white"
-                          >
-                            Save
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Custom Database Stored Settings (if any exist beyond predefined ones) */}
-              {Object.keys(systemSettings).filter(
-                (k) =>
-                  ![
-                    "ALLOW_REGISTRATION",
-                    "PUBLIC_API_ACCESS",
-                    "MAINTENANCE_MODE",
-                    "ALLOW_ANONYMOUS_PLAYBACK",
-                    "REQUIRE_EMAIL_VERIFICATION",
-                    "SITE_NAME",
-                    "DEFAULT_AUDIO_QUALITY",
-                  ].includes(k)
-              ).length > 0 && (
-                <div className="pt-4 border-t border-zinc-800 space-y-3">
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-purple-400">
-                    Custom Database Settings (Localhost / Custom Configs)
-                  </h4>
-                  {Object.keys(systemSettings)
-                    .filter(
-                      (k) =>
-                        ![
-                          "ALLOW_REGISTRATION",
-                          "PUBLIC_API_ACCESS",
-                          "MAINTENANCE_MODE",
-                          "ALLOW_ANONYMOUS_PLAYBACK",
-                          "REQUIRE_EMAIL_VERIFICATION",
-                          "SITE_NAME",
-                          "DEFAULT_AUDIO_QUALITY",
-                        ].includes(k)
-                    )
-                    .map((customKey) => (
-                      <div
-                        key={customKey}
-                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 gap-3"
-                      >
-                        <div className="space-y-0.5">
-                          <Label className="text-white font-bold text-xs">{customKey}</Label>
-                          <p className="text-[10px] text-zinc-400 font-mono">
-                            {systemSettings[customKey]}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          <Input
-                            value={systemSettings[customKey] || ""}
-                            onChange={(e) =>
-                              setSystemSettings((prev) => ({
-                                ...prev,
-                                [customKey]: e.target.value,
-                              }))
-                            }
-                            className="flex-1 sm:w-48 h-8 bg-zinc-900 border-zinc-700 text-xs text-white font-medium"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              handleUpdateSystemSetting(customKey, systemSettings[customKey] || "")
-                            }
-                            className="h-8 bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white"
-                          >
-                            Save
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="settings" className="mt-0">
+          <AdminSettings
+            settings={systemSettings}
+            onSave={handleUpdateSystemSetting}
+            refreshing={isSettingsLoading}
+            onRefresh={async () => {
+              setIsSettingsLoading(true);
+              try {
+                const res = await fetch("/api/admin/settings");
+                if (res.ok) {
+                  const data = await res.json();
+                  setSystemSettings(data.settings || {});
+                }
+              } catch {
+                toast.error("Failed to reload settings");
+              } finally {
+                setIsSettingsLoading(false);
+              }
+            }}
+          />
         </TabsContent>
+        </div>
       </Tabs>
 
       {/* ✏️ USER EDITOR DIALOG */}
       <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <UserIcon className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <UserIcon className="w-5 h-5 text-primary" />
               Edit User Account
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Modify account role, premium status, and display properties for {editingUser?.email}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
-            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
-              <Avatar className="h-14 w-14 border-2 border-purple-500/40 shadow-lg shrink-0">
+            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-background/60 border border-border">
+              <Avatar className="h-14 w-14 border-2 border-primary/40 shadow-lg shrink-0">
                 <AvatarImage src={editUserForm.avatarUrl} />
                 <AvatarFallback className={`bg-gradient-to-br ${getAvatarGradient(editingUser?.id)} text-white font-bold text-base`}>
                   {(editUserForm.displayName?.charAt(0) || editingUser?.email?.charAt(0) || "U").toUpperCase()}
@@ -2883,42 +2575,42 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Display Name</Label>
+                <Label className="text-xs font-bold text-foreground/90">Display Name</Label>
                 <Input
                   value={editUserForm.displayName}
                   onChange={(e) => setEditUserForm({ ...editUserForm, displayName: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Username</Label>
+                <Label className="text-xs font-bold text-foreground/90">Username</Label>
                 <Input
                   value={editUserForm.username}
                   onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Role Privilege</Label>
-                <p className="text-xs text-zinc-400 font-medium">Grant administrator rights</p>
+                <p className="text-xs text-muted-foreground font-medium">Grant administrator rights</p>
               </div>
               <select
                 value={editUserForm.role}
                 onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value as "ADMIN" | "USER" })}
-                className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white font-bold focus:border-purple-500"
+                className="bg-card border border-border rounded-lg px-3 py-1.5 text-xs text-white font-bold focus:border-primary"
               >
                 <option value="USER">USER</option>
                 <option value="ADMIN">ADMIN</option>
               </select>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Premium Subscription</Label>
-                <p className="text-xs text-zinc-400 font-medium">Unlock 24-bit FLAC & offline downloads</p>
+                <p className="text-xs text-muted-foreground font-medium">Unlock 24-bit FLAC & offline downloads</p>
               </div>
               <Switch
                 checked={editUserForm.isPremium}
@@ -2927,9 +2619,9 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setEditingUser(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
-            <Button onClick={handleUpdateUser} disabled={isUpdatingUser} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setEditingUser(null)} className="border-border bg-card text-white hover:bg-accent font-semibold">Cancel</Button>
+            <Button onClick={handleUpdateUser} disabled={isUpdatingUser} className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg">
               Save Changes
             </Button>
           </DialogFooter>
@@ -2938,19 +2630,19 @@ export default function AdminPage() {
 
       {/* 🎤 ARTIST EDITOR DIALOG */}
       <Dialog open={!!editingArtist} onOpenChange={(open) => !open && setEditingArtist(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <UserIcon className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <UserIcon className="w-5 h-5 text-primary" />
               {(editingArtist?.isCollab === true || (editingArtist?.isCollab === null && editingArtist?.name?.includes(' & '))) ? 'Edit Collaboration' : 'Edit Artist Profile'}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Update artist metadata, images, and verification status.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
-            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-background/60 border border-border">
               <Avatar className="h-14 w-14 border-2 border-amber-500/40 shadow-lg shrink-0">
                 <AvatarImage src={editArtistForm.imageUrl} alt={editArtistForm.name} />
                 <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-700 text-white font-bold text-lg">
@@ -2969,32 +2661,32 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Artist Name *</Label>
+              <Label className="text-xs font-bold text-foreground/90">Artist Name *</Label>
               <Input
                 value={editArtistForm.name}
                 onChange={(e) => setEditArtistForm({ ...editArtistForm, name: e.target.value })}
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Alternate / Romanized Names</Label>
+              <Label className="text-xs font-bold text-foreground/90">Alternate / Romanized Names</Label>
               <Input
                 value={editArtistForm.altNames}
                 onChange={(e) => setEditArtistForm({ ...editArtistForm, altNames: e.target.value })}
                 placeholder="e.g. Hoshimachi Suisei, Suisei (comma-separated)"
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
-              <p className="text-[10px] text-zinc-500">Comma-separated names users can search by (romanized, English, etc.)</p>
+              <p className="text-[10px] text-muted-foreground/80">Comma-separated names users can search by (romanized, English, etc.)</p>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Biography</Label>
+              <Label className="text-xs font-bold text-foreground/90">Biography</Label>
               <Textarea
                 value={editArtistForm.bio}
                 onChange={(e) => setEditArtistForm({ ...editArtistForm, bio: e.target.value })}
                 rows={3}
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
             </div>
 
@@ -3008,20 +2700,20 @@ export default function AdminPage() {
               />
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Website Link</Label>
+                <Label className="text-xs font-bold text-foreground/90">Website Link</Label>
                 <Input
                   value={editArtistForm.website}
                   onChange={(e) => setEditArtistForm({ ...editArtistForm, website: e.target.value })}
                   placeholder="https://..."
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Verified Artist Checkmark</Label>
-                <p className="text-xs text-zinc-400 font-medium">Show official blue badge on platform</p>
+                <p className="text-xs text-muted-foreground font-medium">Show official blue badge on platform</p>
               </div>
               <Switch
                 checked={editArtistForm.verified}
@@ -3030,9 +2722,9 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setEditingArtist(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
-            <Button onClick={handleUpdateArtist} disabled={isUpdatingArtist} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setEditingArtist(null)} className="border-border bg-card text-white hover:bg-accent font-semibold">Cancel</Button>
+            <Button onClick={handleUpdateArtist} disabled={isUpdatingArtist} className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg">
               {(editingArtist?.isCollab === true || (editingArtist?.isCollab === null && editingArtist?.name?.includes(' & '))) ? 'Save Collaboration' : 'Save Artist'}
             </Button>
           </DialogFooter>
@@ -3041,26 +2733,26 @@ export default function AdminPage() {
 
       {/* 🤝 COLLAB EDITOR DIALOG */}
       <Dialog open={!!editingCollab} onOpenChange={(open) => !open && setEditingCollab(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[95vw] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <Users className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[95vw] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
               Edit Collaboration
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Manage collaboration members and metadata.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 py-3">
             {/* Preview name */}
-            <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/20">
-              <Label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Collaboration Name</Label>
-              <p className="text-lg font-black text-white mt-1">
+            <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+              <Label className="text-[10px] font-bold text-primary uppercase tracking-wider">Collaboration Name</Label>
+              <p className="text-lg font-bold text-white mt-1">
                 {editingCollab?.name || "Loading..."}
               </p>
               {collabMemberNames && (
-                <p className="text-xs text-purple-300/70 font-medium mt-1">
+                <p className="text-xs text-primary/70 font-medium mt-1">
                   Members: {collabMemberNames}
                 </p>
               )}
@@ -3068,7 +2760,7 @@ export default function AdminPage() {
 
             {/* Member artists management */}
             <div className="space-y-3">
-              <Label className="text-xs font-bold text-zinc-200">Member Artists *</Label>
+              <Label className="text-xs font-bold text-foreground/90">Member Artists *</Label>
 
               {/* Current members */}
               {collabMembers.length > 0 && (
@@ -3076,11 +2768,11 @@ export default function AdminPage() {
                   {collabMembers.map((member) => (
                     <div
                       key={member.id}
-                      className="flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700"
+                      className="flex items-center gap-2 pl-2 pr-1 py-1.5 rounded-lg bg-secondary border border-border"
                     >
-                      <Avatar className="h-6 w-6 border border-zinc-600">
+                      <Avatar className="h-6 w-6 border border-foreground/20">
                         <AvatarImage src={member.imageUrl} alt={member.name} />
-                        <AvatarFallback className="bg-purple-600 text-white text-[10px] font-bold">
+                        <AvatarFallback className="bg-primary text-white text-[10px] font-bold">
                           {member.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -3102,48 +2794,48 @@ export default function AdminPage() {
               {/* Search to add members */}
               <div className="relative">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/80" />
                   <Input
                     value={collabSearch}
                     onChange={(e) => setCollabSearch(e.target.value)}
                     placeholder="Search artists to add as members..."
-                    className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium pl-9"
+                    className="bg-background/60 border-border text-xs text-white font-medium pl-9"
                   />
                 </div>
                 {collabSearch && filteredAvailableArtists.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full rounded-lg bg-zinc-800 border border-zinc-700 shadow-2xl max-h-48 overflow-y-auto">
+                  <div className="absolute z-50 mt-1 w-full rounded-lg bg-secondary border border-border shadow-2xl max-h-48 overflow-y-auto">
                     {filteredAvailableArtists.map((artist) => (
                       <button
                         key={artist.id}
                         onClick={() => addCollabMember(artist)}
-                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-purple-600/20 transition-colors text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary/15 transition-colors text-left"
                       >
-                        <Avatar className="h-6 w-6 border border-zinc-600">
+                        <Avatar className="h-6 w-6 border border-foreground/20">
                           <AvatarImage src={artist.imageUrl} alt={artist.name} />
-                          <AvatarFallback className="bg-zinc-700 text-white text-[10px] font-bold">
+                          <AvatarFallback className="bg-accent text-white text-[10px] font-bold">
                             {artist.name.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-xs font-bold text-white">{artist.name}</span>
                         {artist.verified && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
-                        <Plus className="w-3.5 h-3.5 text-purple-400 ml-auto" />
+                        <Plus className="w-3.5 h-3.5 text-primary ml-auto" />
                       </button>
                     ))}
                   </div>
                 )}
                 {collabSearch && filteredAvailableArtists.length === 0 && (
-                  <div className="absolute z-50 mt-1 w-full rounded-lg bg-zinc-800 border border-zinc-700 shadow-2xl p-3 text-center">
-                    <p className="text-xs text-zinc-400">No solo artists found. Try a different search.</p>
+                  <div className="absolute z-50 mt-1 w-full rounded-lg bg-secondary border border-border shadow-2xl p-3 text-center">
+                    <p className="text-xs text-muted-foreground">No solo artists found. Try a different search.</p>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Sync featured checkbox */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Sync Featured Artists</Label>
-                <p className="text-xs text-zinc-400 font-medium">Update all collab tracks/albums to feature the member artists</p>
+                <p className="text-xs text-muted-foreground font-medium">Update all collab tracks/albums to feature the member artists</p>
               </div>
               <Switch
                 checked={syncFeatured}
@@ -3152,10 +2844,10 @@ export default function AdminPage() {
             </div>
 
             {/* Avatar + Banner */}
-            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
-              <Avatar className="h-14 w-14 border-2 border-purple-500/40 shadow-lg shrink-0">
+            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-background/60 border border-border">
+              <Avatar className="h-14 w-14 border-2 border-primary/40 shadow-lg shrink-0">
                 <AvatarImage src={collabForm.imageUrl} alt="Collab" />
-                <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-bold text-lg">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-violet-800 text-white font-bold text-lg">
                   {(editingCollab?.name?.charAt(0) || "C").toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -3180,32 +2872,32 @@ export default function AdminPage() {
 
             {/* Bio */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Collaboration Bio</Label>
+              <Label className="text-xs font-bold text-foreground/90">Collaboration Bio</Label>
               <Textarea
                 value={collabForm.bio}
                 onChange={(e) => setCollabForm({ ...collabForm, bio: e.target.value })}
                 rows={3}
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
                 placeholder="Describe this collaboration..."
               />
             </div>
 
             {/* Website */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Website Link</Label>
+              <Label className="text-xs font-bold text-foreground/90">Website Link</Label>
               <Input
                 value={collabForm.website}
                 onChange={(e) => setCollabForm({ ...collabForm, website: e.target.value })}
                 placeholder="https://..."
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
             </div>
 
             {/* Verified */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Verified Badge</Label>
-                <p className="text-xs text-zinc-400 font-medium">Show official blue badge on platform</p>
+                <p className="text-xs text-muted-foreground font-medium">Show official blue badge on platform</p>
               </div>
               <Switch
                 checked={collabForm.verified}
@@ -3216,35 +2908,35 @@ export default function AdminPage() {
             {/* Tracks & Albums summary */}
             {(collabTracks.length > 0 || collabAlbums.length > 0) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                <div className="p-3 rounded-xl bg-background/60 border border-border">
                   <div className="flex items-center gap-2 mb-2">
-                    <Music className="w-4 h-4 text-purple-400" />
+                    <Music className="w-4 h-4 text-primary" />
                     <span className="text-xs font-bold text-white">Tracks ({collabTracks.length})</span>
                   </div>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {collabTracks.slice(0, 8).map((track) => (
-                      <div key={track.id} className="text-[10px] text-zinc-400 font-medium truncate">
+                      <div key={track.id} className="text-[10px] text-muted-foreground font-medium truncate">
                         {track.title} {track.playCount > 0 && `• ${track.playCount} plays`}
                       </div>
                     ))}
                     {collabTracks.length > 8 && (
-                      <div className="text-[10px] text-zinc-500">+{collabTracks.length - 8} more...</div>
+                      <div className="text-[10px] text-muted-foreground/80">+{collabTracks.length - 8} more...</div>
                     )}
                   </div>
                 </div>
-                <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                <div className="p-3 rounded-xl bg-background/60 border border-border">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlbumIcon className="w-4 h-4 text-purple-400" />
+                    <AlbumIcon className="w-4 h-4 text-primary" />
                     <span className="text-xs font-bold text-white">Albums ({collabAlbums.length})</span>
                   </div>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {collabAlbums.slice(0, 8).map((album) => (
-                      <div key={album.id} className="text-[10px] text-zinc-400 font-medium truncate">
+                      <div key={album.id} className="text-[10px] text-muted-foreground font-medium truncate">
                         {album.title} • {album.albumType}
                       </div>
                     ))}
                     {collabAlbums.length > 8 && (
-                      <div className="text-[10px] text-zinc-500">+{collabAlbums.length - 8} more...</div>
+                      <div className="text-[10px] text-muted-foreground/80">+{collabAlbums.length - 8} more...</div>
                     )}
                   </div>
                 </div>
@@ -3252,12 +2944,12 @@ export default function AdminPage() {
             )}
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setEditingCollab(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setEditingCollab(null)} className="border-border bg-card text-white hover:bg-accent font-semibold">Cancel</Button>
             <Button
               onClick={handleUpdateCollab}
               disabled={isUpdatingCollab || collabMembers.length < 2}
-              className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg disabled:opacity-50"
+              className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg disabled:opacity-50"
             >
               {isUpdatingCollab ? "Saving..." : "Save Collaboration"}
             </Button>
@@ -3267,33 +2959,33 @@ export default function AdminPage() {
 
       {/* 🎵 TRACK EDITOR DIALOG */}
       <Dialog open={!!editingTrack} onOpenChange={(open) => !open && setEditingTrack(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <Music className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <Music className="w-5 h-5 text-primary" />
               Edit Track Metadata
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Update track details, artist, album, and visibility.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Track Title *</Label>
+              <Label className="text-xs font-bold text-foreground/90">Track Title *</Label>
               <Input
                 value={editTrackForm.title}
                 onChange={(e) => setEditTrackForm({ ...editTrackForm, title: e.target.value })}
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Artist *</Label>
+              <Label className="text-xs font-bold text-foreground/90">Artist *</Label>
               <select
                 value={editTrackForm.artistId}
                 onChange={(e) => setEditTrackForm({ ...editTrackForm, artistId: e.target.value })}
-                className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+                className="w-full h-9 bg-background/60 border border-border rounded-md px-3 text-xs text-white font-bold"
               >
                 <option value="">Select artist...</option>
                 {availableArtists.map((artist: any) => (
@@ -3303,11 +2995,11 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Album</Label>
+              <Label className="text-xs font-bold text-foreground/90">Album</Label>
               <select
                 value={editTrackForm.albumId}
                 onChange={(e) => setEditTrackForm({ ...editTrackForm, albumId: e.target.value })}
-                className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+                className="w-full h-9 bg-background/60 border border-border rounded-md px-3 text-xs text-white font-bold"
               >
                 <option value="">No album (single)</option>
                 {availableAlbums.map((album: any) => (
@@ -3318,29 +3010,29 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Genre</Label>
+                <Label className="text-xs font-bold text-foreground/90">Genre</Label>
                 <Input
                   value={editTrackForm.genre}
                   onChange={(e) => setEditTrackForm({ ...editTrackForm, genre: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Year</Label>
+                <Label className="text-xs font-bold text-foreground/90">Year</Label>
                 <Input
                   type="number"
                   value={editTrackForm.year}
                   onChange={(e) => setEditTrackForm({ ...editTrackForm, year: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Track #</Label>
+                <Label className="text-xs font-bold text-foreground/90">Track #</Label>
                 <Input
                   type="number"
                   value={editTrackForm.trackNumber}
                   onChange={(e) => setEditTrackForm({ ...editTrackForm, trackNumber: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
             </div>
@@ -3353,10 +3045,10 @@ export default function AdminPage() {
               placeholder="https://example.com/cover.jpg"
             />
 
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Public Visibility</Label>
-                <p className="text-xs text-zinc-400 font-medium">Visible to all users when enabled</p>
+                <p className="text-xs text-muted-foreground font-medium">Visible to all users when enabled</p>
               </div>
               <Switch
                 checked={editTrackForm.isPublic}
@@ -3365,9 +3057,9 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setEditingTrack(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
-            <Button onClick={handleUpdateTrack} disabled={isUpdatingTrack} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setEditingTrack(null)} className="border-border bg-card text-white hover:bg-accent font-semibold">Cancel</Button>
+            <Button onClick={handleUpdateTrack} disabled={isUpdatingTrack} className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg">
               Save Track
             </Button>
           </DialogFooter>
@@ -3376,33 +3068,33 @@ export default function AdminPage() {
 
       {/* 💿 ALBUM EDITOR DIALOG */}
       <Dialog open={!!editingAlbum} onOpenChange={(open) => !open && setEditingAlbum(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <AlbumIcon className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <AlbumIcon className="w-5 h-5 text-primary" />
               Edit Album Details
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Update album metadata, artist, release date, and visibility.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Album Title *</Label>
+              <Label className="text-xs font-bold text-foreground/90">Album Title *</Label>
               <Input
                 value={editAlbumForm.title}
                 onChange={(e) => setEditAlbumForm({ ...editAlbumForm, title: e.target.value })}
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Artist *</Label>
+              <Label className="text-xs font-bold text-foreground/90">Artist *</Label>
               <select
                 value={editAlbumForm.artistId}
                 onChange={(e) => setEditAlbumForm({ ...editAlbumForm, artistId: e.target.value })}
-                className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+                className="w-full h-9 bg-background/60 border border-border rounded-md px-3 text-xs text-white font-bold"
               >
                 <option value="">Select artist...</option>
                 {availableArtists.map((artist: any) => (
@@ -3412,12 +3104,12 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-zinc-200">Description</Label>
+              <Label className="text-xs font-bold text-foreground/90">Description</Label>
               <Textarea
                 value={editAlbumForm.description}
                 onChange={(e) => setEditAlbumForm({ ...editAlbumForm, description: e.target.value })}
                 rows={2}
-                className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                className="bg-background/60 border-border text-xs text-white font-medium"
               />
             </div>
 
@@ -3431,11 +3123,11 @@ export default function AdminPage() {
               />
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Album Type</Label>
+                <Label className="text-xs font-bold text-foreground/90">Album Type</Label>
                 <select
                   value={editAlbumForm.albumType}
                   onChange={(e) => setEditAlbumForm({ ...editAlbumForm, albumType: e.target.value })}
-                  className="w-full h-9 bg-zinc-950 border border-zinc-700 rounded-md px-3 text-xs text-white font-bold"
+                  className="w-full h-9 bg-background/60 border border-border rounded-md px-3 text-xs text-white font-bold"
                 >
                   <option value="ALBUM">ALBUM</option>
                   <option value="EP">EP</option>
@@ -3448,28 +3140,28 @@ export default function AdminPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Genre</Label>
+                <Label className="text-xs font-bold text-foreground/90">Genre</Label>
                 <Input
                   value={editAlbumForm.genre}
                   onChange={(e) => setEditAlbumForm({ ...editAlbumForm, genre: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-zinc-200">Release Date</Label>
+                <Label className="text-xs font-bold text-foreground/90">Release Date</Label>
                 <Input
                   type="date"
                   value={editAlbumForm.releaseDate}
                   onChange={(e) => setEditAlbumForm({ ...editAlbumForm, releaseDate: e.target.value })}
-                  className="bg-zinc-950 border-zinc-700 text-xs text-white font-medium"
+                  className="bg-background/60 border-border text-xs text-white font-medium"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
               <div className="space-y-0.5">
                 <Label className="text-sm font-bold text-white">Public Visibility</Label>
-                <p className="text-xs text-zinc-400 font-medium">Visible to all users when enabled</p>
+                <p className="text-xs text-muted-foreground font-medium">Visible to all users when enabled</p>
               </div>
               <Switch
                 checked={editAlbumForm.isPublic}
@@ -3478,9 +3170,9 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setEditingAlbum(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
-            <Button onClick={handleUpdateAlbum} disabled={isUpdatingAlbum} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setEditingAlbum(null)} className="border-border bg-card text-white hover:bg-accent font-semibold">Cancel</Button>
+            <Button onClick={handleUpdateAlbum} disabled={isUpdatingAlbum} className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg">
               Save Album
             </Button>
           </DialogFooter>
@@ -3489,13 +3181,13 @@ export default function AdminPage() {
 
       {/* 💿 ALBUM MERGE DIALOG */}
       <Dialog open={showMergeDialog} onOpenChange={setShowMergeDialog}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[95vw] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
+        <DialogContent className="bg-card border border-border text-white w-[95vw] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
               <Disc className="w-5 h-5 text-amber-400" />
               Merge Duplicate Albums
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Review and merge albums with duplicate titles. Tracks are moved to the oldest album.
             </DialogDescription>
           </DialogHeader>
@@ -3505,7 +3197,7 @@ export default function AdminPage() {
               <div className="text-center py-8">
                 <Check className="w-12 h-12 text-green-400 mx-auto mb-3" />
                 <p className="text-sm font-bold text-white">No duplicate albums found!</p>
-                <p className="text-xs text-zinc-400 mt-1">All albums have unique titles.</p>
+                <p className="text-xs text-muted-foreground mt-1">All albums have unique titles.</p>
               </div>
             ) : (
               <>
@@ -3529,11 +3221,11 @@ export default function AdminPage() {
 
                 <div className="space-y-3">
                   {mergeDuplicates.map((group, gi) => (
-                    <div key={gi} className="rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden">
-                      <div className="flex items-center justify-between p-3 border-b border-zinc-800">
+                    <div key={gi} className="rounded-xl bg-background/60 border border-border overflow-hidden">
+                      <div className="flex items-center justify-between p-3 border-b border-border">
                         <div>
                           <p className="text-sm font-bold text-white">{group.title}</p>
-                          <p className="text-[10px] text-zinc-500">{group.albums.length} copies found</p>
+                          <p className="text-[10px] text-muted-foreground/80">{group.albums.length} copies found</p>
                         </div>
                         <Button
                           size="sm"
@@ -3544,17 +3236,17 @@ export default function AdminPage() {
                           Merge
                         </Button>
                       </div>
-                      <div className="divide-y divide-zinc-800/50">
+                      <div className="divide-y divide-border">
                         {group.albums.map((album: any, ai: number) => (
                           <div key={album.id} className="flex items-center gap-3 px-3 py-2">
-                            <div className="w-8 h-8 rounded bg-zinc-800 overflow-hidden shrink-0">
+                            <div className="w-8 h-8 rounded bg-secondary overflow-hidden shrink-0">
                               {album.coverImageUrl && (
                                 <img src={album.coverImageUrl} alt="" className="w-full h-full object-cover" />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-bold text-white truncate">{album.artist.name}</p>
-                              <p className="text-[10px] text-zinc-500">{album.tracks} tracks</p>
+                              <p className="text-[10px] text-muted-foreground/80">{album.tracks} tracks</p>
                             </div>
                             {ai === 0 && (
                               <Badge className="bg-green-500/20 text-green-300 border-green-500/40 text-[8px] font-bold uppercase">Keep</Badge>
@@ -3572,31 +3264,31 @@ export default function AdminPage() {
             )}
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setShowMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setShowMergeDialog(false)} className="border-border bg-card text-white hover:bg-accent font-semibold">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 🎤 ARTIST MERGE DIALOG */}
       <Dialog open={showArtistMergeDialog} onOpenChange={setShowArtistMergeDialog}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
               <Users className="w-5 h-5 text-cyan-400" />
               Merge Duplicate Artists
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Found {artistMergeDuplicates.length} group(s) of duplicate artists. The first artist in each group (most tracks) is the merge target. Merging moves all tracks, albums, follows, and collab members to the target, then deletes the duplicate.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3 max-h-[60vh] overflow-y-auto">
             {artistMergeDuplicates.length === 0 ? (
-              <div className="text-center py-8 text-zinc-400 text-sm">No duplicate artists found!</div>
+              <div className="text-center py-8 text-muted-foreground text-sm">No duplicate artists found!</div>
             ) : (
               artistMergeDuplicates.map((group: any, gi: number) => (
-                <div key={gi} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                <div key={gi} className="p-4 rounded-xl bg-background/60 border border-border space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-cyan-300">Group {gi + 1} — {group.artists.length} artists</span>
                     <Button
@@ -3615,13 +3307,13 @@ export default function AdminPage() {
                   </div>
                   <div className="space-y-2">
                     {group.artists.map((artist: any, ai: number) => (
-                      <div key={artist.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800">
-                        <div className="h-9 w-9 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700 shrink-0">
+                      <div key={artist.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-card border border-border">
+                        <div className="h-9 w-9 rounded-full overflow-hidden bg-secondary border border-border shrink-0">
                           {artist.imageUrl ? (
                             <img src={artist.imageUrl} alt={artist.name} className="h-full w-full object-cover" />
                           ) : (
                             <div className="h-full w-full flex items-center justify-center">
-                              <UserIcon className="h-4 w-4 text-zinc-500" />
+                              <UserIcon className="h-4 w-4 text-muted-foreground/80" />
                             </div>
                           )}
                         </div>
@@ -3633,7 +3325,7 @@ export default function AdminPage() {
                             )}
                             {artist.verified && <CheckCircle2 className="w-3 h-3 text-blue-400 shrink-0" />}
                           </div>
-                          <div className="text-[10px] text-zinc-500 font-medium">
+                          <div className="text-[10px] text-muted-foreground/80 font-medium">
                             {artist.tracks} tracks • {artist.albums} albums • {artist.followers} followers
                             {artist.altNames?.length > 0 && ` • alt: ${artist.altNames.join(", ")}`}
                           </div>
@@ -3657,8 +3349,8 @@ export default function AdminPage() {
             )}
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setShowArtistMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setShowArtistMergeDialog(false)} className="border-border bg-card text-white hover:bg-accent font-semibold">Close</Button>
             {artistMergeDuplicates.length > 0 && (
               <Button
                 onClick={handleMergeAllArtists}
@@ -3675,25 +3367,25 @@ export default function AdminPage() {
 
       {/* 🎵 TRACK MERGE DIALOG */}
       <Dialog open={showTrackMergeDialog} onOpenChange={setShowTrackMergeDialog}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <Music className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <Music className="w-5 h-5 text-primary" />
               Merge Duplicate Tracks
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Found {trackMergeDuplicates.length} group(s) of duplicate tracks. The first track in each group (most plays) is the merge target. Merging combines play counts, moves all likes/playlists/history to the target, then deletes the duplicate.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3 max-h-[60vh] overflow-y-auto">
             {trackMergeDuplicates.length === 0 ? (
-              <div className="text-center py-8 text-zinc-400 text-sm">No duplicate tracks found!</div>
+              <div className="text-center py-8 text-muted-foreground text-sm">No duplicate tracks found!</div>
             ) : (
               trackMergeDuplicates.map((group: any, gi: number) => (
-                <div key={gi} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                <div key={gi} className="p-4 rounded-xl bg-background/60 border border-border space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-300">Group {gi + 1} — {group.tracks.length} tracks</span>
+                    <span className="text-xs font-bold text-primary">Group {gi + 1} — {group.tracks.length} tracks</span>
                     <Button
                       size="sm"
                       onClick={() => {
@@ -3703,20 +3395,20 @@ export default function AdminPage() {
                         }
                       }}
                       disabled={isMergingTracks}
-                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs h-7 gap-1"
+                      className="bg-primary hover:bg-primary/90 text-white font-bold text-xs h-7 gap-1"
                     >
                       <CheckCircle2 className="w-3 h-3" /> Merge All in Group
                     </Button>
                   </div>
                   <div className="space-y-2">
                     {group.tracks.map((track: any, ti: number) => (
-                      <div key={track.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800">
-                        <div className="h-9 w-9 rounded-lg overflow-hidden bg-zinc-800 border border-zinc-700 shrink-0">
+                      <div key={track.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-card border border-border">
+                        <div className="h-9 w-9 rounded-lg overflow-hidden bg-secondary border border-border shrink-0">
                           {track.album?.coverImageUrl ? (
                             <img src={track.album.coverImageUrl} alt={track.title} className="h-full w-full object-cover" />
                           ) : (
                             <div className="h-full w-full flex items-center justify-center">
-                              <Music className="h-4 w-4 text-zinc-500" />
+                              <Music className="h-4 w-4 text-muted-foreground/80" />
                             </div>
                           )}
                         </div>
@@ -3724,10 +3416,10 @@ export default function AdminPage() {
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-sm text-white truncate">{track.title}</span>
                             {ti === 0 && (
-                              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] font-bold py-0 px-1.5">TARGET</Badge>
+                              <Badge className="bg-primary/15 text-primary border-primary/40 text-[10px] font-bold py-0 px-1.5">TARGET</Badge>
                             )}
                           </div>
-                          <div className="text-[10px] text-zinc-500 font-medium">
+                          <div className="text-[10px] text-muted-foreground/80 font-medium">
                             {track.artist.name} • {track.format} {track.bitRate ? `${track.bitRate}kbps` : ""} • {track.playCount} plays
                             {track.album ? ` • ${track.album.title}` : ""}
                           </div>
@@ -3738,7 +3430,7 @@ export default function AdminPage() {
                             variant="ghost"
                             onClick={() => handleMergeTrack(track.id, group.tracks[0].id)}
                             disabled={isMergingTracks}
-                            className="text-purple-300 hover:text-purple-200 hover:bg-purple-950/50 font-bold text-[10px] h-7 px-2 gap-1 shrink-0"
+                            className="text-primary hover:text-primary/80 hover:bg-primary/10 font-bold text-[10px] h-7 px-2 gap-1 shrink-0"
                           >
                             <CheckCircle2 className="w-3 h-3" /> Merge into target
                           </Button>
@@ -3751,13 +3443,13 @@ export default function AdminPage() {
             )}
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setShowTrackMergeDialog(false)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Close</Button>
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setShowTrackMergeDialog(false)} className="border-border bg-card text-white hover:bg-accent font-semibold">Close</Button>
             {trackMergeDuplicates.length > 0 && (
               <Button
                 onClick={handleMergeAllTracks}
                 disabled={isMergingTracks}
-                className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg gap-2"
+                className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg gap-2"
               >
                 {isMergingTracks ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 Merge All ({trackMergeDuplicates.reduce((acc: number, g: any) => acc + g.tracks.length - 1, 0)} tracks)
@@ -3769,20 +3461,20 @@ export default function AdminPage() {
 
       {/* 📜 LYRICS EDITOR DIALOG */}
       <Dialog open={!!selectedTrackForLyrics} onOpenChange={(open) => !open && setSelectedTrackForLyrics(null)}>
-        <DialogContent className="bg-zinc-900 border border-zinc-700 text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="border-b border-zinc-800 pb-3">
-            <DialogTitle className="text-xl font-extrabold flex items-center gap-2">
-              <FileText className="w-5 h-5 text-purple-400" />
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
               Lyrics Editor: {selectedTrackForLyrics?.title}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Edit plain and synced lyrics, including romanized versions.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-3">
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
-              <span className="text-xs font-bold text-zinc-300">Editor Mode</span>
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/60 border border-border">
+              <span className="text-xs font-bold text-foreground/80">Editor Mode</span>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -3806,42 +3498,42 @@ export default function AdminPage() {
             {manualLyricsMode ? (
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-bold text-zinc-200">Synced Lyrics (LRC Format with [mm:ss.xx])</Label>
+                  <Label className="text-xs font-bold text-foreground/90">Synced Lyrics (LRC Format with [mm:ss.xx])</Label>
                   <Textarea
                     value={manualLyricsData.syncedLyrics}
                     onChange={(e) => setManualLyricsData({ ...manualLyricsData, syncedLyrics: e.target.value })}
                     rows={6}
                     placeholder="[00:12.00] First line of song..."
-                    className="font-mono text-xs bg-zinc-950 border-zinc-700 text-white font-medium"
+                    className="font-mono text-xs bg-background/60 border-border text-white font-medium"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-bold text-zinc-200">Plain Text Lyrics</Label>
+                  <Label className="text-xs font-bold text-foreground/90">Plain Text Lyrics</Label>
                   <Textarea
                     value={manualLyricsData.plainLyrics}
                     onChange={(e) => setManualLyricsData({ ...manualLyricsData, plainLyrics: e.target.value })}
                     rows={4}
                     placeholder="Plain lyrics without timestamps..."
-                    className="text-xs bg-zinc-950 border-zinc-700 text-white font-medium"
+                    className="text-xs bg-background/60 border-border text-white font-medium"
                   />
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+              <div className="p-4 rounded-xl bg-background/60 border border-border space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-300">LRCLib Lyrics Found</span>
+                  <span className="text-xs font-bold text-primary">LRCLib Lyrics Found</span>
                   <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[10px] font-bold">Auto Synced</Badge>
                 </div>
-                <div className="max-h-60 overflow-y-auto font-mono text-xs text-zinc-300 p-3.5 rounded-lg bg-zinc-900 border border-zinc-800 leading-relaxed">
+                <div className="max-h-60 overflow-y-auto font-mono text-xs text-foreground/80 p-3.5 rounded-lg bg-card border border-border leading-relaxed">
                   {selectedTrackForLyrics?.lrcData?.syncedLyrics || selectedTrackForLyrics?.lrcData?.plainLyrics || "No lyrics content in match."}
                 </div>
               </div>
             )}
           </div>
 
-          <DialogFooter className="gap-2 border-t border-zinc-800 pt-3">
-            <Button variant="outline" onClick={() => setSelectedTrackForLyrics(null)} className="border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 font-semibold">Cancel</Button>
-            <Button onClick={handleUpdateLyrics} className="bg-purple-600 hover:bg-purple-500 font-bold text-white shadow-lg">
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button variant="outline" onClick={() => setSelectedTrackForLyrics(null)} className="border-border bg-card text-white hover:bg-accent font-semibold">Cancel</Button>
+            <Button onClick={handleUpdateLyrics} className="bg-primary hover:bg-primary/90 font-bold text-white shadow-lg">
               Save Lyrics
             </Button>
           </DialogFooter>

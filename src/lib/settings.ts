@@ -8,6 +8,8 @@ export interface SystemSettingsConfig {
   REQUIRE_EMAIL_VERIFICATION: boolean;
   SITE_NAME: string;
   DEFAULT_AUDIO_QUALITY: string;
+  ONBOARDING_ENABLED: boolean;
+  ANNOUNCEMENT: string;
 }
 
 export const DEFAULT_SETTINGS: SystemSettingsConfig = {
@@ -17,7 +19,10 @@ export const DEFAULT_SETTINGS: SystemSettingsConfig = {
   ALLOW_ANONYMOUS_PLAYBACK: true,
   REQUIRE_EMAIL_VERIFICATION: false,
   SITE_NAME: "Serika Music",
-  DEFAULT_AUDIO_QUALITY: "FLAC_LOSSLESS",
+  // Matches the player's own default, so an unset value changes nothing.
+  DEFAULT_AUDIO_QUALITY: "auto",
+  ONBOARDING_ENABLED: true,
+  ANNOUNCEMENT: "",
 };
 
 /** Known canonical keys (uppercase). */

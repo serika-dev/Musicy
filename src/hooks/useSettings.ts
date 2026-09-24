@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react"
 import {
   DEFAULT_SETTINGS,
   mergeSettings,
+  resetPreferences,
   type UserSettings,
 } from "@/lib/settings-defaults"
 
@@ -77,8 +78,8 @@ export function useSettings() {
   )
 
   const resetSettings = useCallback(() => {
-    mutation.mutate(DEFAULT_SETTINGS)
-  }, [mutation])
+    mutation.mutate(resetPreferences(settings))
+  }, [mutation, settings])
 
   return {
     settings,

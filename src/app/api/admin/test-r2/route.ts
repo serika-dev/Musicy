@@ -7,12 +7,11 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    // Only allow admins to test R2 connection
-    if (!session || !session.user) {
+    // Only admins may run this: it uploads test objects to the bucket.
+    if (!session || !session.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    // Additional admin check - you might want to add role checking here
     console.log('🧪 R2 Connection Test initiated by:', session.user.email)
 
     const testResults = {
