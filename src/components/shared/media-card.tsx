@@ -17,7 +17,7 @@ interface MediaCardProps {
   imageUrl?: string | null
   /** Render artwork as a circle (for artists). */
   rounded?: boolean
-  /** Small uppercase label shown under the subtitle (e.g. "Album"). */
+  /** Kind label prefixed to the subtitle (e.g. "Album · Artist"). */
   badge?: string
   /** Called when the floating play button is pressed. Omit to hide it. */
   onPlay?: (e: React.MouseEvent) => void
@@ -42,13 +42,17 @@ export function MediaCard({
   return (
     <Link
       href={href}
-      className={cn("group block focus:outline-none", className)}
+      className={cn(
+        // Spotify-style tile: the whole card lifts onto a panel on hover.
+        "group block rounded-lg p-2 -m-2 transition-colors duration-200 hover:bg-panel-hover focus:outline-none focus-visible:bg-panel-hover md:p-3 md:-m-3",
+        className,
+      )}
     >
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <div
           className={cn(
-            "relative aspect-square overflow-hidden bg-gradient-to-br from-muted via-muted/70 to-muted/50 shadow-md transition-all duration-300 group-hover:shadow-xl group-hover:shadow-black/30 group-focus-visible:ring-2 group-focus-visible:ring-ring",
-            rounded ? "rounded-full" : "rounded-xl"
+            "relative aspect-square overflow-hidden bg-secondary shadow-lg shadow-black/30",
+            rounded ? "rounded-full" : "rounded-md"
           )}
         >
           {imageUrl ? (
@@ -56,7 +60,7 @@ export function MediaCard({
             <img
               src={imageUrl}
               alt={title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="h-full w-full object-cover"
               loading="lazy"
             />
           ) : (
@@ -68,10 +72,10 @@ export function MediaCard({
           )}
 
           {onPlay && (
-            <div className="absolute bottom-2 right-2 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+            <div className="absolute bottom-2 right-2 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 max-md:hidden">
               <Button
                 size="icon"
-                className="h-11 w-11 rounded-full shadow-lg shadow-primary/30"
+                className="h-12 w-12 rounded-full shadow-xl shadow-black/50 hover:scale-105 hover:bg-primary"
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -79,46 +83,49 @@ export function MediaCard({
                 }}
                 aria-label={`Play ${title}`}
               >
-                <Play className="ml-0.5 h-5 w-5 fill-current" />
+                <Play className="ml-0.5 !size-5 fill-current" />
               </Button>
             </div>
           )}
         </div>
 
-        <div className={cn("px-0.5", rounded && "text-center")}>
-          <h3 className="truncate text-xs md:text-sm font-semibold leading-tight">
+        <div className={cn("min-w-0", rounded && "text-center")}>
+          <h3 className="truncate text-sm font-medium leading-snug">
             {title}
           </h3>
-          {subtitle &&
-            (subtitleHref ? (
-              <span
-                role="link"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  router.push(subtitleHref)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    router.push(subtitleHref)
-                  }
-                }}
-                className="mt-1 line-clamp-1 text-[10px] md:text-xs font-medium text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-              >
-                {subtitle}
-              </span>
-            ) : (
-              <p className="mt-1 line-clamp-1 text-[10px] md:text-xs font-medium text-muted-foreground">
-                {subtitle}
-              </p>
-            ))}
-          {badge && (
-            <span className="mt-1 inline-block text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-              {badge}
-            </span>
+          {(subtitle || badge) && (
+            <p className="mt-0.5 line-clamp-1 text-[13px] text-muted-foreground">
+              {badge && (
+                <span>
+                  {badge}
+                  {subtitle && " · "}
+                </span>
+              )}
+              {subtitle &&
+                (subtitleHref ? (
+                  <span
+                    role="link"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      router.push(subtitleHref)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        router.push(subtitleHref)
+                      }
+                    }}
+                    className="cursor-pointer hover:text-foreground hover:underline"
+                  >
+                    {subtitle}
+                  </span>
+                ) : (
+                  subtitle
+                ))}
+            </p>
           )}
         </div>
       </div>

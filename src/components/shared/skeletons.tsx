@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils"
 
 export function MediaCardSkeleton({ rounded = false }: { rounded?: boolean }) {
   return (
-    <div className="space-y-3">
-      <Skeleton className={cn("aspect-square w-full", rounded ? "rounded-full" : "rounded-xl")} />
+    <div className="space-y-2.5">
+      <Skeleton className={cn("aspect-square w-full", rounded ? "rounded-full" : "rounded-md")} />
       <div className={cn("space-y-2", rounded && "flex flex-col items-center")}>
         <Skeleton className="h-3.5 w-3/4" />
         <Skeleton className="h-3 w-1/2" />
@@ -39,7 +39,7 @@ export function MediaGridSkeleton({
 export function TrackRowSkeleton() {
   return (
     <div className="flex items-center gap-3 p-2">
-      <Skeleton className="h-12 w-12 rounded-md" />
+      <Skeleton className="h-11 w-11 rounded" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-3.5 w-1/3" />
         <Skeleton className="h-3 w-1/4" />

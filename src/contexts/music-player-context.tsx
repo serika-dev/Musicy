@@ -36,6 +36,12 @@ interface MusicPlayerContextType {
   repeatMode: "off" | "track" | "playlist";
   queue: Track[];
   currentIndex: number;
+  /** Collection the queue was started from (album, playlist, mix…). */
+  playbackContext: {
+    type: "playlist" | "album" | "standalone" | "daily-mix" | null;
+    id?: string;
+    name?: string;
+  };
 
   // Player actions
   playTrack: (
@@ -1452,6 +1458,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     repeatMode,
     queue,
     currentIndex,
+    playbackContext,
     playTrack,
     togglePlayPause,
     stopPlayback,

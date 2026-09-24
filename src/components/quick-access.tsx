@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Play, Heart, Clock, Music2, Sparkles, Radio } from "lucide-react"
+import { Play, Heart, Sparkles, Mic2, Disc3, Compass, ListMusic } from "lucide-react"
 import { useMusicPlayer } from "@/contexts/music-player-context"
 import { useLikedSongs } from "@/hooks/useLikedSongs"
 
@@ -23,7 +23,7 @@ export function QuickAccess() {
       name: "Liked Songs", 
       href: "/liked-songs", 
       icon: Heart, 
-      color: "from-primary/80 to-primary",
+      color: "from-indigo-600 via-violet-500 to-fuchsia-300",
       onPlay: handlePlayLiked
     },
     { 
@@ -35,50 +35,56 @@ export function QuickAccess() {
     { 
       name: "Your Playlists", 
       href: "/playlists", 
-      icon: Music2, 
+      icon: ListMusic, 
       color: "from-blue-600 to-blue-800" 
     },
     { 
       name: "Artists", 
       href: "/artists", 
-      icon: Music2, 
+      icon: Mic2, 
       color: "from-purple-600 to-purple-800" 
     },
     { 
       name: "Albums", 
       href: "/albums", 
-      icon: Music2, 
+      icon: Disc3, 
       color: "from-amber-600 to-amber-800" 
     },
     { 
-      name: "Search", 
+      name: "Browse", 
       href: "/search", 
-      icon: Radio, 
+      icon: Compass, 
       color: "from-rose-600 to-rose-800" 
     },
   ]
 
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 gap-2 md:gap-4">
-      {items.map((item, i) => (
-        <Link key={i} href={item.href} className="group relative overflow-hidden bg-card/40 hover:bg-card/60 transition-all rounded-lg md:rounded-md">
-          <div className="flex items-center gap-3 md:gap-4 p-1">
-            <div className={`w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform duration-300 rounded-md`}>
-              <item.icon className="w-5 h-5 md:w-7 md:h-7 text-white" />
-            </div>
-            <span className="font-bold text-xs md:text-sm lg:text-base leading-none truncate pr-8 md:pr-12">
-              {item.name}
-            </span>
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              onClick={item.onPlay}
-              className="absolute right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl"
-            >
-              <Play className="w-5 h-5 fill-current" />
-            </Button>
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          className="group relative flex h-14 items-center overflow-hidden rounded-md bg-foreground/[0.07] transition-colors hover:bg-foreground/[0.14] md:h-16"
+        >
+          <div
+            className={`flex h-full aspect-square shrink-0 items-center justify-center bg-gradient-to-br ${item.color} shadow-[4px_0_12px_rgba(0,0,0,0.25)]`}
+          >
+            <item.icon className="h-5 w-5 text-white md:h-6 md:w-6" />
           </div>
+          <span className="min-w-0 flex-1 truncate px-3 text-[13px] font-semibold md:text-sm">
+            {item.name}
+          </span>
+          {item.onPlay && (
+            <Button
+              size="icon"
+              onClick={item.onPlay}
+              aria-label={`Play ${item.name}`}
+              className="absolute right-2 hidden h-9 w-9 rounded-full opacity-0 shadow-xl shadow-black/40 transition-opacity hover:scale-105 hover:bg-primary group-hover:opacity-100 focus-visible:opacity-100 md:flex"
+            >
+              <Play className="ml-0.5 !size-4 fill-current" />
+            </Button>
+          )}
         </Link>
       ))}
     </div>

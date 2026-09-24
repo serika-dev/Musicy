@@ -318,7 +318,7 @@ export default function PlaylistPage() {
       </div>
 
       {/* Sticky Action Bar */}
-      <div className="sticky top-16 z-30 -mx-4 border-b border-white/5 bg-background/80 px-4 backdrop-blur-xl lg:static lg:mx-0 lg:border-none lg:bg-transparent lg:px-0">
+      <div className="sticky top-0 z-30 -mx-4 border-b border-white/5 bg-background/80 px-4 backdrop-blur-xl lg:static lg:mx-0 lg:border-none lg:bg-transparent lg:px-0">
         <div className="flex items-center justify-between py-4">
           <div className="flex items-center gap-4 lg:gap-6">
             <Button

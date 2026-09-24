@@ -3,13 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   BadgeCheck,
-  Calendar,
   Clock,
-  Heart,
   Music,
   Pause,
   Play,
   Share,
+  Shuffle,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,9 +17,9 @@ import { ShareMenu } from "@/components/share-menu";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TrackListSkeleton } from "@/components/shared/skeletons";
 import { TrackListItem } from "@/components/track-list-item";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useMusicPlayer } from "@/contexts/music-player-context";
+import { useArtworkColor } from "@/hooks/useArtworkColor";
 import { formatDuration } from "@/lib/utils";
 
 interface Album {
@@ -85,8 +84,16 @@ export default function AlbumPage() {
   const albumId = params.id as string;
 
   const { data: album, isLoading, error } = useAlbum(albumId);
-  const { playTrack, isCurrentTrack, isPlaying, currentTrack } =
-    useMusicPlayer();
+  const {
+    playTrack,
+    isCurrentTrack,
+    isPlaying,
+    currentTrack,
+    togglePlayPause,
+    isShuffle,
+    toggleShuffle,
+  } = useMusicPlayer();
+  const tint = useArtworkColor(album?.coverImageUrl);
 
   if (isLoading) {
     return (
@@ -125,6 +132,17 @@ export default function AlbumPage() {
     }
   };
 
+  const handleShuffle = () => {
+    if (allTracks.length === 0) return;
+    if (!isShuffle) toggleShuffle();
+    const start = allTracks[Math.floor(Math.random() * allTracks.length)];
+    playTrack(start, allTracks, {
+      type: "album",
+      id: album.id,
+      name: album.title,
+    });
+  };
+
   const totalDuration =
     album.tracks?.reduce((acc, track) => acc + (track.duration || 0), 0) || 0;
   const releaseDate = album.releaseDate ? new Date(album.releaseDate) : null;
@@ -156,145 +174,164 @@ export default function AlbumPage() {
     : [...allTracks].sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 10);
 
   return (
-    <div className="space-y-10">
-      {/* Hero */}
-      <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-end sm:text-left">
-        <div className="relative h-52 w-52 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 to-primary/60 shadow-2xl shadow-primary/20 sm:h-56 sm:w-56">
-          {album.coverImageUrl ? (
-            <Image
-              src={album.coverImageUrl}
-              alt={album.title}
-              fill
-              className="object-cover"
-              sizes="224px"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Music className="h-24 w-24 text-white/80" />
-            </div>
-          )}
-        </div>
+    <div className="space-y-6">
+      {/* Hero — tinted with the cover's colour, fading into the page */}
+      <div
+        className="-mx-4 -mt-4 px-4 pb-6 pt-8 transition-[background] duration-700 md:-mx-6 md:-mt-6 md:px-6 md:pt-12 lg:-mx-8 lg:px-8"
+        style={{
+          background: `linear-gradient(180deg, ${tint ? `color-mix(in srgb, ${tint} 55%, transparent)` : "hsl(var(--primary) / 0.25)"} 0%, transparent 100%)`,
+        }}
+      >
+        <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-end sm:text-left">
+          <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-md bg-secondary shadow-[0_8px_40px_rgba(0,0,0,0.55)] sm:h-52 sm:w-52 lg:h-60 lg:w-60">
+            {album.coverImageUrl ? (
+              <Image
+                src={album.coverImageUrl}
+                alt={album.title}
+                fill
+                className="object-cover"
+                sizes="240px"
+                priority
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <Music className="h-20 w-20 text-muted-foreground/60" />
+              </div>
+            )}
+          </div>
 
-        <div className="min-w-0 flex-1 space-y-4">
-          <div className="space-y-2">
-            <Badge variant="secondary">{albumTypeLabel(album.albumType)}</Badge>
-            <p className="text-4xl font-black tracking-tight sm:text-6xl" aria-hidden="true">
+          <div className="min-w-0 flex-1 space-y-3">
+            <p className="text-sm font-medium text-foreground/80">
+              {albumTypeLabel(album.albumType)}
+            </p>
+            <p
+              className="break-words text-3xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-7xl"
+              aria-hidden="true"
+            >
               {album.title}
             </p>
             {album.description && (
-              <p className="text-muted-foreground">{album.description}</p>
+              <p className="line-clamp-2 text-sm text-muted-foreground">{album.description}</p>
             )}
-          </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:justify-start">
-            {isMultiPerformer ? (
-              <span className="font-semibold text-foreground">
-                {heroArtistNames.join(", ")}
-                {performers.length > heroArtistNames.length &&
-                  ` +${performers.length - heroArtistNames.length} more`}
-              </span>
-            ) : (
-              <Link
-                href={`/artists/${album.artist.id}`}
-                className="inline-flex items-center font-semibold text-foreground hover:underline"
-              >
-                {album.artist.name}
-                {album.artist.verified && (
-                  <BadgeCheck className="ml-1 h-4 w-4 text-primary" />
-                )}
-              </Link>
-            )}
-            {releaseDate && (
-              <>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {releaseDate.getFullYear()}
+            <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-sm text-foreground/70 sm:justify-start">
+              {isMultiPerformer ? (
+                <span className="font-semibold text-foreground">
+                  {heroArtistNames.join(", ")}
+                  {performers.length > heroArtistNames.length &&
+                    ` +${performers.length - heroArtistNames.length} more`}
                 </span>
-              </>
-            )}
-            <span>•</span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              {formatDuration(totalDuration)}
-            </span>
-            <span>•</span>
-            <span>{album._count.tracks} tracks</span>
-            {album.genre && (
-              <>
-                <span>•</span>
-                <span>{album.genre}</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
-            <Button
-              size="lg"
-              onClick={handlePlayAll}
-              disabled={!album.tracks || album.tracks.length === 0}
-              className="rounded-full shadow-lg shadow-primary/30"
-            >
-              {isAlbumPlaying ? (
-                <Pause className="h-5 w-5 fill-current" />
               ) : (
-                <Play className="h-5 w-5 fill-current" />
+                <Link
+                  href={`/artists/${album.artist.id}`}
+                  className="inline-flex items-center font-semibold text-foreground hover:underline"
+                >
+                  {album.artist.name}
+                  {album.artist.verified && (
+                    <BadgeCheck className="ml-1 h-4 w-4 text-primary" aria-label="Verified" />
+                  )}
+                </Link>
               )}
-              {isAlbumPlaying ? "Pause" : "Play"}
-            </Button>
-
-            <Button variant="outline" size="lg" className="rounded-full">
-              <Heart className="h-5 w-5" />
-              Like
-            </Button>
-
-            <ShareMenu
-              title={album.title}
-              url={`/albums/${album.id}`}
-              id={album.id}
-              type="album"
-              trigger={
-                <Button variant="outline" size="lg" className="rounded-full">
-                  <Share className="h-5 w-5" />
-                  Share
-                </Button>
-              }
-            />
+              {releaseDate && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>{releaseDate.getFullYear()}</span>
+                </>
+              )}
+              <span aria-hidden="true">·</span>
+              <span>
+                {album._count.tracks} {album._count.tracks === 1 ? "song" : "songs"},{" "}
+                <span className="text-foreground/55">{formatDuration(totalDuration)}</span>
+              </span>
+              {album.genre && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>{album.genre}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Action bar */}
+      <div className="flex items-center gap-5">
+        <Button
+          size="icon"
+          onClick={isAlbumPlaying ? togglePlayPause : handlePlayAll}
+          disabled={!album.tracks || album.tracks.length === 0}
+          aria-label={isAlbumPlaying ? "Pause" : `Play ${album.title}`}
+          className="h-14 w-14 rounded-full shadow-xl shadow-black/40 hover:scale-105 hover:bg-primary"
+        >
+          {isAlbumPlaying ? (
+            <Pause className="!size-6 fill-current" />
+          ) : (
+            <Play className="ml-0.5 !size-6 fill-current" />
+          )}
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleShuffle}
+          disabled={!album.tracks || album.tracks.length === 0}
+          aria-label="Shuffle play"
+          className="h-10 w-10 text-muted-foreground hover:bg-transparent hover:text-foreground hover:scale-105"
+        >
+          <Shuffle className="!size-6" />
+        </Button>
+
+        <ShareMenu
+          title={album.title}
+          url={`/albums/${album.id}`}
+          id={album.id}
+          type="album"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Share"
+              className="h-10 w-10 text-muted-foreground hover:bg-transparent hover:text-foreground hover:scale-105"
+            >
+              <Share className="!size-5" />
+            </Button>
+          }
+        />
+      </div>
+
       {/* Tracks */}
-      <section className="space-y-1">
+      <section>
         {!hasDescription && sortedTracks.length > 0 && (
-          <p className="text-xs text-muted-foreground font-medium pb-2">
+          <p className="pb-3 text-sm font-semibold">
             Top {sortedTracks.length} tracks
           </p>
         )}
+        {sortedTracks.length > 0 && (
+          <div className="mb-2 hidden items-center gap-4 border-b border-border px-3 pb-2 text-[13px] text-muted-foreground sm:flex">
+            <span className="w-6 text-center">#</span>
+            <span className="flex-1">Title</span>
+            <Clock className="mr-9 h-4 w-4" aria-label="Duration" />
+          </div>
+        )}
         {sortedTracks.length > 0 ? (
           sortedTracks.map((track, index) => (
-            <div key={track.id} className="flex items-center gap-2">
-              <span className="hidden w-8 shrink-0 text-center text-sm text-muted-foreground sm:block">
-                {track.trackNumber || index + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <TrackListItem
-                  track={track}
-                  isCurrentTrack={isCurrentTrack(track.id)}
-                  isPlaying={isCurrentTrack(track.id) && isPlaying}
-                  onPlay={() =>
-                    playTrack(track, allTracks, {
-                      type: "album",
-                      id: album.id,
-                      name: album.title,
-                    })
-                  }
-                  showAlbum={false}
-                  showAddButton={true}
-                  className="bg-transparent hover:bg-white/5"
-                />
-              </div>
-            </div>
+            <TrackListItem
+              key={track.id}
+              track={track}
+              index={hasDescription ? (track.trackNumber ? track.trackNumber - 1 : index) : index}
+              showArtwork={isMultiPerformer}
+              isCurrentTrack={isCurrentTrack(track.id)}
+              isPlaying={isCurrentTrack(track.id) && isPlaying}
+              onPlay={() =>
+                playTrack(track, allTracks, {
+                  type: "album",
+                  id: album.id,
+                  name: album.title,
+                })
+              }
+              showAlbum={false}
+              showAddButton={true}
+            />
           ))
         ) : (
           <EmptyState

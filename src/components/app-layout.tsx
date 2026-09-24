@@ -66,30 +66,35 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
+    <div className="flex h-dvh flex-col bg-background text-foreground">
       {!isAuthPage && <Header />}
 
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Desktop sidebar */}
+      {/* Desktop: library panel + main panel side by side on a near-black
+          canvas (Spotify-style). Phones get a single full-bleed column. */}
+      <div
+        className={cn(
+          "relative flex min-h-0 flex-1 overflow-hidden",
+          showSidebar && "lg:gap-2 lg:px-2",
+        )}
+      >
         {/* overflow-hidden is a hard stop: nothing in the sidebar may bleed
             into the content column, whatever a child's CSS tries to do. */}
         {showSidebar && (
-          <div className="hidden lg:flex w-64 flex-shrink-0 min-w-0 overflow-hidden p-2 pr-0">
-            <Sidebar className={`h-full min-w-0 ${currentTrack ? 'pb-24' : 'pb-4'}`} />
-          </div>
+          <aside className="hidden w-[18.5rem] min-w-0 shrink-0 overflow-hidden lg:flex xl:w-80">
+            <Sidebar className="h-full min-w-0 w-full" />
+          </aside>
         )}
 
-        {/* Main content. Bottom padding accounts for the mobile nav + the
-            floating player bar (which sits above the nav on phones).
-            Use min-h-0 so flex doesn't block scrolling, and CSS vars so
-            the last rows stay clear of the player chrome. */}
+        {/* Main content. On phones the bottom padding clears the tab bar and
+            the mini player that floats above it; on desktop the player is
+            docked in the layout flow, so only a normal end gap is needed. */}
         <main
           className={cn(
-            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
+            "min-h-0 flex-1 overflow-y-auto overflow-x-hidden",
+            showSidebar && "app-panel-main lg:rounded-xl",
             currentTrack
-              ? "pb-[var(--content-pad-player-mobile)] lg:pb-[var(--content-pad-player-desktop)]"
+              ? "pb-[var(--content-pad-player-mobile)] lg:pb-6"
               : "pb-[var(--content-pad-nav-mobile)] lg:pb-6",
-            showSidebar ? "lg:pl-2" : "",
           )}
           style={{
             scrollPaddingBottom: currentTrack
@@ -98,15 +103,15 @@ export function AppLayout({ children }: AppLayoutProps) {
           }}
         >
           <div className="flex min-h-full w-full flex-col">
-            <div className="flex-1 px-3 py-4 md:px-6 md:py-6 lg:px-8">{children}</div>
+            <div className="flex-1 px-4 py-4 md:px-6 md:py-6 lg:px-8">{children}</div>
             {/* Footer handles its own route visibility checks */}
             {!isAuthPage && <SiteFooter />}
           </div>
         </main>
       </div>
 
-      {showSidebar && <MobileNav />}
       <PlayerBar />
+      {showSidebar && <MobileNav />}
     </div>
   )
 }

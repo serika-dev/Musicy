@@ -11,6 +11,8 @@ interface SeekBarProps {
   showTimes?: boolean;
   /** Show remaining time (-m:ss) instead of total duration on the right. */
   remaining?: boolean;
+  /** Put the time labels either side of the rail (desktop dock). */
+  inline?: boolean;
   className?: string;
 }
 
@@ -18,6 +20,7 @@ export function SeekBar({
   variant = "bar",
   showTimes = false,
   remaining = false,
+  inline = false,
   className,
 }: SeekBarProps) {
   const { currentTime, duration, seekTo } = useMusicPlayer();
@@ -27,6 +30,32 @@ export function SeekBar({
   const onValueChange = (value: number[]) => {
     if (duration > 0) seekTo((value[0] / 100) * duration);
   };
+
+  const elapsedLabel = formatDuration(Math.floor(currentTime));
+  const endLabel = remaining
+    ? `-${formatDuration(Math.max(0, Math.floor(duration - currentTime)))}`
+    : formatDuration(Math.floor(duration));
+
+  if (inline) {
+    return (
+      <div className={cn("flex w-full items-center gap-2", className)}>
+        <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+          {elapsedLabel}
+        </span>
+        <Slider
+          value={[progress]}
+          onValueChange={onValueChange}
+          max={100}
+          step={0.1}
+          aria-label="Seek"
+          className="cursor-pointer"
+        />
+        <span className="w-10 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          {endLabel}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("w-full", className)}>
@@ -48,12 +77,8 @@ export function SeekBar({
             immersive ? "text-white/60" : "text-muted-foreground",
           )}
         >
-          <span>{formatDuration(Math.floor(currentTime))}</span>
-          <span>
-            {remaining
-              ? `-${formatDuration(Math.max(0, Math.floor(duration - currentTime)))}`
-              : formatDuration(Math.floor(duration))}
-          </span>
+          <span>{elapsedLabel}</span>
+          <span>{endLabel}</span>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   Pause,
   Play,
   Repeat,
+  Repeat1,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -26,7 +27,7 @@ interface PlayerControlsProps {
 }
 
 const sizeMap = {
-  sm: { play: "h-9 w-9", icon: "h-4 w-4", skip: "h-4 w-4", side: "h-4 w-4" },
+  sm: { play: "h-8 w-8", icon: "h-4 w-4", skip: "h-4 w-4", side: "h-4 w-4" },
   md: { play: "h-11 w-11", icon: "h-5 w-5", skip: "h-5 w-5", side: "h-5 w-5" },
   lg: { play: "h-16 w-16", icon: "h-7 w-7", skip: "h-8 w-8", side: "h-6 w-6" },
 };
@@ -53,8 +54,13 @@ export function PlayerControls({
 
   const ghost = immersive
     ? "text-white/80 hover:text-white hover:bg-white/10"
-    : "text-muted-foreground hover:text-foreground";
-  const active = immersive ? "text-white" : "text-primary";
+    : "text-muted-foreground hover:bg-transparent hover:text-foreground";
+  const active = immersive ? "text-white" : "text-primary hover:text-primary";
+  // Toggles get a dot under the glyph when on, so state never relies on
+  // colour alone.
+  const dot = (
+    <span className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-current" />
+  );
 
   return (
     <div
@@ -69,11 +75,12 @@ export function PlayerControls({
             variant="ghost"
             size="icon"
             onClick={toggleShuffle}
-            className={cn("hidden sm:flex", ghost, isShuffle && active)}
+            className={cn("relative hidden sm:flex", ghost, isShuffle && active)}
             aria-label="Shuffle"
             aria-pressed={isShuffle}
           >
             <Shuffle className={s.side} />
+            {isShuffle && dot}
           </Button>
         </TooltipTrigger>
         <TooltipContent>Shuffle</TooltipContent>
@@ -86,7 +93,7 @@ export function PlayerControls({
         className={ghost}
         aria-label="Previous track"
       >
-        <SkipBack className={cn(s.skip, immersive && "fill-current")} />
+        <SkipBack className={cn(s.skip, "fill-current")} />
       </Button>
 
       <Button
@@ -97,7 +104,7 @@ export function PlayerControls({
           s.play,
           immersive
             ? "bg-white text-black hover:bg-white"
-            : "bg-primary text-primary-foreground hover:bg-primary/90",
+            : "bg-foreground text-background hover:bg-foreground",
         )}
         aria-label={isPlaying ? "Pause" : "Play"}
       >
@@ -115,7 +122,7 @@ export function PlayerControls({
         className={ghost}
         aria-label="Next track"
       >
-        <SkipForward className={cn(s.skip, immersive && "fill-current")} />
+        <SkipForward className={cn(s.skip, "fill-current")} />
       </Button>
 
       <Tooltip>
@@ -128,10 +135,12 @@ export function PlayerControls({
             aria-label="Repeat"
             aria-pressed={isRepeat}
           >
-            <Repeat className={s.side} />
-            {repeatMode === "track" && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-current" />
+            {repeatMode === "track" ? (
+              <Repeat1 className={s.side} />
+            ) : (
+              <Repeat className={s.side} />
             )}
+            {isRepeat && dot}
           </Button>
         </TooltipTrigger>
         <TooltipContent>

@@ -3,8 +3,8 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useSession, signOut } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -16,13 +16,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Search, User, LogOut, Settings, Shield, LayoutDashboard } from "lucide-react"
+import { Search, User, LogOut, Settings, Shield, LayoutDashboard, Home, LayoutGrid } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
+import { cn } from "@/lib/utils"
 
 export function Header() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // "/" or Cmd/Ctrl+K jumps to search from anywhere, as in most music apps.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const typing =
+        target?.isContentEditable ||
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT"
+      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
+        if (!searchRef.current || searchRef.current.offsetParent === null) return
+        e.preventDefault()
+        searchRef.current.focus()
+        searchRef.current.select()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,40 +62,53 @@ export function Header() {
   const avatarSrc = session?.user?.avatarUrl || session?.user?.image || ""
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/60 backdrop-blur-2xl lg:border-b">
-      <div className="w-full px-4 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-background">
+      <div className="flex h-14 w-full items-center justify-between gap-3 px-4 lg:h-16 lg:px-4">
         {/* Wordmark */}
         <Link
           href="/"
           aria-label="Musicy home"
-          className="group shrink-0 transition-opacity active:scale-95 hover:opacity-90"
+          className="group shrink-0 transition-opacity active:scale-95 hover:opacity-90 lg:w-[17.5rem] xl:w-[19rem]"
         >
           <Logo size="md" />
         </Link>
 
-        {/* Nav Links */}
-        <nav className="hidden lg:flex items-center gap-8 ml-4">
-          <Link href="/playlists" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hover:translate-y-[-1px]">
-            Playlists
-          </Link>
-          <Link href="/artists" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hover:translate-y-[-1px]">
-            Artists
-          </Link>
-          <Link href="/albums" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hover:translate-y-[-1px]">
-            Albums
-          </Link>
-        </nav>
-
-        {/* Search */}
-        <div className="hidden md:flex items-center flex-1 max-w-xl mx-8">
-          <form onSubmit={handleSearch} className="relative w-full group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        {/* Home + search, centred like Spotify's desktop client */}
+        <div className="hidden min-w-0 flex-1 items-center justify-center gap-2 md:flex">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            className={cn(
+              "h-12 w-12 shrink-0 rounded-full bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground hover:scale-105",
+              pathname === "/" && "text-foreground",
+            )}
+          >
+            <Link href="/" aria-label="Home" aria-current={pathname === "/" ? "page" : undefined}>
+              <Home className={cn("!size-5", pathname === "/" && "fill-current")} />
+            </Link>
+          </Button>
+          <form onSubmit={handleSearch} role="search" className="group relative w-full max-w-[30rem]">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground" />
             <Input
+              ref={searchRef}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search songs, artists, albums..."
-              className="w-full pl-10 h-10 bg-secondary/30 border-border/20 focus:border-primary/30 focus:bg-secondary/50 rounded-xl text-sm transition-all shadow-sm focus:shadow-md"
+              placeholder="What do you want to play?"
+              aria-label="Search songs, artists, albums"
+              className="h-12 w-full rounded-full border-transparent bg-secondary pl-12 pr-16 text-[15px] shadow-none transition-colors placeholder:text-muted-foreground hover:bg-accent focus-visible:border-foreground/80 focus-visible:bg-accent focus-visible:ring-0 focus-visible:ring-offset-0"
             />
+            <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center">
+              <span className="mr-1 h-6 w-px bg-border" aria-hidden="true" />
+              <Link
+                href="/search"
+                aria-label="Browse"
+                title="Browse"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <LayoutGrid className="h-5 w-5" />
+              </Link>
+            </div>
           </form>
         </div>
 
@@ -81,22 +117,22 @@ export function Header() {
           variant="ghost"
           size="icon"
           asChild
-          className="md:hidden shrink-0"
+          className="ml-auto shrink-0 rounded-full md:hidden"
         >
           <Link href="/search" aria-label="Search">
-            <Search className="h-5 w-5" />
+            <Search className="!size-5" />
           </Link>
         </Button>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex shrink-0 items-center justify-end gap-3 lg:w-[17.5rem] xl:w-[19rem]">
           {status === "loading" ? (
             <div className="w-8 h-8 animate-spin rounded-full border-b-2 border-primary" />
           ) : session ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 ring-2 ring-transparent transition-all hover:ring-primary/40 active:scale-95">
-                  <Avatar className="h-9 w-9 overflow-hidden rounded-full">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full bg-secondary p-0 transition-all hover:scale-105 hover:bg-accent active:scale-95" aria-label="Account menu">
+                  <Avatar className="h-8 w-8 overflow-hidden rounded-full">
                     <AvatarImage src={avatarSrc} alt={session.user?.name || "Profile"} />
                     <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
                       {userInitials}
@@ -109,7 +145,7 @@ export function Header() {
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60 bg-card/95 backdrop-blur-xl border-border/50">
+              <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-xl border-border/60 bg-popover p-1.5 shadow-2xl">
                 <DropdownMenuLabel className="p-3">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
@@ -159,8 +195,8 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-              <Link href="/login">Sign In</Link>
+            <Button className="h-10 rounded-full bg-foreground px-6 font-semibold text-background hover:scale-105 hover:bg-foreground" asChild>
+              <Link href="/login">Log in</Link>
             </Button>
           )}
         </div>

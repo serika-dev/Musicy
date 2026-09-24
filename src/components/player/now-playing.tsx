@@ -35,7 +35,15 @@ interface NowPlayingProps {
 }
 
 export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
-  const { currentTrack } = useMusicPlayer();
+  const { currentTrack, playbackContext } = useMusicPlayer();
+  const contextLabel =
+    playbackContext?.type === "album"
+      ? "album"
+      : playbackContext?.type === "playlist"
+        ? "playlist"
+        : playbackContext?.type === "daily-mix"
+          ? "mix"
+          : null;
   const [showLyrics, setShowLyrics] = useState(true);
   const [gradient, setGradient] = useState<string | null>(null);
 
@@ -144,9 +152,16 @@ export function NowPlaying({ isOpen, onClose }: NowPlayingProps) {
               >
                 <ChevronDown className="h-7 w-7" />
               </Button>
-              <span className="truncate px-4 text-xs font-bold uppercase tracking-widest text-white/80">
-                Now Playing
-              </span>
+              <div className="min-w-0 px-4 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-white/70">
+                  {contextLabel ? `Playing from ${contextLabel}` : "Now playing"}
+                </p>
+                {playbackContext?.name && contextLabel && (
+                  <p className="truncate text-[13px] font-bold text-white">
+                    {playbackContext.name}
+                  </p>
+                )}
+              </div>
               <span className="h-9 w-9" />
             </div>
 

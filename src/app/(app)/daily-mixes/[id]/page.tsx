@@ -244,7 +244,7 @@ export default function DailyMixPage() {
       </div>
 
       {/* Sticky Action Bar */}
-      <div className="sticky top-16 z-30 -mx-4 lg:-mx-8 px-4 lg:px-8 bg-background/80 backdrop-blur-xl border-b border-white/5 lg:static lg:mx-0 lg:px-0 lg:bg-transparent lg:border-none">
+      <div className="sticky top-0 z-30 -mx-4 lg:-mx-8 px-4 lg:px-8 bg-background/80 backdrop-blur-xl border-b border-white/5 lg:static lg:mx-0 lg:px-0 lg:bg-transparent lg:border-none">
         <div className="py-4 flex items-center justify-between">
           <div className="flex items-center gap-4 lg:gap-6">
             <Button

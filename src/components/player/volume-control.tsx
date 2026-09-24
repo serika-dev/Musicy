@@ -32,7 +32,7 @@ export function VolumeControl({
         className={
           immersive
             ? "text-white/80 hover:bg-white/10 hover:text-white"
-            : "text-muted-foreground hover:text-foreground"
+            : "text-muted-foreground hover:bg-transparent hover:text-foreground"
         }
       >
         <Icon className="h-4 w-4" />
@@ -43,7 +43,7 @@ export function VolumeControl({
         max={100}
         step={1}
         aria-label="Volume"
-        className="w-20 cursor-pointer"
+        className="w-24 cursor-pointer"
         trackClassName={immersive ? "bg-white/25" : undefined}
         rangeClassName={immersive ? "bg-white" : undefined}
         thumbClassName={immersive ? "border-white bg-white" : undefined}

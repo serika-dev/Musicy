@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Play, Pause, Info, ChevronLeft, ChevronRight } from "lucide-react"
+import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react"
 import { Album, useAlbum } from "@/hooks/useAlbums"
 import { useMusicPlayer } from "@/contexts/music-player-context"
 
@@ -21,6 +21,7 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
+  const [focalPosition, setFocalPosition] = useState<string>("object-[center_15%]")
 
   const activeInitialAlbum = spotlightAlbums[currentIndex] || spotlightAlbums[0]
 
@@ -98,7 +99,6 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
   }
 
   const coverUrl = currentAlbum.coverImageUrl || "/placeholder-album.png"
-  const [focalPosition, setFocalPosition] = useState<string>("object-[center_15%]")
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const img = e.currentTarget
@@ -114,126 +114,132 @@ export function AlbumSpotlight({ album: initialAlbum, albums: initialAlbums }: A
     }
   }
 
+  const kind =
+    currentAlbum.albumType === "SINGLE" ? "Single" : currentAlbum.albumType === "EP" ? "EP" : "Album"
+
   return (
     <div
-      className="relative overflow-hidden rounded-b-[2.5rem] sm:rounded-b-[3rem] rounded-t-none border-b border-white/10 bg-card shadow-[0_30px_70px_-15px_rgba(0,0,0,0.85)] h-[400px] sm:h-[460px] lg:h-[520px] transition-all duration-500 flex flex-col justify-center"
+      className="relative flex h-[23rem] flex-col overflow-hidden sm:h-[25rem] lg:h-[26rem]"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Ambient Artwork Background Blur */}
+      {/* Artwork wash — colour comes from the cover, chrome stays neutral */}
       <div
-        className="absolute inset-0 z-0 bg-cover bg-top filter blur-3xl opacity-35 scale-110 transition-all duration-1000"
+        key={coverUrl}
+        className="absolute inset-0 z-0 scale-125 bg-cover bg-center opacity-60 blur-3xl animate-fade-in"
         style={{ backgroundImage: `url(${coverUrl})` }}
       />
-
-      {/* Modern Gradient Overlay */}
       <div
-        className="absolute inset-0 z-[1] bg-gradient-to-t from-background via-background/80 to-background/30 md:bg-gradient-to-r md:from-background md:via-background/85 md:to-transparent"
+        className="absolute inset-0 z-[1] bg-gradient-to-t from-background via-background/60 to-background/10 lg:from-card lg:via-card/60 lg:to-card/10"
         aria-hidden
       />
 
-      {/* Main Content Layout - Fixed Container Height with Scaling Text */}
-      <div className="relative z-10 h-full flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8 p-6 sm:p-10 lg:p-14 overflow-hidden">
-
-        {/* Album Cover — on mobile it sits at the top, on desktop at the right */}
-        <div className="order-first md:order-last flex-shrink-0 relative group">
-          <div className="w-32 h-32 sm:w-48 sm:h-48 md:w-48 md:h-48 lg:w-76 lg:h-76 rounded-2xl overflow-hidden shadow-2xl border border-white/10 transition-transform duration-500 group-hover:scale-[1.03]">
+      <div
+        key={currentAlbum.id}
+        className="relative z-10 flex h-full flex-col items-center justify-end gap-5 px-5 pb-12 pt-6 text-center animate-fade-in sm:flex-row sm:items-end sm:gap-7 sm:px-8 sm:pb-12 sm:text-left lg:px-8"
+      >
+        <Link
+          href={`/albums/${currentAlbum.id}`}
+          className="group relative shrink-0"
+          aria-label={`Open ${currentAlbum.title}`}
+        >
+          <div className="h-36 w-36 overflow-hidden rounded-md shadow-[0_8px_40px_rgba(0,0,0,0.6)] transition-transform duration-500 group-hover:scale-[1.02] sm:h-48 sm:w-48 lg:h-56 lg:w-56">
             <img
               src={coverUrl}
               alt={currentAlbum.title}
               onLoad={handleImageLoad}
-              className={`w-full h-full object-cover transition-all duration-500 ${focalPosition}`}
+              className={`h-full w-full object-cover ${focalPosition}`}
             />
           </div>
-        </div>
+        </Link>
 
-        {/* Left Copy Column */}
-        <div className="flex-1 min-w-0 space-y-4 sm:space-y-5 text-center md:text-left overflow-hidden">
-
-          {/* Title & Artist */}
-          <div className="space-y-1.5 sm:space-y-2">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-foreground line-clamp-2 drop-shadow-md leading-tight min-w-0 break-words">
+        <div className="min-w-0 flex-1 space-y-3 sm:space-y-4">
+          <div className="space-y-1 sm:space-y-2">
+            <p className="text-xs font-semibold text-foreground/80 sm:text-sm">
+              New release · {kind}
+            </p>
+            <h2 className="line-clamp-2 break-words text-3xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
               {currentAlbum.title}
-            </h1>
-
-            <p className="text-base sm:text-xl font-bold text-muted-foreground truncate">
+            </h2>
+            <p className="truncate text-sm font-semibold text-foreground/90 sm:text-base">
               {isMultiPerformer ? (
                 <span>{performerLine}</span>
               ) : (
                 <Link
                   href={`/artists/${currentAlbum.artist.id}`}
-                  className="hover:text-primary transition-colors"
+                  className="hover:underline"
                 >
                   {currentAlbum.artist.name}
                 </Link>
               )}
               {tracks.length > 0 && (
-                <span className="text-xs sm:text-sm font-semibold text-muted-foreground/70 ml-2">
-                  • {tracks.length} {tracks.length === 1 ? "track" : "tracks"}
+                <span className="font-normal text-foreground/60">
+                  {" "}· {tracks.length} {tracks.length === 1 ? "song" : "songs"}
                 </span>
               )}
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-center md:justify-start gap-3 sm:gap-4 pt-1 sm:pt-3 shrink-0">
+          <div className="flex items-center justify-center gap-3 sm:justify-start">
             <Button
-              size="lg"
-              className="rounded-full px-7 sm:px-9 h-12 sm:h-14 text-sm sm:text-base font-extrabold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/25 transition-transform active:scale-95 inline-flex items-center justify-center gap-2 shrink-0"
+              size="icon"
+              className="h-12 w-12 shrink-0 rounded-full shadow-xl shadow-black/40 hover:scale-105 hover:bg-primary sm:h-14 sm:w-14"
               onClick={handlePlay}
               disabled={tracks.length === 0}
+              aria-label={isPlayingThisAlbum ? "Pause" : `Play ${currentAlbum.title}`}
             >
               {isPlayingThisAlbum ? (
-                <>
-                  <Pause className="w-5 h-5 fill-current shrink-0" />
-                  <span>Pause</span>
-                </>
+                <Pause className="!size-6 fill-current" />
               ) : (
-                <>
-                  <Play className="w-5 h-5 fill-current shrink-0" />
-                  <span>Listen now</span>
-                </>
+                <Play className="ml-0.5 !size-6 fill-current" />
               )}
             </Button>
-
             <Button
-              size="lg"
               variant="outline"
-              className="rounded-full px-6 sm:px-8 h-12 sm:h-14 text-sm sm:text-base font-bold bg-white/5 hover:bg-white/10 border-white/15 backdrop-blur-md text-foreground transition-transform active:scale-95 inline-flex items-center justify-center gap-2 shrink-0"
+              className="h-9 rounded-full border-foreground/50 bg-transparent px-5 text-sm font-semibold hover:scale-105 hover:border-foreground hover:bg-transparent"
               asChild
             >
-              <Link href={`/albums/${currentAlbum.id}`}>
-                <Info className="w-5 h-5 shrink-0" />
-                <span>View album</span>
-              </Link>
+              <Link href={`/albums/${currentAlbum.id}`}>View album</Link>
             </Button>
           </div>
-
         </div>
-
       </div>
 
-      {/* Minimal Carousel Controls (Only if multiple albums) */}
+      {/* Pager */}
       {spotlightAlbums.length > 1 && (
-        <div className="absolute bottom-5 right-6 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/15 px-3 py-1.5 rounded-full shadow-lg">
+        <div className="absolute inset-x-0 bottom-4 z-20 flex items-center justify-center gap-3 sm:justify-end sm:px-8">
           <button
+            type="button"
             onClick={handlePrev}
-            className="p-1 rounded-full hover:bg-white/20 text-white transition-colors"
+            className="hidden h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/70 sm:flex"
             aria-label="Previous album"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
-
-          <span className="text-xs font-mono font-bold text-white/80 px-1">
-            {String(currentIndex + 1).padStart(2, "0")} / {String(spotlightAlbums.length).padStart(2, "0")}
-          </span>
-
+          <div className="flex items-center gap-1.5">
+            {spotlightAlbums.map((a, i) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCurrentIndex(i)
+                }}
+                aria-label={`Show ${a.title}`}
+                aria-current={i === currentIndex}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === currentIndex ? "w-5 bg-foreground" : "w-1.5 bg-foreground/35 hover:bg-foreground/60"
+                }`}
+              />
+            ))}
+          </div>
           <button
+            type="button"
             onClick={handleNext}
-            className="p-1 rounded-full hover:bg-white/20 text-white transition-colors"
+            className="hidden h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/70 sm:flex"
             aria-label="Next album"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       )}

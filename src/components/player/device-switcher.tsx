@@ -64,7 +64,7 @@ export function DeviceSwitcher({ variant = "bar" }: DeviceSwitcherProps) {
               className={cn(
                 immersive
                   ? "text-white/80 hover:bg-white/10 hover:text-white"
-                  : "text-muted-foreground hover:text-foreground",
+                  : "text-muted-foreground hover:bg-transparent hover:text-foreground",
                 !isActiveDevice && (immersive ? "text-white" : "text-primary"),
               )}
             >
