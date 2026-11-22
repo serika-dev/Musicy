@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { broadcastDeviceList } from "@/lib/devices";
 import { getAuthSession } from "@/lib/mobile-auth";
 import {
+  getLastState,
   isDeviceLive,
   publish,
   registerLiveDevice,
@@ -63,6 +64,18 @@ export async function GET(request: NextRequest) {
 
       send(`: connected\n\n`);
       send(`event: ready\ndata: ${JSON.stringify({ deviceId })}\n\n`);
+
+      // A device that connects mid-playback has missed every "state" tick
+      // so far; the active device only broadcasts on its own schedule, with
+      // no way for a new listener to ask for a snapshot. Replay the last
+      // known state immediately so this device shows the right track and
+      // controls right away instead of waiting on (or missing) the next
+      // broadcast — unless this connection belongs to the active device
+      // itself, which already knows its own state.
+      const cachedState = getLastState(userId);
+      if (cachedState && cachedState.fromDeviceId !== deviceId) {
+        send(`event: ${cachedState.type}\ndata: ${JSON.stringify(cachedState)}\n\n`);
+      }
 
       const unsubscribe = subscribe(userId, (event: SyncEvent) => {
         send(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);

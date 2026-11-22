@@ -29,16 +29,28 @@ export async function POST(request: NextRequest) {
       .catch(() => {});
   }
 
-  // If this is a claim, flip active flags in the DB
+  // If this is a claim, flip active flags in the DB. Upsert the claiming
+  // device rather than update — a claim can race the claiming device's own
+  // SSE connection (which is what normally creates its Device row), and an
+  // update() on a row that doesn't exist yet throws, silently dropping this
+  // whole publish (including the claim event itself) before anyone hears
+  // about the transfer.
   if (body.type === "claim") {
     await prisma.$transaction([
       prisma.device.updateMany({
         where: { userId },
         data: { isActive: false },
       }),
-      prisma.device.update({
+      prisma.device.upsert({
         where: { id: body.fromDeviceId },
-        data: {
+        create: {
+          id: body.fromDeviceId,
+          userId,
+          name: body.payload.deviceName,
+          isActive: true,
+          lastSeenAt: new Date(),
+        },
+        update: {
           isActive: true,
           name: body.payload.deviceName,
           lastSeenAt: new Date(),

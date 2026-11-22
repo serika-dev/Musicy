@@ -69,6 +69,22 @@ type Subscriber = (event: SyncEvent) => void;
 const subscribers = new Map<string, Set<Subscriber>>();
 
 /**
+ * Last "state" event published per user. The active device only broadcasts
+ * on its own schedule (periodically, or when something changes); a device
+ * that connects mid-playback has no way to ask for the current snapshot, so
+ * without this it shows nothing until the active device's next tick happens
+ * to land after the new connection is live. Replaying this immediately on
+ * connect (see stream/route.ts) closes that gap.
+ */
+const lastState = new Map<string, SyncEvent & { type: "state" }>();
+
+export function getLastState(
+  userId: string,
+): (SyncEvent & { type: "state" }) | undefined {
+  return lastState.get(userId);
+}
+
+/**
  * Live SSE connections per user.
  * deviceId -> open stream count (tabs on same device share an id, so count > 1).
  */
@@ -88,6 +104,16 @@ export function subscribe(userId: string, fn: Subscriber): () => void {
 }
 
 export function publish(userId: string, event: SyncEvent): void {
+  if (event.type === "state") {
+    lastState.set(userId, event);
+  } else if (event.type === "disconnect" && event.fromDeviceId) {
+    // The device that just went away may have been the one whose state
+    // we're holding onto — drop it so new connections don't get handed a
+    // snapshot from a device that's no longer around to keep it fresh.
+    const cached = lastState.get(userId);
+    if (cached?.fromDeviceId === event.fromDeviceId) lastState.delete(userId);
+  }
+
   const set = subscribers.get(userId);
   if (!set) return;
   for (const fn of set) {
