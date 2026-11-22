@@ -33,7 +33,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const audioFile = formData.get('audioFile') as File | null
     const extractMetadata = formData.get('extractMetadata') === 'true' // New option
-    
+    // Lets the UI preview extracted tags (e.g. right after picking a file)
+    // without creating artist/album/track records or uploading to storage.
+    const previewOnly = formData.get('previewOnly') === 'true'
+
     // Optional override fields (will override extracted metadata if provided)
     const titleOverride = formData.get('title') as string
     const artistNameOverride = formData.get('artistName') as string
@@ -123,6 +126,13 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+
+      if (previewOnly) {
+        return NextResponse.json({
+          message: 'Metadata extracted',
+          extractedMetadata: metadata,
+        })
+      }
     }
 
     // Use overrides if provided, fallback to extracted metadata, then to defaults
@@ -153,7 +163,8 @@ export async function POST(request: NextRequest) {
     const artistOverrideId = formData.get('artistOverrideId') as string
     
     let artist: any
-    
+    let isNewArtist = false
+
     if (artistOverrideId) {
       // Use the artist ID provided by admin after conflict resolution
       artist = await prisma.artist.findUnique({
@@ -196,11 +207,13 @@ export async function POST(request: NextRequest) {
           verified: false,
         }
       })
+      isNewArtist = true
       console.log(`✅ Created new artist: ${finalData.artistName}`)
     }
 
     // Resolve Album Artist
     let albumArtist = artist;
+    let isNewAlbumArtist = false
     if (finalData.albumArtistName !== finalData.artistName) {
       const existingAlbumArtist = await prisma.artist.findFirst({
         where: { name: finalData.albumArtistName }
@@ -211,6 +224,7 @@ export async function POST(request: NextRequest) {
         albumArtist = await prisma.artist.create({
           data: { name: finalData.albumArtistName, verified: false }
         });
+        isNewAlbumArtist = true
       }
     }
 
@@ -225,6 +239,7 @@ export async function POST(request: NextRequest) {
     // Create or find album if provided
     let album = null
     let coverImageUrl = null
+    let isNewAlbum = false
 
     if (finalData.albumTitle) {
       // Improved lookup: Case-insensitive and trimmed to avoid duplicates like "Album " vs "Album"
@@ -264,6 +279,7 @@ export async function POST(request: NextRequest) {
         })
         // "Pop, Rock" becomes two tags; the column keeps the primary one.
         await setAlbumTags(prisma, album.id, finalData.genre)
+        isNewAlbum = true
         console.log(`✅ Created new album: ${normalizedTitle}${validReleaseDate ? ` (Year: ${parsedYear})` : ''}`)
       } else {
         console.log(`✅ Using existing album: ${album.title} (ID: ${album.id})`)
@@ -376,8 +392,8 @@ export async function POST(request: NextRequest) {
     console.log(`   R2 key: ${audioKey}`)
     console.log(`   Buffer type: ${Buffer.isBuffer(audioBuffer) ? 'Buffer' : 'Other'}`)
     console.log('📊 Environment:')
-    console.log(`   R2 Endpoint: ${process.env.R2_ENDPOINT}`)
-    console.log(`   R2 Bucket: ${process.env.R2_BUCKET_NAME}`)
+    console.log(`   B2 Endpoint: ${process.env.B2_ENDPOINT}`)
+    console.log(`   B2 Bucket: ${process.env.B2_BUCKET_NAME}`)
     console.log(`   Node.js version: ${process.version}`)
     console.log('🧪 Test script showed this should work perfectly...')
     
@@ -426,7 +442,31 @@ export async function POST(request: NextRequest) {
       await prisma.track.delete({
         where: { id: track.id }
       })
-      
+
+      // Clean up any artist/album records created for this failed upload
+      // so a retry doesn't hit a false "already exists" conflict against
+      // orphaned rows with no tracks.
+      if (isNewAlbum && album) {
+        const remainingAlbumTracks = await prisma.track.count({ where: { albumId: album.id } })
+        if (remainingAlbumTracks === 0) {
+          await prisma.album.delete({ where: { id: album.id } }).catch(() => {})
+        }
+      }
+      if (isNewAlbumArtist && albumArtist.id !== artist.id) {
+        const remainingAlbumArtistTracks = await prisma.track.count({ where: { artistId: albumArtist.id } })
+        const remainingAlbumArtistAlbums = await prisma.album.count({ where: { artistId: albumArtist.id } })
+        if (remainingAlbumArtistTracks === 0 && remainingAlbumArtistAlbums === 0) {
+          await prisma.artist.delete({ where: { id: albumArtist.id } }).catch(() => {})
+        }
+      }
+      if (isNewArtist) {
+        const remainingArtistTracks = await prisma.track.count({ where: { artistId: artist.id } })
+        const remainingArtistAlbums = await prisma.album.count({ where: { artistId: artist.id } })
+        if (remainingArtistTracks === 0 && remainingArtistAlbums === 0) {
+          await prisma.artist.delete({ where: { id: artist.id } }).catch(() => {})
+        }
+      }
+
       // Provide specific guidance based on file size and error
       const isLargeFile = fileSizeMB > 20
       const isNetworkError = uploadError.code === 'ECONNRESET' || 

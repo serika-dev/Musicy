@@ -2,6 +2,7 @@
 
 import {
   Album as AlbumIcon,
+  AlertTriangle,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -748,6 +749,7 @@ export default function AdminPage() {
       const formData = new FormData();
       formData.append("audioFile", file);
       formData.append("extractMetadata", "true");
+      formData.append("previewOnly", "true");
 
       const response = await fetch("/api/admin/upload/track-auto", {
         method: "POST",
@@ -775,34 +777,6 @@ export default function AdminPage() {
           }));
         }
         toast.success(`Metadata extracted: ${metadata.title} by ${metadata.artist}`);
-      } else if (response.status === 409) {
-        const error = await response.json();
-
-        if (error.error === "ARTIST_CONFLICT") {
-          setConflictData(error);
-          setExtractedMetadata(error.extractedMetadata);
-          setSelectedArtistInDialog(error.conflictingArtists?.[0]?.id || "");
-          setShowConflictDialog(true);
-
-          if (error.extractedMetadata) {
-            const metadata = error.extractedMetadata;
-            setUploadFormData((prev) => ({
-              ...prev,
-              title: metadata.title || prev.title,
-              artistName: metadata.artist || prev.artistName,
-              albumTitle: metadata.album || prev.albumTitle,
-              trackNumber: metadata.trackNumber?.toString() || prev.trackNumber,
-              year: metadata.year?.toString() || prev.year,
-              genre: metadata.genre || prev.genre,
-              duration: metadata.duration?.toString() || prev.duration,
-              bitRate: metadata.bitrate?.toString() || prev.bitRate,
-              sampleRate: metadata.sampleRate?.toString() || prev.sampleRate,
-              format: metadata.format || prev.format,
-            }));
-          }
-        } else {
-          toast.error(`Metadata extraction failed: ${error.message}`);
-        }
       } else {
         const error = await response.json();
         toast.error(`Metadata extraction failed: ${error.message}`);
@@ -815,10 +789,9 @@ export default function AdminPage() {
     setIsExtracting(false);
   };
 
-  // Handle Track Upload
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  // Submit the upload, optionally overriding the artist (used when the
+  // admin resolves an ARTIST_CONFLICT via the conflict dialog).
+  const submitUpload = async (overrideArtistId?: string) => {
     if (!uploadFormData.audioFile) {
       toast.error("Audio file is required");
       return;
@@ -838,8 +811,9 @@ export default function AdminPage() {
       formData.append("extractMetadata", "true");
     }
 
-    if (uploadFormData.selectedArtistId) {
-      formData.append("artistOverrideId", uploadFormData.selectedArtistId);
+    const artistOverrideId = overrideArtistId || uploadFormData.selectedArtistId;
+    if (artistOverrideId) {
+      formData.append("artistOverrideId", artistOverrideId);
     }
 
     Object.entries(uploadFormData).forEach(([key, value]) => {
@@ -901,34 +875,40 @@ export default function AdminPage() {
           setExtractedMetadata(null);
           setConflictData(null);
           setSelectedArtistInDialog("");
+          setShowConflictDialog(false);
           setIsUploading(false);
           setUploadProgress("");
           refetchTracks();
         }, 1000);
-      } else if (response.status === 409) {
-        const error = await response.json();
-
-        if (error.error === "ARTIST_CONFLICT") {
-          setConflictData(error);
-          setSelectedArtistInDialog(error.conflictingArtists?.[0]?.id || "");
-          setShowConflictDialog(true);
-          setUploadProgress("Artist name conflict detected - please choose an option");
-        } else {
-          toast.error(`Upload failed: ${error.message}`);
-          setIsUploading(false);
-          setUploadProgress("");
-        }
-      } else {
-        const error = await response.json();
-        toast.error(`Upload failed: ${error.message}`);
+        return;
       }
+
+      const error = await response.json();
+
+      if (response.status === 409 && error.error === "ARTIST_CONFLICT") {
+        setConflictData(error);
+        setSelectedArtistInDialog(error.conflictingArtists?.[0]?.id || "");
+        setShowConflictDialog(true);
+        setUploadProgress("Artist name conflict detected - please choose an option");
+        setIsUploading(false);
+        return;
+      }
+
+      toast.error(`Upload failed: ${error.message}`);
+      setIsUploading(false);
+      setUploadProgress("");
     } catch (error: any) {
       console.error("Upload error:", error);
       toast.error(`Upload failed: ${error.message || "Network error"}`);
-    } finally {
       setIsUploading(false);
       setUploadProgress("");
     }
+  };
+
+  // Handle Track Upload
+  const handleUpload = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitUpload();
   };
 
   // User editing handlers
@@ -2541,6 +2521,79 @@ export default function AdminPage() {
         </TabsContent>
         </div>
       </Tabs>
+
+      {/* ⚠️ ARTIST CONFLICT DIALOG */}
+      <Dialog
+        open={showConflictDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowConflictDialog(false);
+            setUploadProgress("");
+          }
+        }}
+      >
+        <DialogContent className="bg-card border border-border text-white w-[calc(100vw-1.5rem)] max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              Artist Already Exists
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              An artist named &quot;{uploadFormData.artistName}&quot; already exists. Pick the artist
+              this track belongs to, or cancel and rename the artist to create a new, separate one.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            {conflictData?.conflictingArtists?.map((a: any) => (
+              <label
+                key={a.id}
+                className={`flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                  selectedArtistInDialog === a.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-background/60 hover:bg-background"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="conflictingArtist"
+                  value={a.id}
+                  checked={selectedArtistInDialog === a.id}
+                  onChange={() => setSelectedArtistInDialog(a.id)}
+                  className="accent-primary"
+                />
+                <span className="flex-1">
+                  <span className="font-medium text-white">{a.name}</span>
+                  {a.verified && <Check className="inline w-3.5 h-3.5 ml-1 text-primary" />}
+                  {a.bio && (
+                    <span className="block text-xs text-muted-foreground line-clamp-1">{a.bio}</span>
+                  )}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <DialogFooter className="gap-2 border-t border-border pt-3">
+            <Button
+              variant="outline"
+              className="border-border text-white"
+              onClick={() => {
+                setShowConflictDialog(false);
+                setUploadProgress("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-primary hover:bg-primary/90 text-white font-bold"
+              disabled={!selectedArtistInDialog || isUploading}
+              onClick={() => submitUpload(selectedArtistInDialog)}
+            >
+              Use This Artist
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ✏️ USER EDITOR DIALOG */}
       <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
