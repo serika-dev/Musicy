@@ -15,6 +15,12 @@ export const b2Client = new S3Client({
   },
   forcePathStyle: true,
   maxAttempts: 3,
+  // AWS SDK v3 defaults to attaching CRC32 checksum trailers to requests.
+  // B2's S3-compatible API rejects those on multipart uploads (UploadPart /
+  // CompleteMultipartUpload) with a 503 "Service unavailable", so only
+  // compute/validate checksums when the API explicitly requires them.
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
 export const B2_BUCKET = process.env.B2_BUCKET_NAME!;
