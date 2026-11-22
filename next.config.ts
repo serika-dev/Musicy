@@ -30,6 +30,12 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ["music-metadata"],
+  experimental: {
+    // Admin audio uploads accept files up to 100MB; Next.js's default proxy
+    // body cap (10MB) was silently truncating those requests, breaking
+    // FormData parsing in /api/admin/upload/track-auto.
+    proxyClientMaxBodySize: "150mb",
+  },
   async headers() {
     return [
       {
