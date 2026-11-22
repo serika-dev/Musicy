@@ -6,6 +6,9 @@ export type SyncEvent =
       type: "state";
       fromDeviceId: string;
       payload: {
+        // Per-page-load id + counter from the sending device, for ordering.
+        session?: string;
+        seq?: number;
         trackId: string | null;
         // Full track object so controller devices can render now-playing
         // without an extra fetch. Typed loosely here to avoid importing the
@@ -84,6 +87,24 @@ export function getLastState(
   return lastState.get(userId);
 }
 
+function cacheState(userId: string, event: SyncEvent & { type: "state" }) {
+  const cached = lastState.get(userId);
+  const sameSource =
+    cached?.fromDeviceId === event.fromDeviceId &&
+    cached.payload.session === event.payload.session;
+
+  // Don't let a frame that arrived late overwrite a newer snapshot.
+  if (
+    sameSource &&
+    typeof cached.payload.seq === "number" &&
+    typeof event.payload.seq === "number" &&
+    event.payload.seq <= cached.payload.seq
+  ) {
+    return;
+  }
+  lastState.set(userId, event);
+}
+
 /**
  * Live SSE connections per user.
  * deviceId -> open stream count (tabs on same device share an id, so count > 1).
@@ -105,7 +126,7 @@ export function subscribe(userId: string, fn: Subscriber): () => void {
 
 export function publish(userId: string, event: SyncEvent): void {
   if (event.type === "state") {
-    lastState.set(userId, event);
+    cacheState(userId, event);
   } else if (event.type === "disconnect" && event.fromDeviceId) {
     // The device that just went away may have been the one whose state
     // we're holding onto — drop it so new connections don't get handed a

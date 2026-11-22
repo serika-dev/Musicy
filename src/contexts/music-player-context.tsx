@@ -105,7 +105,13 @@ type SyncPublisher = (event: {
   fromDeviceId?: string;
   targetDeviceId?: string;
   payload?: unknown;
-}) => void | Promise<void>;
+}) => unknown;
+
+// State frames carry a window of the queue around the current track rather
+// than the whole thing (playlists can run to hundreds of tracks). Matches the
+// window the playTrack command already sends.
+const QUEUE_WINDOW_BEFORE = 10;
+const QUEUE_WINDOW_SIZE = 80;
 
 // Utility function to shuffle array
 function shuffleArray<T>(array: T[]): T[] {
@@ -169,6 +175,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const pendingClaimRef = useRef<string | null>(null);
   const isActiveRef = useRef<boolean>(false);
   const handlingRemoteRef = useRef<boolean>(false);
+  // Last state frame applied, per sending device.
+  const lastStateFrameRef = useRef(new Map<string, { session?: string; seq: number }>());
   const tabIdRef = useRef<string>("");
   const isLeaderRef = useRef<boolean>(true);
   const syncPublishRef = useRef<SyncPublisher>(() => {});
@@ -677,6 +685,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       ) {
         // We are a controller - mirror the active device's state for display
         const p = event.payload as {
+          session?: string;
+          seq?: number;
           trackId: string | null;
           currentTrack: Track | null;
           isPlaying: boolean;
@@ -688,6 +698,18 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
           repeatMode?: "off" | "track" | "playlist";
           activeDeviceId: string;
         };
+
+        // Drop frames older than one already applied from the same page load
+        // of that device; a stale frame would flip us back to the old track.
+        if (typeof p.seq === "number" && event.fromDeviceId) {
+          const last = lastStateFrameRef.current.get(event.fromDeviceId);
+          if (last && last.session === p.session && p.seq <= last.seq) return;
+          lastStateFrameRef.current.set(event.fromDeviceId, {
+            session: p.session,
+            seq: p.seq,
+          });
+        }
+
         handlingRemoteRef.current = true;
         setActiveDeviceId(p.activeDeviceId);
         setIsPlaying(p.isPlaying);
@@ -907,27 +929,43 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   // Broadcast our state periodically while active
   const currentTrackRef = useRef<Track | null>(null);
   currentTrackRef.current = currentTrack;
+  // Per-page-load id + counter so controllers can drop stale or out-of-order
+  // frames (and accept a fresh sequence after this page reloads).
+  const stateSessionRef = useRef(Math.random().toString(36).slice(2, 10));
+  const stateSeqRef = useRef(0);
+
+  const publishState = useCallback(() => {
+    if (!deviceId) return Promise.resolve(false);
+    const start = Math.max(0, currentIndex - QUEUE_WINDOW_BEFORE);
+    stateSeqRef.current += 1;
+    return syncPublish({
+      type: "state",
+      payload: {
+        session: stateSessionRef.current,
+        seq: stateSeqRef.current,
+        trackId: currentTrackRef.current?.id ?? null,
+        currentTrack: currentTrackRef.current,
+        isPlaying,
+        currentTime: currentTimeRef.current,
+        duration,
+        queue: queue.slice(start, start + QUEUE_WINDOW_SIZE),
+        currentIndex: currentIndex - start,
+        shuffle: isShuffle,
+        repeatMode,
+        activeDeviceId: deviceId,
+      },
+    });
+  }, [deviceId, currentIndex, queue, isPlaying, duration, isShuffle, repeatMode, syncPublish]);
+
   useEffect(() => {
     // Only the tab that actually outputs audio speaks for this device.
     if (!isActiveDevice || !deviceId || !isLeader) return;
     const broadcast = () => {
-      syncPublish({
-        type: "state",
-        payload: {
-          trackId: currentTrackRef.current?.id ?? null,
-          currentTrack: currentTrackRef.current,
-          isPlaying,
-          currentTime,
-          duration,
-          queue,
-          currentIndex,
-          shuffle: isShuffle,
-          repeatMode,
-          activeDeviceId: deviceId,
-        },
-      });
+      void publishState();
     };
-    // Immediate + interval while playing
+    // Immediately on any meaningful change (track, play state, queue...),
+    // then on an interval to keep controllers' seek bars in step. Position
+    // comes from a ref so playback progress alone doesn't re-run this.
     broadcast();
     const interval = window.setInterval(broadcast, isPlaying ? 1000 : 3000);
     // Broadcast immediately when tab becomes visible again (e.g. after
@@ -941,19 +979,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [
-    isActiveDevice,
-    isLeader,
-    deviceId,
-    isPlaying,
-    currentTime,
-    duration,
-    queue,
-    currentIndex,
-    isShuffle,
-    repeatMode,
-    syncPublish,
-  ]);
+  }, [isActiveDevice, isLeader, deviceId, isPlaying, publishState]);
 
   const claimPlayback = useCallback(() => {
     if (!deviceId) return;
@@ -995,27 +1021,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   }, [isPlaying, handleAutoplayResolved, handleAutoplayBlock]);
 
   const transferPlayback = useCallback(
-    (toDeviceId: string) => {
+    async (toDeviceId: string) => {
       if (!deviceId) return;
-      // Send one final state broadcast so the target device has the latest
-      // position before it claims playback. Without this, the target might
-      // use a stale currentTime from up to 2s ago.
+      // Send one final state frame so the target has the latest position and
+      // queue, and wait for it so the claim below can't overtake it.
       if (isActiveDevice) {
-        syncPublish({
-          type: "state",
-          payload: {
-            trackId: currentTrackRef.current?.id ?? null,
-            currentTrack: currentTrackRef.current,
-            isPlaying,
-            currentTime,
-            duration,
-            queue,
-            currentIndex,
-            shuffle: isShuffle,
-            repeatMode,
-            activeDeviceId: deviceId,
-          },
-        });
+        await publishState();
       }
       // Directly tell the target device to claim playback
       syncPublish({
@@ -1024,18 +1035,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         payload: { action: "claim" },
       });
     },
-    [
-      deviceId,
-      syncPublish,
-      isActiveDevice,
-      isPlaying,
-      currentTime,
-      duration,
-      queue,
-      currentIndex,
-      isShuffle,
-      repeatMode,
-    ],
+    [deviceId, syncPublish, isActiveDevice, publishState],
   );
 
   // React to a dedicated "transfer" command (handled above could be extended)

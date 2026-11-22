@@ -50,6 +50,13 @@ export type SyncEventHandler = (event: {
   payload?: unknown;
 }) => void;
 
+export interface SyncPublishEvent {
+  type: string;
+  fromDeviceId?: string;
+  targetDeviceId?: string;
+  payload?: unknown;
+}
+
 /**
  * Low-level SSE connection. Returns helpers for publishing and a list of
  * currently-registered devices.
@@ -200,40 +207,85 @@ export function useDeviceSync(onEvent?: SyncEventHandler) {
     };
   }, [status, deviceId]);
 
+  // State frames are sent one at a time: while one is in flight, a newer
+  // frame replaces any queued one. Overlapping POSTs could land out of order
+  // (flipping controllers back to the previous track) and pile up.
+  const stateInFlightRef = useRef(false);
+  const pendingStateRef = useRef<{
+    event: SyncPublishEvent;
+    resolvers: Array<(ok: boolean) => void>;
+  } | null>(null);
+
   const publish = useCallback(
-    async (event: {
-      type: string;
-      fromDeviceId?: string;
-      targetDeviceId?: string;
-      payload?: unknown;
-    }) => {
+    async (event: SyncPublishEvent): Promise<boolean> => {
       // Only the leader tab sends state to server (prevents duplicate HTTP requests)
       // Non-leader tabs still process events locally but don't send to server
       // All tabs receive state via SSE (server distributes to all connections)
-      if (!isLeader && event.type === "state") return;
+      if (!isLeader && event.type === "state") return false;
 
-      const body = JSON.stringify({ fromDeviceId: deviceId, ...event });
-      const send = () =>
+      const post = (body: string, keepalive: boolean) =>
         fetch("/api/sync/publish", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body,
-          keepalive: true,
+          keepalive,
         }).catch(() => null);
 
-      let response = await send();
+      if (event.type === "state") {
+        return new Promise<boolean>((resolve) => {
+          if (stateInFlightRef.current) {
+            const replaced = pendingStateRef.current;
+            pendingStateRef.current = {
+              event,
+              resolvers: [...(replaced?.resolvers ?? []), resolve],
+            };
+            return;
+          }
 
-      // State frames are superseded by the next tick, so a dropped one is
-      // harmless. Commands are one-shot instructions — a lost "pause" leaves
-      // the other device playing, so those get one retry.
-      if (event.type !== "state" && (!response || !response.ok)) {
+          const run = async (
+            next: SyncPublishEvent,
+            resolvers: Array<(ok: boolean) => void>,
+          ) => {
+            stateInFlightRef.current = true;
+            // Never keepalive: browsers cap in-flight keepalive bodies at 64KB
+            // total and reject the rest, and state frames carry a queue window.
+            const response = await post(
+              JSON.stringify({ fromDeviceId: deviceId, ...next }),
+              false,
+            );
+            const ok = !!response?.ok;
+            for (const r of resolvers) r(ok);
+
+            const queued = pendingStateRef.current;
+            pendingStateRef.current = null;
+            if (queued) {
+              void run(queued.event, queued.resolvers);
+            } else {
+              stateInFlightRef.current = false;
+            }
+          };
+          void run(event, [resolve]);
+        });
+      }
+
+      const body = JSON.stringify({ fromDeviceId: deviceId, ...event });
+      // keepalive lets a command sent as the tab closes still land, but only
+      // fits small bodies (a playTrack command can carry a large queue).
+      const keepalive = new TextEncoder().encode(body).length < 60_000;
+
+      let response = await post(body, keepalive);
+
+      // Commands are one-shot instructions — a lost "pause" leaves the other
+      // device playing, so those get one retry.
+      if (!response || !response.ok) {
         await new Promise((r) => setTimeout(r, 400));
-        response = await send();
+        response = await post(body, keepalive);
       }
 
       if (response && !response.ok) {
         console.warn("sync publish returned non-ok status:", response.status);
       }
+      return !!response?.ok;
     },
     [deviceId, isLeader],
   );
