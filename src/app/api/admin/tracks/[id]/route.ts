@@ -8,6 +8,37 @@ interface RouteContext {
   params: Promise<{ id: string }>
 }
 
+// Lightweight status check, used by the admin upload UI to poll rendition
+// progress for a track right after publishing it.
+export async function GET(_request: NextRequest, { params }: RouteContext) {
+  const session = await getServerSession(authOptions)
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  }
+
+  const adminUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true }
+  })
+
+  if (!adminUser || adminUser.role !== 'ADMIN') {
+    return NextResponse.json({ message: 'Forbidden - Admin access required' }, { status: 403 })
+  }
+
+  const { id } = await params
+  const track = await prisma.track.findUnique({
+    where: { id },
+    select: { id: true, title: true, renditionStatus: true },
+  })
+
+  if (!track) {
+    return NextResponse.json({ message: 'Track not found' }, { status: 404 })
+  }
+
+  return NextResponse.json(track)
+}
+
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
     const session = await getServerSession(authOptions)

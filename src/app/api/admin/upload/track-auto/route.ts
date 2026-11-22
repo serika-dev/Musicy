@@ -70,15 +70,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Read the upload once and reuse the same buffer for metadata
+    // extraction and the storage upload, instead of re-reading the file
+    // (which can be ~100MB) from the request a second time.
+    const audioBuffer = Buffer.from(await audioFile.arrayBuffer())
+
     let metadata: any = {}
     let extractedCoverArt: Buffer | null = null
 
     if (extractMetadata) {
       try {
         console.log('🎵 Extracting metadata from audio file...')
-        const audioBytes = await audioFile.arrayBuffer()
-        const audioBuffer = Buffer.from(audioBytes)
-        
+
         const fileMetadata = await musicMetadata.parseBuffer(audioBuffer, audioFile.type)
         
         const rawArtistStr = fileMetadata.common.artist || 'Unknown Artist'
@@ -379,8 +382,6 @@ export async function POST(request: NextRequest) {
 
     // Now upload audio file using the actual track ID
     await setTrackTags(prisma, track.id, finalData.genre)
-    const audioBytes = await audioFile.arrayBuffer()
-    const audioBuffer = Buffer.from(audioBytes)
     const audioFileExtension = audioFile.name.split('.').pop() || 'flac'
     const audioKey = generateAudioFileKey(artist.id, track.id, audioFileExtension)
     

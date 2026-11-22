@@ -70,6 +70,35 @@ export async function uploadFileToB2(
   );
 }
 
+// How many multipart parts to upload to B2 at once. Uploading parts
+// sequentially left large-file uploads bottlenecked on a single
+// connection's throughput; a handful of parts in flight at a time keeps
+// retries/backpressure manageable while using far more of the available
+// bandwidth.
+const PART_UPLOAD_CONCURRENCY = 4;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    for (;;) {
+      const current = nextIndex++;
+      if (current >= items.length) return;
+      results[current] = await fn(items[current], current);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return results;
+}
+
 /**
  * Upload large files to B2 using multipart
  */
@@ -83,7 +112,6 @@ export async function uploadLargeFileToB2(
     CreateMultipartUploadCommand,
     UploadPartCommand,
     CompleteMultipartUploadCommand,
-    AbortMultipartUploadCommand,
   } = await import("@aws-sdk/client-s3");
 
   let UploadId: string | undefined;
@@ -106,20 +134,23 @@ export async function uploadLargeFileToB2(
       chunks.push(buffer.slice(i, i + chunkSize));
     }
 
-    const parts = [];
-    for (let index = 0; index < chunks.length; index++) {
-      const partNumber = index + 1;
-      const result = await b2Client.send(
-        new UploadPartCommand({
-          Bucket: B2_BUCKET,
-          Key: key,
-          PartNumber: partNumber,
-          UploadId,
-          Body: chunks[index],
-        }),
-      );
-      parts.push({ ETag: result.ETag, PartNumber: partNumber });
-    }
+    const parts = await mapWithConcurrency(
+      chunks,
+      PART_UPLOAD_CONCURRENCY,
+      async (chunk, index) => {
+        const partNumber = index + 1;
+        const result = await b2Client.send(
+          new UploadPartCommand({
+            Bucket: B2_BUCKET,
+            Key: key,
+            PartNumber: partNumber,
+            UploadId,
+            Body: chunk,
+          }),
+        );
+        return { ETag: result.ETag, PartNumber: partNumber };
+      },
+    );
 
     await b2Client.send(
       new CompleteMultipartUploadCommand({

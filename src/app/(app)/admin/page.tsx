@@ -311,6 +311,7 @@ export default function AdminPage() {
   const [searchUsers, setSearchUsers] = useState("");
   const [searchTracks, setSearchTracks] = useState("");
   const [trackRenditionFilter, setTrackRenditionFilter] = useState<'all' | 'ready' | 'missing' | 'failed' | 'processing'>('all');
+  const [recentUpload, setRecentUpload] = useState<{ trackId: string; title: string; status: string } | null>(null);
   const [searchArtists, setSearchArtists] = useState("");
   const [artistFilter, setArtistFilter] = useState<'all' | 'collab' | 'solo'>('all');
   const [searchCollabs, setSearchCollabs] = useState("");
@@ -672,6 +673,32 @@ export default function AdminPage() {
     return () => { if (interval) clearInterval(interval); };
   }, [activeTab]);
 
+  // Poll rendition status for a just-uploaded track so the upload form can
+  // show when streaming-quality tiers finish transcoding, instead of
+  // leaving the admin with no feedback once the publish response returns.
+  useEffect(() => {
+    if (!recentUpload || recentUpload.status === "ready" || recentUpload.status === "failed") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/tracks/${recentUpload.trackId}`);
+        if (res.ok) {
+          const track = await res.json();
+          setRecentUpload((prev) => prev && prev.trackId === track.id
+            ? { ...prev, status: track.renditionStatus || "pending" }
+            : prev);
+          if (track.renditionStatus === "ready" || track.renditionStatus === "failed") {
+            refetchTracks();
+          }
+        }
+      } catch (e) {
+        console.error("Error polling rendition status:", e);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [recentUpload, refetchTracks]);
+
   // Load system settings on mount
   useEffect(() => {
     const loadSettings = async () => {
@@ -878,6 +905,11 @@ export default function AdminPage() {
           setShowConflictDialog(false);
           setIsUploading(false);
           setUploadProgress("");
+          setRecentUpload({
+            trackId: result.track.id,
+            title: result.track.title,
+            status: result.track.renditionStatus || "pending",
+          });
           refetchTracks();
         }, 1000);
         return;
@@ -2493,6 +2525,26 @@ export default function AdminPage() {
                   {isUploading ? (uploadProgress || "Uploading...") : "Publish Track to Platform"}
                 </Button>
               </form>
+
+              {recentUpload && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-border bg-background/60 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileMusic className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-white font-medium">{recentUpload.title}</span>
+                    <span className="text-muted-foreground">— streaming renditions</span>
+                  </div>
+                  {recentUpload.status === "ready" ? (
+                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[10px] font-bold">Ready</Badge>
+                  ) : recentUpload.status === "failed" ? (
+                    <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-[10px] font-bold">Failed</Badge>
+                  ) : (
+                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] font-bold flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      {recentUpload.status === "processing" ? "Processing" : "Pending"}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
