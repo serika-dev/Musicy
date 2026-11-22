@@ -7,8 +7,8 @@ import { join } from "node:path";
 /**
  * Thin ffmpeg / ffprobe wrappers for generating streaming quality renditions.
  *
- * Both binaries must be available on PATH (they are on the app host, and
- * `ffmpeg` is added to nixpacks for production builds).
+ * Both binaries must be available on PATH (`ffmpeg` is added as a Railpack
+ * deploy apt package in railpack.json for production builds).
  */
 
 const FFMPEG_BIN = process.env.FFMPEG_PATH || "ffmpeg";
